@@ -2,6 +2,9 @@ export type SimulationSpeed = 0 | 1 | 2 | 4 | 8
 export type VillageEra = 'Mầm lửa' | 'Nhà gỗ' | 'Thợ đá'
 export type EventTone = 'calm' | 'good' | 'warning' | 'danger'
 
+/** Prevents imported or long-running sessions from leaving safe integer territory. */
+export const MAX_SIMULATION_TICK = 1_000_000
+
 export interface VillageSimulation {
   id: string
   name: string
@@ -35,6 +38,8 @@ export interface SimulationState {
   speed: SimulationSpeed
   paused: boolean
   villages: VillageSimulation[]
+  /** Monotonic sequence makes simultaneous, deterministic events safe React keys. */
+  eventSequence: number
   activeStorm?: StormState
   events: SimulationEvent[]
 }

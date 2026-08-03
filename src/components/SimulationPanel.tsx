@@ -49,6 +49,13 @@ export function SimulationPanel({
             <div><span>Thời đại</span><strong>{village.era}</strong></div>
           </div>
         ) : <p className="muted-copy">Chưa có cộng đồng nào trên bản đồ này.</p>}
+        {village ? (
+          <div className="council-stats" aria-label="Nghiên cứu, phòng vệ và lãnh thổ">
+            <span>Nghiên cứu <strong>{Math.round(village.research)}</strong><small>Tăng thu hoạch</small></span>
+            <span>Phòng vệ <strong>{Math.round(village.military)}</strong><small>Giảm thiệt hại bão</small></span>
+            <span>Lãnh thổ <strong>{village.territory}</strong><small>Mở rộng sản lượng</small></span>
+          </div>
+        ) : null}
         <p className="decision-line">{village?.lastDecision ?? 'Chờ một câu chuyện bắt đầu.'}</p>
 
         <div className="time-controls" aria-label="Điều khiển thời gian">

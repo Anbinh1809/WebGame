@@ -181,6 +181,13 @@ export function getTile(world: World, tileIndex: number): Tile | undefined {
 }
 
 export function refreshTileBiome(tile: Tile, config: WorldConfig): Tile {
-  const withWaterRules = tile.height <= getWaterLevel(config) ? { ...tile, forest: false, resources: 0 } : tile
-  return { ...withWaterRules, biome: classifyBiome(withWaterRules, config) }
+  const waterLevel = getWaterLevel(config)
+  const supportsForest = tile.height > waterLevel + 0.1
+    && tile.height < 0.72
+    && tile.moisture > 0.42
+    && tile.temperature > 0.18
+  const withEcologyRules = tile.height <= waterLevel
+    ? { ...tile, forest: false, resources: 0 }
+    : { ...tile, forest: tile.forest && supportsForest }
+  return { ...withEcologyRules, biome: classifyBiome(withEcologyRules, config) }
 }

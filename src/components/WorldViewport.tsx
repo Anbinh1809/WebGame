@@ -4,6 +4,7 @@ import { WorldRenderer } from '../renderer/WorldRenderer'
 import type { HoveredTile, RenderStats } from '../renderer/WorldRenderer'
 import type { SimulationState } from '../simulation/types'
 import type { HeatmapMode, ToolId, World } from '../world/types'
+import type { QualityProfile } from '../renderer/quality'
 
 interface WorldViewportProps {
   world: World
@@ -11,10 +12,12 @@ interface WorldViewportProps {
   tool: ToolId
   heatmap: HeatmapMode
   photoSignal: number
+  quality: QualityProfile
   onTileHover: (tile: HoveredTile | undefined) => void
   onTileActivate: (tileIndex: number) => void
   onStats: (stats: RenderStats) => void
   onPhotoReady: (dataUrl: string) => void
+  onPhotoError: (message: string) => void
 }
 
 export function WorldViewport({
@@ -23,21 +26,31 @@ export function WorldViewport({
   tool,
   heatmap,
   photoSignal,
+  quality,
   onTileHover,
   onTileActivate,
   onStats,
   onPhotoReady,
+  onPhotoError,
 }: WorldViewportProps): JSX.Element {
   const hostRef = useRef<HTMLDivElement>(null)
   const rendererRef = useRef<WorldRenderer | null>(null)
-  const callbacksRef = useRef({ onTileHover, onTileActivate, onStats, onPhotoReady })
+  const callbacksRef = useRef({ onTileHover, onTileActivate, onStats, onPhotoReady, onPhotoError })
   const worldRef = useRef(world)
   const simulationRef = useRef(simulation)
+  const qualityRef = useRef(quality)
   const [error, setError] = useState<string | null>(null)
+  const [attempt, setAttempt] = useState(0)
 
   useEffect(() => {
-    callbacksRef.current = { onTileHover, onTileActivate, onStats, onPhotoReady }
-  }, [onPhotoReady, onStats, onTileActivate, onTileHover])
+    callbacksRef.current = { onTileHover, onTileActivate, onStats, onPhotoReady, onPhotoError }
+  }, [onPhotoError, onPhotoReady, onStats, onTileActivate, onTileHover])
+
+  useEffect(() => {
+    worldRef.current = world
+    simulationRef.current = simulation
+    qualityRef.current = quality
+  }, [quality, simulation, world])
 
   useEffect(() => {
     const host = hostRef.current
@@ -48,7 +61,8 @@ export function WorldViewport({
         onTileHover: (tile) => callbacksRef.current.onTileHover(tile),
         onTileActivate: (tileIndex) => callbacksRef.current.onTileActivate(tileIndex),
         onStats: (stats) => callbacksRef.current.onStats(stats),
-      })
+        onWebGlError: (message) => setError(message),
+      }, qualityRef.current)
       rendererRef.current = renderer
 
       return () => {
@@ -60,7 +74,7 @@ export function WorldViewport({
       const timeout = window.setTimeout(() => setError(message), 0)
       return () => window.clearTimeout(timeout)
     }
-  }, [])
+  }, [attempt])
 
   useEffect(() => {
     rendererRef.current?.updateWorld(world)
@@ -79,10 +93,21 @@ export function WorldViewport({
   }, [heatmap])
 
   useEffect(() => {
+    rendererRef.current?.setQuality(quality)
+  }, [quality])
+
+  useEffect(() => {
     if (photoSignal === 0) return
     const renderer = rendererRef.current
-    if (!renderer) return
-    callbacksRef.current.onPhotoReady(renderer.capturePhoto())
+    if (!renderer) {
+      callbacksRef.current.onPhotoError('Bản đồ 3D chưa sẵn sàng để chụp ảnh. Hãy thử lại sau khi đồ họa được khôi phục.')
+      return
+    }
+    try {
+      callbacksRef.current.onPhotoReady(renderer.capturePhoto())
+    } catch {
+      callbacksRef.current.onPhotoError('Không thể chụp PNG ở độ phân giải hiện tại. Hãy chọn chất lượng thấp hơn rồi thử lại.')
+    }
   }, [photoSignal])
 
   return (
@@ -93,6 +118,7 @@ export function WorldViewport({
           <span className="eyebrow">Chế độ dự phòng</span>
           <strong>Bản đồ 3D không khả dụng</strong>
           <p>{error} Bạn vẫn có thể thay đổi seed và xem trạng thái mô phỏng.</p>
+          <button type="button" className="secondary-button" onClick={() => { setError(null); setAttempt((value) => value + 1) }}>Thử lại đồ họa 3D</button>
         </div>
       ) : null}
       <div className="viewport-vignette" aria-hidden="true" />

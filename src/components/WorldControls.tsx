@@ -9,6 +9,11 @@ interface WorldControlsProps {
   onGenerate: () => void
   onRandomWorld: () => void
   onCopySeed: () => void
+  onSave: () => void
+  onLoad: () => void
+  onReset: () => void
+  onExport: () => void
+  onImport: () => void
 }
 
 export function WorldControls({
@@ -18,6 +23,11 @@ export function WorldControls({
   onGenerate,
   onRandomWorld,
   onCopySeed,
+  onSave,
+  onLoad,
+  onReset,
+  onExport,
+  onImport,
 }: WorldControlsProps): JSX.Element {
   const updateText = (event: ChangeEvent<HTMLInputElement>): void => {
     onDraftChange({ ...draft, seed: event.target.value })
@@ -84,7 +94,14 @@ export function WorldControls({
 
         <div className="form-actions">
           <button type="submit" className="primary-button">Tái tạo</button>
-          <button type="button" className="secondary-button" onClick={onRandomWorld}>Seed mới</button>
+          <button type="button" className="secondary-button" onClick={onRandomWorld}>Thế giới mới</button>
+        </div>
+        <div className="save-actions" aria-label="Lưu và nạp thế giới cục bộ">
+          <button type="button" className="secondary-button" onClick={onSave}>Lưu</button>
+          <button type="button" className="secondary-button" onClick={onLoad}>Nạp</button>
+          <button type="button" className="secondary-button" onClick={onReset}>Đặt lại</button>
+          <button type="button" className="secondary-button" onClick={onExport}>Xuất JSON</button>
+          <button type="button" className="secondary-button" onClick={onImport}>Nhập JSON</button>
         </div>
       </form>
     </section>

@@ -45,6 +45,9 @@ export interface TileMutationCommand {
   kind: 'tile'
   label: string
   tileIndex: number
+  worldSignature: string
+  worldRevisionBefore: number
+  worldRevisionAfter: number
   before: Tile
   after: Tile
 }

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { applyTerrainTool, revertTileCommand } from './commands'
-import { generateWorld } from './generator'
+import { generateWorld, refreshTileBiome } from './generator'
 import type { WorldConfig } from './types'
 
 const config: WorldConfig = {
@@ -44,6 +44,17 @@ describe('world generation', () => {
     if (!result) return
 
     expect(result.world.tiles[target ?? 0]?.height).toBeGreaterThan(world.tiles[target ?? 0]?.height ?? 0)
-    expect(revertTileCommand(result.world, result.command).tiles).toEqual(world.tiles)
+    expect(revertTileCommand(result.world, result.command)?.tiles).toEqual(world.tiles)
+  })
+
+  it('protects settlement ground and removes trees from unsuitable high terrain', () => {
+    const world = generateWorld(config)
+    const villageTile = world.villages[0]?.tileIndex ?? 0
+    expect(applyTerrainTool(world, villageTile, 'water', 'Gọi nước')).toBeUndefined()
+
+    const forest = world.tiles.find((tile) => tile.forest)
+    expect(forest).toBeDefined()
+    if (!forest) return
+    expect(refreshTileBiome({ ...forest, height: 0.9, forest: true }, world.config).forest).toBe(false)
   })
 })

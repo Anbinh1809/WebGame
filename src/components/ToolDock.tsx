@@ -8,6 +8,7 @@ interface ToolDockProps {
   onRedo: () => void
   canUndo: boolean
   canRedo: boolean
+  onGlobalStorm: () => void
 }
 
 const TOOL_OPTIONS: Array<{ id: ToolId; key: string; symbol: string; label: string; hint: string }> = [
@@ -21,7 +22,7 @@ const TOOL_OPTIONS: Array<{ id: ToolId; key: string; symbol: string; label: stri
   { id: 'storm', key: '8', symbol: 'ϟ', label: 'Mưa lớn', hint: 'Gọi một đợt thiên tai' },
 ]
 
-export function ToolDock({ activeTool, onToolChange, onUndo, onRedo, canUndo, canRedo }: ToolDockProps): JSX.Element {
+export function ToolDock({ activeTool, onToolChange, onUndo, onRedo, canUndo, canRedo, onGlobalStorm }: ToolDockProps): JSX.Element {
   return (
     <section className="tool-dock panel-surface" aria-labelledby="tools-heading">
       <div className="panel-heading compact-heading">
@@ -54,6 +55,12 @@ export function ToolDock({ activeTool, onToolChange, onUndo, onRedo, canUndo, ca
           </button>
         ))}
       </div>
+      {activeTool === 'storm' ? (
+        <div className="global-action">
+          <span>Mưa lớn tác động toàn cầu, không phụ thuộc vào ô bạn bấm.</span>
+          <button type="button" className="primary-button" onClick={onGlobalStorm}>Gọi mưa toàn cõi</button>
+        </div>
+      ) : null}
     </section>
   )
 }
