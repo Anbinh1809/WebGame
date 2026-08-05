@@ -1,8 +1,10 @@
 import { hash2d, seedToUint32 } from '../world/prng'
-import type { Tile, VillageSite, World } from '../world/types'
+import type { Tile, ToolId, VillageSite, World } from '../world/types'
 import { nearestVillage, tileDistance } from './metrics'
-import { MAX_SIMULATION_TICK } from './types'
+import { createWorldObjectives, refreshWorldObjectives } from './objectives'
+import { EMPTY_GOD_TOOL_USES, MAX_SIMULATION_TICK } from './types'
 import type {
+  CouncilChoiceId,
   SimulationEvent,
   SimulationSpeed,
   SimulationState,
@@ -48,9 +50,43 @@ function appendEvent(state: SimulationState, input: EventInput): SimulationState
 }
 
 function eraFor(village: VillageSimulation): VillageEra {
-  if (village.research >= 44 && village.homes >= 7) return 'Thợ đá'
+  if (village.population >= 60 && village.food >= village.population * 1.7 && village.happiness >= 67 && village.resilience >= 60) return 'Thành đá'
+  if (village.population >= 34 && village.food >= village.population * 1.55 && village.happiness >= 58 && village.resilience >= 48) return 'Nông trang'
+  if (village.research >= 30 && village.homes >= 6 && village.population >= 18) return 'Thợ đá'
   if (village.homes >= 4) return 'Nhà gỗ'
   return 'Mầm lửa'
+}
+
+interface SettlementEcology {
+  fertility: number
+  water: number
+  forest: number
+}
+
+/**
+ * Reads nearby, actual terrain rather than a global world average. Terrain
+ * tools therefore have observable consequences for settlement survival.
+ */
+function settlementEcology(world: World, tileIndex: number): SettlementEcology {
+  const home = world.tiles[tileIndex]
+  if (!home) return { fertility: 0.2, water: 0.2, forest: 0 }
+  let weightTotal = 0
+  let fertility = 0
+  let water = 0
+  let forest = 0
+
+  for (const tile of world.tiles) {
+    const distance = Math.abs(tile.x - home.x) + Math.abs(tile.z - home.z)
+    if (distance > 3) continue
+    const weight = 1 - distance / 4
+    weightTotal += weight
+    fertility += weight * (tile.soil === 'màu mỡ' ? 1 : tile.soil === 'thường' ? 0.48 : 0.08)
+    water += weight * (tile.biome === 'biển' || tile.moisture > 0.72 ? 1 : tile.moisture * 0.52)
+    forest += weight * (tile.forest ? 1 : 0)
+  }
+
+  const divisor = Math.max(weightTotal, 1)
+  return { fertility: fertility / divisor, water: water / divisor, forest: forest / divisor }
 }
 
 function localizedResourceScore(world: World, tileIndex: number): number {
@@ -77,13 +113,28 @@ function updateVillage(
   seed: number,
 ): VillageSimulation {
   const localResources = localizedResourceScore(world, village.tileIndex)
+  const ecology = settlementEcology(world, village.tileIndex)
   const seasonalModifier = 0.9 + Math.sin(tick / 9) * 0.16
   const workers = Math.max(2, Math.floor(village.population * 0.57))
   const researchBonus = clamp(village.research / 320, 0, 0.18)
   const territoryBonus = clamp(village.territory / 90, 0, 0.12)
-  const harvest = workers * (0.14 + localResources * 0.17 + researchBonus + territoryBonus) * seasonalModifier
+  const harvest = workers * (
+    0.1
+    + localResources * 0.13
+    + ecology.fertility * 0.14
+    + ecology.water * 0.08
+    + ecology.forest * 0.035
+    + researchBonus
+    + territoryBonus
+  ) * seasonalModifier
   const stormDefense = clamp(village.military / 65, 0, 0.42)
-  const stormPenalty = storm ? storm.intensity * 0.7 * (1 - stormDefense) : 0
+  const resilienceTarget = clamp(24 + ecology.fertility * 22 + ecology.water * 18 + ecology.forest * 17 + village.military * 0.23, 0, 100)
+  const resilience = clamp(
+    village.resilience + (resilienceTarget - village.resilience) * 0.075 + (storm ? -storm.intensity * 0.45 : 0.2),
+    0,
+    100,
+  )
+  const stormPenalty = storm ? storm.intensity * 0.7 * (1 - stormDefense) * (1 - resilience / 180) : 0
   const consumption = village.population * 0.11 + stormPenalty
   let food = clamp(village.food + harvest - consumption, 0, 999)
   let happiness = clamp(village.happiness + (food > village.population * 2 ? 0.45 : -0.8) - stormPenalty * 0.38, 0, 100)
@@ -129,6 +180,7 @@ function updateVillage(
     research,
     military,
     territory,
+    resilience,
     era: village.era,
     lastDecision,
   }
@@ -163,6 +215,7 @@ function villageFromSite(site: VillageSite, index: number): VillageSimulation {
     research: 4,
     military: 2,
     territory: 3,
+    resilience: 42,
     era: 'Mầm lửa',
     lastDecision: 'Chọn nơi dựng lửa đầu tiên',
   }
@@ -180,6 +233,8 @@ export function createSimulation(world: World): SimulationState {
     villages: world.villages.map(villageFromSite),
     eventSequence: 0,
     events: [],
+    objectives: createWorldObjectives(world),
+    godToolUses: { ...EMPTY_GOD_TOOL_USES },
   }
   return appendEvent(state, {
     kind: 'first-dawn',
@@ -213,13 +268,26 @@ export function advanceSimulation(state: SimulationState, world: World, ticks = 
       villages,
       eventSequence: next.eventSequence,
       events: next.events,
+      objectives: next.objectives,
+      godToolUses: next.godToolUses,
       ...(activeStorm ? { activeStorm } : {}),
+      ...(next.pendingCouncil ? { pendingCouncil: next.pendingCouncil } : {}),
     }
     next = storm && storm.remainingTicks === 1
       ? appendEvent(steppedState, { kind: 'storm-cleared', title: 'Mây tan', detail: 'Mưa lớn rút đi; kho lương cần thời gian để hồi phục.', tone: 'calm' })
       : steppedState
     const periodicEvent = createPeriodicEvent(next, seed)
     if (periodicEvent) next = appendEvent(next, periodicEvent)
+    const objectiveUpdate = refreshWorldObjectives(next.objectives, world, next.villages)
+    next = { ...next, objectives: objectiveUpdate.objectives }
+    for (const objective of objectiveUpdate.newlyCompleted) {
+      next = appendEvent(next, {
+        kind: 'objective-complete',
+        title: 'Cột mốc: ' + objective.title,
+        detail: objective.detail,
+        tone: 'good',
+      })
+    }
   }
 
   return next.tick >= MAX_SIMULATION_TICK && (!next.paused || next.speed !== 0)
@@ -290,7 +358,87 @@ export function spawnSettlersAt(state: SimulationState, world: World, tileIndex:
 export function triggerStorm(state: SimulationState): SimulationState {
   const location = state.villages.length === 0 ? 'toàn cõi Aetheria' : 'toàn bộ các cộng đồng'
   return appendEvent(
-    { ...state, activeStorm: { remainingTicks: 18, intensity: 1.6 } },
+    {
+      ...state,
+      activeStorm: { remainingTicks: 18, intensity: 1.6 },
+      ...(state.pendingCouncil ? {} : {
+        pendingCouncil: {
+          id: 'council-storm-' + state.tick + '-' + state.eventSequence,
+          issuedTick: state.tick,
+          title: 'Mây đen ở chân trời',
+          detail: 'Chọn một chuẩn bị có đánh đổi trước khi cơn mưa lớn quét qua các làng.',
+        },
+      }),
+    },
     { kind: 'global-storm', title: 'Mưa lớn toàn cõi', detail: `Mây đen phủ ${location}; mùa màng và hạnh phúc đang chịu thử thách.`, tone: 'danger' },
   )
+}
+
+const GOD_TOOL_LABELS: Record<ToolId, string> = {
+  raise: 'Nâng địa hình',
+  lower: 'Hạ địa hình',
+  water: 'Gọi nước',
+  forest: 'Gieo rừng',
+  fertile: 'Làm đất màu mỡ',
+  barren: 'Làm đất cằn cỗi',
+  settler: 'Thả cư dân',
+  storm: 'Gọi mưa lớn',
+}
+
+/**
+ * Records player intent for the chronicle without changing terrain, ticks, or
+ * any deterministic outcome by itself.
+ */
+export function recordGodToolUse(state: SimulationState, tool: ToolId): SimulationState {
+  const uses = state.godToolUses[tool] + 1
+  const next = { ...state, godToolUses: { ...state.godToolUses, [tool]: uses } }
+  if (uses !== 1 && uses % 5 !== 0) return next
+  return appendEvent(next, {
+    kind: 'god-tool-' + tool,
+    title: GOD_TOOL_LABELS[tool],
+    detail: uses === 1
+      ? 'Quyền năng này lần đầu để lại dấu ấn trong biên niên sử.'
+      : 'Quyền năng này đã được dùng ' + uses + ' lần.',
+    tone: tool === 'storm' || tool === 'barren' ? 'warning' : 'calm',
+  })
+}
+
+export function resolveCouncilDecision(state: SimulationState, choice: CouncilChoiceId): SimulationState {
+  const pending = state.pendingCouncil
+  if (!pending) return state
+  const villages = state.villages.map((village) => {
+    if (choice === 'stockpile') {
+      return {
+        ...village,
+        food: clamp(village.food - 4, 0, 999),
+        happiness: clamp(village.happiness - 1, 0, 100),
+        resilience: clamp(village.resilience + 8, 0, 100),
+        lastDecision: 'Hy sinh một phần lương thực để củng cố kho dự trữ',
+      }
+    }
+    return {
+      ...village,
+      food: clamp(village.food - 3, 0, 999),
+      happiness: clamp(village.happiness - 2, 0, 100),
+      military: clamp(village.military + 8, 0, 100),
+      resilience: clamp(village.resilience + 4, 0, 100),
+      lastDecision: 'Tạm gác lễ hội để gia cố phòng vệ trước giông bão',
+    }
+  })
+  const input: EventInput = choice === 'stockpile'
+    ? {
+        kind: 'council-stockpile',
+        title: 'Kho lương được niêm phong',
+        detail: 'Dân làng chấp nhận mất một phần tiện nghi để tăng sức hồi phục.',
+        tone: 'good',
+      }
+    : {
+        kind: 'council-ward',
+        title: 'Tường chắn mưa được dựng lên',
+        detail: 'Làng đổi chút lương thực và niềm vui lấy phòng vệ trước bão.',
+        tone: 'good',
+      }
+  const resolved = { ...state, villages }
+  delete resolved.pendingCouncil
+  return appendEvent(resolved, input)
 }

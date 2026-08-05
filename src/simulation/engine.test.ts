@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { advanceSimulation, createSimulation, isHabitableTile, MAX_ADVANCE_TICKS, spawnSettlersAt, toggleSimulationPause, triggerStorm } from './engine'
+import { advanceSimulation, createSimulation, isHabitableTile, MAX_ADVANCE_TICKS, recordGodToolUse, resolveCouncilDecision, spawnSettlersAt, toggleSimulationPause, triggerStorm } from './engine'
 import { MAX_SIMULATION_TICK } from './types'
 import { generateWorld } from '../world/generator'
 import type { WorldConfig } from '../world/types'
@@ -83,5 +83,43 @@ describe('simulation engine', () => {
       paused: true,
     })
     expect(spawnSettlersAt(saturated, world, village.tileIndex).ok).toBe(false)
+  })
+
+  it('uses nearby fertility, water, and forest for deterministic harvest and resilience', () => {
+    const world = generateWorld(config)
+    const home = world.tiles[world.villages[0]!.tileIndex]!
+    const restoredEcology = {
+      ...world,
+      tiles: world.tiles.map((tile) => Math.abs(tile.x - home.x) + Math.abs(tile.z - home.z) <= 3
+        ? { ...tile, soil: 'màu mỡ' as const, moisture: 1, forest: true, resources: 1 }
+        : tile),
+    }
+    const depletedEcology = {
+      ...world,
+      tiles: world.tiles.map((tile) => Math.abs(tile.x - home.x) + Math.abs(tile.z - home.z) <= 3
+        ? { ...tile, soil: 'cằn cỗi' as const, moisture: 0, forest: false, resources: 0 }
+        : tile),
+    }
+    const restored = advanceSimulation(createSimulation(restoredEcology), restoredEcology, 8)
+    const depleted = advanceSimulation(createSimulation(depletedEcology), depletedEcology, 8)
+
+    expect(restored.villages[0]!.food).toBeGreaterThan(depleted.villages[0]!.food)
+    expect(restored.villages[0]!.resilience).toBeGreaterThan(depleted.villages[0]!.resilience)
+  })
+
+  it('records god tools without changing ticks and resolves a visible council trade-off', () => {
+    const world = generateWorld(config)
+    const initial = createSimulation(world)
+    const logged = recordGodToolUse(initial, 'forest')
+    expect(logged.tick).toBe(initial.tick)
+    expect(logged.godToolUses.forest).toBe(1)
+    expect(logged.events[0]?.id).toMatch(/^event-0-god-tool-forest-/)
+
+    const storm = triggerStorm(initial)
+    expect(storm.pendingCouncil).toBeDefined()
+    const resolved = resolveCouncilDecision(storm, 'stockpile')
+    expect(resolved.pendingCouncil).toBeUndefined()
+    expect(resolved.villages[0]!.resilience).toBeGreaterThan(storm.villages[0]!.resilience)
+    expect(resolved.villages[0]!.food).toBeLessThan(storm.villages[0]!.food)
   })
 })

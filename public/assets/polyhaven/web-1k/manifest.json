@@ -1,0 +1,828 @@
+[
+  {
+    "id": "terrain-grass-web-1k",
+    "biome": "đồng cỏ",
+    "useCase": "grassland and hill terrain material",
+    "deterministicVariants": [
+      "aerial_grass_rock"
+    ],
+    "provider": "polyhaven",
+    "polyHavenSlug": "aerial_grass_rock",
+    "sourceUrl": "https://polyhaven.com/a/aerial_grass_rock",
+    "license": "CC0-1.0",
+    "attribution": "Poly Haven — aerial_grass_rock (CC0 1.0)",
+    "sourceChecksum": "sha256:4dce476c07ab33662677931be5cd89aa97c07a11811b2be348242410e54631b3",
+    "processedChecksum": "sha256:9f61bd8b9cd47c0f0babf7d453379214f12aba28e825e5ac17b81c8c69c1a366",
+    "pack": "web-1k",
+    "fileSizes": {
+      "sourceBytes": 1933825,
+      "processedBytes": 996438,
+      "runtimeBytes": 996438
+    },
+    "lods": [
+      {
+        "id": "lod0",
+        "triangles": 0,
+        "available": true
+      },
+      {
+        "id": "lod1",
+        "triangles": 0,
+        "available": true
+      },
+      {
+        "id": "lod2",
+        "triangles": 0,
+        "available": true
+      }
+    ],
+    "fallback": "procedural",
+    "runtimeBudget": {
+      "maxInstances": 1,
+      "residentMiB": 7,
+      "preload": true,
+      "intendedUse": "grassland and hill terrain material"
+    },
+    "runtime": {
+      "kind": "material",
+      "surface": "terrainGrass",
+      "repeat": [
+        5,
+        5
+      ],
+      "files": [
+        {
+          "role": "albedo",
+          "path": "/assets/polyhaven/web-1k/aerial_grass_rock/albedo.webp",
+          "colorSpace": "srgb"
+        },
+        {
+          "role": "normal",
+          "path": "/assets/polyhaven/web-1k/aerial_grass_rock/normal.webp",
+          "colorSpace": "linear"
+        },
+        {
+          "role": "roughness",
+          "path": "/assets/polyhaven/web-1k/aerial_grass_rock/roughness.webp",
+          "colorSpace": "linear"
+        }
+      ]
+    }
+  },
+  {
+    "id": "terrain-forest-web-1k",
+    "biome": "rừng",
+    "useCase": "forest terrain material",
+    "deterministicVariants": [
+      "forest_floor"
+    ],
+    "provider": "polyhaven",
+    "polyHavenSlug": "forest_floor",
+    "sourceUrl": "https://polyhaven.com/a/forest_floor",
+    "license": "CC0-1.0",
+    "attribution": "Poly Haven — forest_floor (CC0 1.0)",
+    "sourceChecksum": "sha256:75ac642e50407f617a5861e6825718906a81aadab0b7c4bbed00fe813f22f69b",
+    "processedChecksum": "sha256:c526057d41a5f9d7e19bf98bab855c18d729c43d7d72189864ed738729da1fa7",
+    "pack": "web-1k",
+    "fileSizes": {
+      "sourceBytes": 3446310,
+      "processedBytes": 1491898,
+      "runtimeBytes": 1491898
+    },
+    "lods": [
+      {
+        "id": "lod0",
+        "triangles": 0,
+        "available": true
+      },
+      {
+        "id": "lod1",
+        "triangles": 0,
+        "available": true
+      },
+      {
+        "id": "lod2",
+        "triangles": 0,
+        "available": true
+      }
+    ],
+    "fallback": "procedural",
+    "runtimeBudget": {
+      "maxInstances": 1,
+      "residentMiB": 7,
+      "preload": true,
+      "intendedUse": "forest terrain material"
+    },
+    "runtime": {
+      "kind": "material",
+      "surface": "terrainForest",
+      "repeat": [
+        5,
+        5
+      ],
+      "files": [
+        {
+          "role": "albedo",
+          "path": "/assets/polyhaven/web-1k/forest_floor/albedo.webp",
+          "colorSpace": "srgb"
+        },
+        {
+          "role": "normal",
+          "path": "/assets/polyhaven/web-1k/forest_floor/normal.webp",
+          "colorSpace": "linear"
+        },
+        {
+          "role": "roughness",
+          "path": "/assets/polyhaven/web-1k/forest_floor/roughness.webp",
+          "colorSpace": "linear"
+        }
+      ]
+    }
+  },
+  {
+    "id": "terrain-rock-web-1k",
+    "biome": "núi",
+    "useCase": "rocky terrain and instanced rocks",
+    "deterministicVariants": [
+      "rocky_terrain_02"
+    ],
+    "provider": "polyhaven",
+    "polyHavenSlug": "rocky_terrain_02",
+    "sourceUrl": "https://polyhaven.com/a/rocky_terrain_02",
+    "license": "CC0-1.0",
+    "attribution": "Poly Haven — rocky_terrain_02 (CC0 1.0)",
+    "sourceChecksum": "sha256:1f01f979b11afb74fb3cf378303199f52aa3562e0a29e563da37eb7d791a93ba",
+    "processedChecksum": "sha256:410a028d43724a2dde19d73c9e931f988ac976ec3e1026d086cc407de5fb7c37",
+    "pack": "web-1k",
+    "fileSizes": {
+      "sourceBytes": 2273974,
+      "processedBytes": 794484,
+      "runtimeBytes": 794484
+    },
+    "lods": [
+      {
+        "id": "lod0",
+        "triangles": 0,
+        "available": true
+      },
+      {
+        "id": "lod1",
+        "triangles": 0,
+        "available": true
+      },
+      {
+        "id": "lod2",
+        "triangles": 0,
+        "available": true
+      }
+    ],
+    "fallback": "procedural",
+    "runtimeBudget": {
+      "maxInstances": 220,
+      "residentMiB": 7,
+      "preload": true,
+      "intendedUse": "rocky terrain and instanced rocks"
+    },
+    "runtime": {
+      "kind": "material",
+      "surface": "terrainRock",
+      "repeat": [
+        4,
+        4
+      ],
+      "files": [
+        {
+          "role": "albedo",
+          "path": "/assets/polyhaven/web-1k/rocky_terrain_02/albedo.webp",
+          "colorSpace": "srgb"
+        },
+        {
+          "role": "normal",
+          "path": "/assets/polyhaven/web-1k/rocky_terrain_02/normal.webp",
+          "colorSpace": "linear"
+        },
+        {
+          "role": "roughness",
+          "path": "/assets/polyhaven/web-1k/rocky_terrain_02/roughness.webp",
+          "colorSpace": "linear"
+        }
+      ]
+    }
+  },
+  {
+    "id": "terrain-sand-web-1k",
+    "biome": "bờ cát",
+    "useCase": "coastal terrain material",
+    "deterministicVariants": [
+      "coast_sand_02"
+    ],
+    "provider": "polyhaven",
+    "polyHavenSlug": "coast_sand_02",
+    "sourceUrl": "https://polyhaven.com/a/coast_sand_02",
+    "license": "CC0-1.0",
+    "attribution": "Poly Haven — coast_sand_02 (CC0 1.0)",
+    "sourceChecksum": "sha256:b8860426e9a99e8ecc900bc679ed7a8304789c0877124972c11ef0ed31c5f5ad",
+    "processedChecksum": "sha256:683436b2a3a9df49df0d13917882a52f94a926f7e4cac7a500725a507d3855e2",
+    "pack": "web-1k",
+    "fileSizes": {
+      "sourceBytes": 2517211,
+      "processedBytes": 952816,
+      "runtimeBytes": 952816
+    },
+    "lods": [
+      {
+        "id": "lod0",
+        "triangles": 0,
+        "available": true
+      },
+      {
+        "id": "lod1",
+        "triangles": 0,
+        "available": true
+      },
+      {
+        "id": "lod2",
+        "triangles": 0,
+        "available": true
+      }
+    ],
+    "fallback": "procedural",
+    "runtimeBudget": {
+      "maxInstances": 1,
+      "residentMiB": 7,
+      "preload": true,
+      "intendedUse": "coastal terrain material"
+    },
+    "runtime": {
+      "kind": "material",
+      "surface": "terrainSand",
+      "repeat": [
+        5,
+        5
+      ],
+      "files": [
+        {
+          "role": "albedo",
+          "path": "/assets/polyhaven/web-1k/coast_sand_02/albedo.webp",
+          "colorSpace": "srgb"
+        },
+        {
+          "role": "normal",
+          "path": "/assets/polyhaven/web-1k/coast_sand_02/normal.webp",
+          "colorSpace": "linear"
+        },
+        {
+          "role": "roughness",
+          "path": "/assets/polyhaven/web-1k/coast_sand_02/roughness.webp",
+          "colorSpace": "linear"
+        }
+      ]
+    }
+  },
+  {
+    "id": "terrain-snow-web-1k",
+    "biome": "tuyết",
+    "useCase": "snow terrain material",
+    "deterministicVariants": [
+      "snow_02"
+    ],
+    "provider": "polyhaven",
+    "polyHavenSlug": "snow_02",
+    "sourceUrl": "https://polyhaven.com/a/snow_02",
+    "license": "CC0-1.0",
+    "attribution": "Poly Haven — snow_02 (CC0 1.0)",
+    "sourceChecksum": "sha256:b4468ca12d04b3e741b6d079919c4f36566026b1b52e16514b4c3d7bc5f23b2f",
+    "processedChecksum": "sha256:f79321279cd9cefbaef9f0d44ecc5738064767048419f40a41b66f2e0525fb18",
+    "pack": "web-1k",
+    "fileSizes": {
+      "sourceBytes": 1553444,
+      "processedBytes": 702060,
+      "runtimeBytes": 702060
+    },
+    "lods": [
+      {
+        "id": "lod0",
+        "triangles": 0,
+        "available": true
+      },
+      {
+        "id": "lod1",
+        "triangles": 0,
+        "available": true
+      },
+      {
+        "id": "lod2",
+        "triangles": 0,
+        "available": true
+      }
+    ],
+    "fallback": "procedural",
+    "runtimeBudget": {
+      "maxInstances": 1,
+      "residentMiB": 6,
+      "preload": true,
+      "intendedUse": "snow terrain material"
+    },
+    "runtime": {
+      "kind": "material",
+      "surface": "terrainSnow",
+      "repeat": [
+        5,
+        5
+      ],
+      "files": [
+        {
+          "role": "albedo",
+          "path": "/assets/polyhaven/web-1k/snow_02/albedo.webp",
+          "colorSpace": "srgb"
+        },
+        {
+          "role": "normal",
+          "path": "/assets/polyhaven/web-1k/snow_02/normal.webp",
+          "colorSpace": "linear"
+        },
+        {
+          "role": "roughness",
+          "path": "/assets/polyhaven/web-1k/snow_02/roughness.webp",
+          "colorSpace": "linear"
+        }
+      ]
+    }
+  },
+  {
+    "id": "tree-foliage-web-1k",
+    "biome": "rừng",
+    "useCase": "instanced tree foliage",
+    "deterministicVariants": [
+      "leafy_grass"
+    ],
+    "provider": "polyhaven",
+    "polyHavenSlug": "leafy_grass",
+    "sourceUrl": "https://polyhaven.com/a/leafy_grass",
+    "license": "CC0-1.0",
+    "attribution": "Poly Haven — leafy_grass (CC0 1.0)",
+    "sourceChecksum": "sha256:e58e88dde01a477193ee7cc3fb401667486743f8c582f128d181f18857a00311",
+    "processedChecksum": "sha256:fc709f2347dc8ec26fa4a22ad0cd0980e0323bd309b0846a4266dd5d6ea7bc93",
+    "pack": "web-1k",
+    "fileSizes": {
+      "sourceBytes": 3172828,
+      "processedBytes": 1270028,
+      "runtimeBytes": 1270028
+    },
+    "lods": [
+      {
+        "id": "lod0",
+        "triangles": 0,
+        "available": true
+      },
+      {
+        "id": "lod1",
+        "triangles": 0,
+        "available": true
+      },
+      {
+        "id": "lod2",
+        "triangles": 0,
+        "available": true
+      }
+    ],
+    "fallback": "procedural",
+    "runtimeBudget": {
+      "maxInstances": 240,
+      "residentMiB": 6,
+      "preload": true,
+      "intendedUse": "instanced tree foliage"
+    },
+    "runtime": {
+      "kind": "material",
+      "surface": "foliage",
+      "repeat": [
+        1,
+        2
+      ],
+      "files": [
+        {
+          "role": "albedo",
+          "path": "/assets/polyhaven/web-1k/leafy_grass/albedo.webp",
+          "colorSpace": "srgb"
+        },
+        {
+          "role": "normal",
+          "path": "/assets/polyhaven/web-1k/leafy_grass/normal.webp",
+          "colorSpace": "linear"
+        },
+        {
+          "role": "roughness",
+          "path": "/assets/polyhaven/web-1k/leafy_grass/roughness.webp",
+          "colorSpace": "linear"
+        }
+      ]
+    }
+  },
+  {
+    "id": "tree-bark-web-1k",
+    "biome": "rừng",
+    "useCase": "instanced tree trunks",
+    "deterministicVariants": [
+      "bark_brown_02"
+    ],
+    "provider": "polyhaven",
+    "polyHavenSlug": "bark_brown_02",
+    "sourceUrl": "https://polyhaven.com/a/bark_brown_02",
+    "license": "CC0-1.0",
+    "attribution": "Poly Haven — bark_brown_02 (CC0 1.0)",
+    "sourceChecksum": "sha256:22da29a30787fe800872b6fda050891e8f12ea33bc8f90f45b31df48e9393cb8",
+    "processedChecksum": "sha256:7a0cdb0ce941f250648dd1e7d12e39e3bd7bf30eeff0099dfa6d18c338774836",
+    "pack": "web-1k",
+    "fileSizes": {
+      "sourceBytes": 2013161,
+      "processedBytes": 1019964,
+      "runtimeBytes": 1019964
+    },
+    "lods": [
+      {
+        "id": "lod0",
+        "triangles": 0,
+        "available": true
+      },
+      {
+        "id": "lod1",
+        "triangles": 0,
+        "available": true
+      },
+      {
+        "id": "lod2",
+        "triangles": 0,
+        "available": true
+      }
+    ],
+    "fallback": "procedural",
+    "runtimeBudget": {
+      "maxInstances": 240,
+      "residentMiB": 6,
+      "preload": true,
+      "intendedUse": "instanced tree trunks"
+    },
+    "runtime": {
+      "kind": "material",
+      "surface": "trunk",
+      "repeat": [
+        2,
+        3
+      ],
+      "files": [
+        {
+          "role": "albedo",
+          "path": "/assets/polyhaven/web-1k/bark_brown_02/albedo.webp",
+          "colorSpace": "srgb"
+        },
+        {
+          "role": "normal",
+          "path": "/assets/polyhaven/web-1k/bark_brown_02/normal.webp",
+          "colorSpace": "linear"
+        },
+        {
+          "role": "roughness",
+          "path": "/assets/polyhaven/web-1k/bark_brown_02/roughness.webp",
+          "colorSpace": "linear"
+        }
+      ]
+    }
+  },
+  {
+    "id": "settlement-wood-web-1k",
+    "biome": "settlement",
+    "useCase": "procedural house walls",
+    "deterministicVariants": [
+      "dark_wooden_planks"
+    ],
+    "provider": "polyhaven",
+    "polyHavenSlug": "dark_wooden_planks",
+    "sourceUrl": "https://polyhaven.com/a/dark_wooden_planks",
+    "license": "CC0-1.0",
+    "attribution": "Poly Haven — dark_wooden_planks (CC0 1.0)",
+    "sourceChecksum": "sha256:7a76da9e979954456c4d06a9c557bf540df942387eae95080af365b0b55533f6",
+    "processedChecksum": "sha256:66d28d690333f917cf10ca7d92c1f95f332ecc1e9e6ac4fb3fb8cc5738498df5",
+    "pack": "web-1k",
+    "fileSizes": {
+      "sourceBytes": 2033633,
+      "processedBytes": 702064,
+      "runtimeBytes": 702064
+    },
+    "lods": [
+      {
+        "id": "lod0",
+        "triangles": 0,
+        "available": true
+      },
+      {
+        "id": "lod1",
+        "triangles": 0,
+        "available": true
+      },
+      {
+        "id": "lod2",
+        "triangles": 0,
+        "available": true
+      }
+    ],
+    "fallback": "procedural",
+    "runtimeBudget": {
+      "maxInstances": 48,
+      "residentMiB": 6,
+      "preload": true,
+      "intendedUse": "procedural house walls"
+    },
+    "runtime": {
+      "kind": "material",
+      "surface": "house",
+      "repeat": [
+        2,
+        2
+      ],
+      "files": [
+        {
+          "role": "albedo",
+          "path": "/assets/polyhaven/web-1k/dark_wooden_planks/albedo.webp",
+          "colorSpace": "srgb"
+        },
+        {
+          "role": "normal",
+          "path": "/assets/polyhaven/web-1k/dark_wooden_planks/normal.webp",
+          "colorSpace": "linear"
+        },
+        {
+          "role": "roughness",
+          "path": "/assets/polyhaven/web-1k/dark_wooden_planks/roughness.webp",
+          "colorSpace": "linear"
+        }
+      ]
+    }
+  },
+  {
+    "id": "settlement-roof-web-1k",
+    "biome": "settlement",
+    "useCase": "procedural roofs",
+    "deterministicVariants": [
+      "roof_slates_02"
+    ],
+    "provider": "polyhaven",
+    "polyHavenSlug": "roof_slates_02",
+    "sourceUrl": "https://polyhaven.com/a/roof_slates_02",
+    "license": "CC0-1.0",
+    "attribution": "Poly Haven — roof_slates_02 (CC0 1.0)",
+    "sourceChecksum": "sha256:a68c16ebe24cd412a17aa33919c201c42bd153bab7e3f74e6ac29193746b1829",
+    "processedChecksum": "sha256:79c29f13cd3ab02cd94c07c9574cac3322e296c33d9d6b97390926c58aac9511",
+    "pack": "web-1k",
+    "fileSizes": {
+      "sourceBytes": 1585908,
+      "processedBytes": 814034,
+      "runtimeBytes": 814034
+    },
+    "lods": [
+      {
+        "id": "lod0",
+        "triangles": 0,
+        "available": true
+      },
+      {
+        "id": "lod1",
+        "triangles": 0,
+        "available": true
+      },
+      {
+        "id": "lod2",
+        "triangles": 0,
+        "available": true
+      }
+    ],
+    "fallback": "procedural",
+    "runtimeBudget": {
+      "maxInstances": 48,
+      "residentMiB": 6,
+      "preload": true,
+      "intendedUse": "procedural roofs"
+    },
+    "runtime": {
+      "kind": "material",
+      "surface": "roof",
+      "repeat": [
+        2,
+        2
+      ],
+      "files": [
+        {
+          "role": "albedo",
+          "path": "/assets/polyhaven/web-1k/roof_slates_02/albedo.webp",
+          "colorSpace": "srgb"
+        },
+        {
+          "role": "normal",
+          "path": "/assets/polyhaven/web-1k/roof_slates_02/normal.webp",
+          "colorSpace": "linear"
+        },
+        {
+          "role": "roughness",
+          "path": "/assets/polyhaven/web-1k/roof_slates_02/roughness.webp",
+          "colorSpace": "linear"
+        }
+      ]
+    }
+  },
+  {
+    "id": "farm-soil-web-1k",
+    "biome": "settlement",
+    "useCase": "procedural farms",
+    "deterministicVariants": [
+      "brown_mud_dry"
+    ],
+    "provider": "polyhaven",
+    "polyHavenSlug": "brown_mud_dry",
+    "sourceUrl": "https://polyhaven.com/a/brown_mud_dry",
+    "license": "CC0-1.0",
+    "attribution": "Poly Haven — brown_mud_dry (CC0 1.0)",
+    "sourceChecksum": "sha256:5d2abe74da432dffbcc46cb9629a477083e5b9b18653c55b555386128d74387b",
+    "processedChecksum": "sha256:7bf097a9ea5dce8a58de582cec2e23b34c3d1cd247ef299943296bff184aff52",
+    "pack": "web-1k",
+    "fileSizes": {
+      "sourceBytes": 2849933,
+      "processedBytes": 1478624,
+      "runtimeBytes": 1478624
+    },
+    "lods": [
+      {
+        "id": "lod0",
+        "triangles": 0,
+        "available": true
+      },
+      {
+        "id": "lod1",
+        "triangles": 0,
+        "available": true
+      },
+      {
+        "id": "lod2",
+        "triangles": 0,
+        "available": true
+      }
+    ],
+    "fallback": "procedural",
+    "runtimeBudget": {
+      "maxInstances": 64,
+      "residentMiB": 5,
+      "preload": true,
+      "intendedUse": "procedural farms"
+    },
+    "runtime": {
+      "kind": "material",
+      "surface": "farm",
+      "repeat": [
+        2,
+        2
+      ],
+      "files": [
+        {
+          "role": "albedo",
+          "path": "/assets/polyhaven/web-1k/brown_mud_dry/albedo.webp",
+          "colorSpace": "srgb"
+        },
+        {
+          "role": "normal",
+          "path": "/assets/polyhaven/web-1k/brown_mud_dry/normal.webp",
+          "colorSpace": "linear"
+        },
+        {
+          "role": "roughness",
+          "path": "/assets/polyhaven/web-1k/brown_mud_dry/roughness.webp",
+          "colorSpace": "linear"
+        }
+      ]
+    }
+  },
+  {
+    "id": "road-gravel-web-1k",
+    "biome": "settlement",
+    "useCase": "procedural roads",
+    "deterministicVariants": [
+      "gravel_ground_01"
+    ],
+    "provider": "polyhaven",
+    "polyHavenSlug": "gravel_ground_01",
+    "sourceUrl": "https://polyhaven.com/a/gravel_ground_01",
+    "license": "CC0-1.0",
+    "attribution": "Poly Haven — gravel_ground_01 (CC0 1.0)",
+    "sourceChecksum": "sha256:26779b49e344c591c5d9447c5bce621b0e295efcc9325a9f0a186816a44506f4",
+    "processedChecksum": "sha256:cf7ab9897bdd8a85fae6223baf83608487211dec5801689a9eb815a49de29867",
+    "pack": "web-1k",
+    "fileSizes": {
+      "sourceBytes": 2648174,
+      "processedBytes": 1351678,
+      "runtimeBytes": 1351678
+    },
+    "lods": [
+      {
+        "id": "lod0",
+        "triangles": 0,
+        "available": true
+      },
+      {
+        "id": "lod1",
+        "triangles": 0,
+        "available": true
+      },
+      {
+        "id": "lod2",
+        "triangles": 0,
+        "available": true
+      }
+    ],
+    "fallback": "procedural",
+    "runtimeBudget": {
+      "maxInstances": 48,
+      "residentMiB": 6,
+      "preload": true,
+      "intendedUse": "procedural roads"
+    },
+    "runtime": {
+      "kind": "material",
+      "surface": "road",
+      "repeat": [
+        2,
+        4
+      ],
+      "files": [
+        {
+          "role": "albedo",
+          "path": "/assets/polyhaven/web-1k/gravel_ground_01/albedo.webp",
+          "colorSpace": "srgb"
+        },
+        {
+          "role": "normal",
+          "path": "/assets/polyhaven/web-1k/gravel_ground_01/normal.webp",
+          "colorSpace": "linear"
+        },
+        {
+          "role": "roughness",
+          "path": "/assets/polyhaven/web-1k/gravel_ground_01/roughness.webp",
+          "colorSpace": "linear"
+        }
+      ]
+    }
+  },
+  {
+    "id": "environment-kloppenheim-web-1k",
+    "biome": "global",
+    "useCase": "PMREM environment lighting",
+    "deterministicVariants": [
+      "kloppenheim_02"
+    ],
+    "provider": "polyhaven",
+    "polyHavenSlug": "kloppenheim_02",
+    "sourceUrl": "https://polyhaven.com/a/kloppenheim_02",
+    "license": "CC0-1.0",
+    "attribution": "Poly Haven — kloppenheim_02 (CC0 1.0)",
+    "sourceChecksum": "sha256:04d23c6b243742b5046310b29211aec671d7a0570f3596e1a6b43e614c9acadf",
+    "processedChecksum": "sha256:04d23c6b243742b5046310b29211aec671d7a0570f3596e1a6b43e614c9acadf",
+    "pack": "web-1k",
+    "fileSizes": {
+      "sourceBytes": 1740414,
+      "processedBytes": 1740414,
+      "runtimeBytes": 1740414
+    },
+    "lods": [
+      {
+        "id": "lod0",
+        "triangles": 0,
+        "available": true
+      },
+      {
+        "id": "lod1",
+        "triangles": 0,
+        "available": true
+      },
+      {
+        "id": "lod2",
+        "triangles": 0,
+        "available": true
+      }
+    ],
+    "fallback": "procedural",
+    "runtimeBudget": {
+      "maxInstances": 1,
+      "residentMiB": 8,
+      "preload": true,
+      "intendedUse": "PMREM environment lighting"
+    },
+    "runtime": {
+      "kind": "environment",
+      "surface": "environment",
+      "files": [
+        {
+          "role": "environment",
+          "path": "/assets/polyhaven/web-1k/kloppenheim_02/environment.hdr",
+          "colorSpace": "linear"
+        }
+      ]
+    }
+  }
+]

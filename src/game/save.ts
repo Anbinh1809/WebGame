@@ -1,10 +1,11 @@
 import type { GameSession, GameState } from './session'
-import { MAX_SIMULATION_TICK } from '../simulation/types'
-import type { SimulationEvent, SimulationState, VillageSimulation } from '../simulation/types'
+import { createWorldObjectives } from '../simulation/objectives'
+import { EMPTY_GOD_TOOL_USES, MAX_SIMULATION_TICK } from '../simulation/types'
+import type { CouncilDecision, SimulationEvent, SimulationState, VillageSimulation, WorldObjective } from '../simulation/types'
 import { refreshTileBiome } from '../world/generator'
-import type { SoilKind, TerrainKind, Tile, VillageSite, World, WorldConfig } from '../world/types'
+import type { SoilKind, TerrainKind, Tile, ToolId, VillageSite, World, WorldConfig } from '../world/types'
 
-export const SAVE_SCHEMA_VERSION = 1
+export const SAVE_SCHEMA_VERSION = 2
 export const SAVE_STORAGE_KEY = 'aetheria-world-shaper.save.v1'
 /**
  * Saves are intentionally bounded before JSON.parse. This keeps a corrupt or
@@ -25,7 +26,7 @@ export type SaveDecodeResult =
 const CLIMATES = ['ôn hòa', 'ấm', 'lạnh'] as const
 const BIOMES = ['biển', 'bờ cát', 'đồng cỏ', 'rừng', 'đồi', 'núi', 'tuyết'] as const
 const SOILS = ['thường', 'màu mỡ', 'cằn cỗi'] as const
-const ERAS = ['Mầm lửa', 'Nhà gỗ', 'Thợ đá'] as const
+const ERAS = ['Mầm lửa', 'Nhà gỗ', 'Thợ đá', 'Nông trang', 'Thành đá'] as const
 const EVENT_TONES = ['calm', 'good', 'warning', 'danger'] as const
 const SIMULATION_SPEEDS = [0, 1, 2, 4, 8] as const
 
@@ -132,6 +133,7 @@ function isVillageSimulation(value: unknown, world: World): value is VillageSimu
     && isNumberInRange(value.research, 0, 100_000)
     && isNumberInRange(value.military, 0, 100)
     && isIntegerInRange(value.territory, 0, 100_000)
+    && isNumberInRange(value.resilience, 0, 100)
     && isOneOf(value.era, ERAS)
     && typeof value.lastDecision === 'string'
     && value.lastDecision.length <= 512
@@ -160,12 +162,52 @@ function isEvent(value: unknown, currentTick: number): value is SimulationEvent 
     && isOneOf(value.tone, EVENT_TONES)
 }
 
+function isGodToolUses(value: unknown): value is Record<ToolId, number> {
+  if (!isRecord(value)) return false
+  const expectedKeys = Object.keys(EMPTY_GOD_TOOL_USES) as ToolId[]
+  const valueKeys = Object.keys(value)
+  return valueKeys.length === expectedKeys.length
+    && expectedKeys.every((tool) => isIntegerInRange(value[tool], 0, 100_000))
+}
+
+function isObjective(value: unknown, expected: WorldObjective): value is WorldObjective {
+  if (!isRecord(value)) return false
+  return value.id === expected.id
+    && value.metric === expected.metric
+    && value.title === expected.title
+    && value.detail === expected.detail
+    && value.target === expected.target
+    && isIntegerInRange(value.progress, 0, 100_000)
+    && typeof value.completed === 'boolean'
+    && value.completed === (value.progress >= value.target)
+}
+
+function hasExpectedObjectives(value: unknown, world: World): value is WorldObjective[] {
+  if (!Array.isArray(value)) return false
+  const expected = createWorldObjectives(world)
+  return value.length === expected.length && expected.every((objective, index) => isObjective(value[index], objective))
+}
+
+function isCouncilDecision(value: unknown, currentTick: number): value is CouncilDecision {
+  return isRecord(value)
+    && /^council-storm-\d+-\d+$/.test(String(value.id))
+    && isIntegerInRange(value.issuedTick, 0, currentTick)
+    && typeof value.title === 'string'
+    && value.title.length > 0
+    && value.title.length <= 160
+    && typeof value.detail === 'string'
+    && value.detail.length > 0
+    && value.detail.length <= 512
+}
+
 function isSimulation(value: unknown, world: World): value is SimulationState {
   if (!isRecord(value)) return false
   const tick = value.tick
   if (!isIntegerInRange(tick, 0, MAX_SIMULATION_TICK) || !isOneOf(value.speed, SIMULATION_SPEEDS) || typeof value.paused !== 'boolean' || !isIntegerInRange(value.eventSequence, 0, Number.MAX_SAFE_INTEGER)) return false
   if (!Array.isArray(value.villages) || !Array.isArray(value.events) || value.events.length > 24) return false
   if ('activeStorm' in value && value.activeStorm !== undefined && !isStorm(value.activeStorm)) return false
+  if ('pendingCouncil' in value && value.pendingCouncil !== undefined && !isCouncilDecision(value.pendingCouncil, tick)) return false
+  if (!hasExpectedObjectives(value.objectives, world) || !isGodToolUses(value.godToolUses)) return false
   if (!value.villages.every((village) => isVillageSimulation(village, world))) return false
   if (!value.events.every((event) => isEvent(event, tick))) return false
   const villages = value.villages as VillageSimulation[]
@@ -205,16 +247,57 @@ export function serializeSave(game: GameState): string {
   return JSON.stringify(document)
 }
 
+/**
+ * v1 saved the same core session but predates resilience, objectives, and the
+ * tool ledger. Migration fills only deterministic defaults, then the complete
+ * v2 validator still treats the result as untrusted input.
+ */
+export function migrateSaveDocument(value: unknown): unknown {
+  if (!isRecord(value) || value.schemaVersion !== 1 || !isRecord(value.game)) return value
+  const game = value.game
+  if (!isRecord(game.session) || !isRecord(game.session.world) || !isRecord(game.session.simulation)) return value
+  const world = game.session.world
+  const simulation = game.session.simulation
+  if (!isRecord(world.config) || typeof world.config.seed !== 'string' || !Array.isArray(simulation.villages)) return value
+  const legacyWorld = world as unknown as World
+
+  return {
+    ...value,
+    schemaVersion: SAVE_SCHEMA_VERSION,
+    game: {
+      ...game,
+      session: {
+        ...game.session,
+        simulation: {
+          ...simulation,
+          villages: simulation.villages.map((village) => isRecord(village) ? { ...village, resilience: 42 } : village),
+          objectives: createWorldObjectives(legacyWorld),
+          godToolUses: { ...EMPTY_GOD_TOOL_USES },
+        },
+      },
+    },
+  }
+}
+
 export function decodeSave(raw: string): SaveDecodeResult {
   if (raw.length > MAX_SAVE_BYTES) {
     return { ok: false, reason: 'Tệp lưu quá lớn để nạp an toàn. Hãy dùng bản xuất JSON dưới 2.5 MB.' }
   }
   try {
-    const value: unknown = JSON.parse(raw)
+    const value = migrateSaveDocument(JSON.parse(raw) as unknown)
     if (!isRecord(value) || value.schemaVersion !== SAVE_SCHEMA_VERSION || typeof value.savedAt !== 'string' || Number.isNaN(Date.parse(value.savedAt))) {
       return { ok: false, reason: 'Tệp lưu không đúng phiên bản dữ liệu Aetheria.' }
     }
-    if (!isGameState(value.game)) return { ok: false, reason: 'Tệp lưu bị thiếu hoặc có dữ liệu thế giới không hợp lệ.' }
+    if (!isRecord(value.game) || !isRecord(value.game.session)) {
+      return { ok: false, reason: 'Tệp lưu bị thiếu phiên chơi hợp lệ.' }
+    }
+    if (!isWorld(value.game.session.world)) {
+      return { ok: false, reason: 'Tệp lưu có dữ liệu thế giới không hợp lệ.' }
+    }
+    if (!isSimulation(value.game.session.simulation, value.game.session.world)) {
+      return { ok: false, reason: 'Tệp lưu có dữ liệu mô phỏng không hợp lệ.' }
+    }
+    if (!isGameState(value.game)) return { ok: false, reason: 'Tệp lưu chứa lịch sử không được phép nhập.' }
     return { ok: true, game: value.game }
   } catch {
     return { ok: false, reason: 'Không thể đọc JSON của tệp lưu.' }

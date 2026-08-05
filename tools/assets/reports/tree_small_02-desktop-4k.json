@@ -1,0 +1,120 @@
+{
+  "schemaVersion": 1,
+  "asset": {
+    "id": "tree-small-02",
+    "slug": "tree_small_02",
+    "license": "CC0-1.0",
+    "attribution": "Poly Haven — tree_small_02 by Rico Cilliers (CC0 1.0)",
+    "sourceUrl": "https://polyhaven.com/a/tree_small_02"
+  },
+  "pack": "desktop-4k",
+  "textureSourceResolution": "4k",
+  "sourceCache": ".asset-cache/polyhaven-models/tree_small_02/4k",
+  "sourceFiles": [
+    {
+      "path": "tree_small_02_4k.gltf",
+      "sourceUrl": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/4k/tree_small_02/tree_small_02_4k.gltf",
+      "sourceMd5": "96915c3d6621e4e57558db348a9e43b8",
+      "sourceChecksum": "sha256:3e7f2fe0be398bfc944fe49186b33a10669573c4f99fbfc97e0d963678215e84",
+      "sourceBytes": 9075
+    },
+    {
+      "path": "textures/tree_small_02_branch_nor_gl_4k.jpg",
+      "sourceUrl": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/4k/tree_small_02/tree_small_02_branch_nor_gl_4k.jpg",
+      "sourceMd5": "8f019a6ed9c261afdb440b74a664ddce",
+      "sourceChecksum": "sha256:8b5727573794a4063a7c3ce9e04ef0a04d7b99e236af2a6ad61f713e25218ab8",
+      "sourceBytes": 5570594
+    },
+    {
+      "path": "textures/tree_small_02_branch_diff_4k.jpg",
+      "sourceUrl": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/4k/tree_small_02/tree_small_02_branch_diff_4k.jpg",
+      "sourceMd5": "49fc55ec218c7b0ae19b86b62c1c7c2c",
+      "sourceChecksum": "sha256:9cf6259a8e03d235bb5f50ef891f4d8d3388cb32aa2a1389d47a4fdf3476af15",
+      "sourceBytes": 4519943
+    },
+    {
+      "path": "textures/tree_small_02_branch_arm_4k.jpg",
+      "sourceUrl": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/4k/tree_small_02/tree_small_02_branch_arm_4k.jpg",
+      "sourceMd5": "1e240df732bc01ccaec217aba2764bad",
+      "sourceChecksum": "sha256:47a06d05e6a20c4b68debc5f4526e2c3521ddae184ee664a93a1f98345013abd",
+      "sourceBytes": 3496176
+    },
+    {
+      "path": "textures/tree_small_02_leaves_nor_gl_4k.jpg",
+      "sourceUrl": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/4k/tree_small_02/tree_small_02_leaves_nor_gl_4k.jpg",
+      "sourceMd5": "f8b0ee2e142cc78cb4ed141485e21786",
+      "sourceChecksum": "sha256:90b08d620b81e3f3cd815dfdc2e204d991eb83054cfeb01f18950d4685b6459b",
+      "sourceBytes": 7597392
+    },
+    {
+      "path": "textures/tree_small_02_leaves_diff_4k.jpg",
+      "sourceUrl": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/4k/tree_small_02/tree_small_02_leaves_diff_4k.jpg",
+      "sourceMd5": "ae20f6dd54a00e3bc98c4dbc754bc0ec",
+      "sourceChecksum": "sha256:afb62fb009cc1a8b1e659cff28973536f987a0035de44fc8776b3ccdbe838e54",
+      "sourceBytes": 2754213
+    },
+    {
+      "path": "textures/tree_small_02_leaves_arm_4k.jpg",
+      "sourceUrl": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/4k/tree_small_02/tree_small_02_leaves_arm_4k.jpg",
+      "sourceMd5": "7dbc5c9d48c2ad79665aa3334714b65d",
+      "sourceChecksum": "sha256:2b1cac7fe6fd0e0644541abf140cd1e9d072bc7dac852e2b169a8801dd8c8315",
+      "sourceBytes": 6704068
+    },
+    {
+      "path": "textures/tree_small_02_nor_gl_4k.jpg",
+      "sourceUrl": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/4k/tree_small_02/tree_small_02_nor_gl_4k.jpg",
+      "sourceMd5": "b7adc5b5cf6719c83572d2bcc839e2e0",
+      "sourceChecksum": "sha256:e191e6642d200f9172c77bcf5e3b646050ad73d9752bee50211ce11774e00f5a",
+      "sourceBytes": 15559521
+    },
+    {
+      "path": "textures/tree_small_02_diff_4k.jpg",
+      "sourceUrl": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/4k/tree_small_02/tree_small_02_diff_4k.jpg",
+      "sourceMd5": "7578d0971281c3ebca5c81a3fb1f3f06",
+      "sourceChecksum": "sha256:24f6aac6dcd2bf6793836aebc94b496757b38f0667f2358d1436310f86cfc954",
+      "sourceBytes": 10734001
+    },
+    {
+      "path": "textures/tree_small_02_arm_4k.jpg",
+      "sourceUrl": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/4k/tree_small_02/tree_small_02_arm_4k.jpg",
+      "sourceMd5": "973ee9e95542d47d4fca7e246dc01972",
+      "sourceChecksum": "sha256:e45a47c8eb10c3745196d8172206def2ff8447e7707be24d34b27062af592f65",
+      "sourceBytes": 8859265
+    },
+    {
+      "path": "tree_small_02.bin",
+      "sourceUrl": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/8k/tree_small_02/tree_small_02.bin",
+      "sourceMd5": "7a7019a87e6fe0d7475c0fa2e08d8962",
+      "sourceChecksum": "sha256:8da6c3c389ad8748286d1b7488cd827f75ebdad9d8f59ef7dfb0916df5edc634",
+      "sourceBytes": 95102324
+    }
+  ],
+  "sourceBytes": 160906572,
+  "runtimeBytes": 136211300,
+  "variants": [
+    {
+      "id": "forest-lod2",
+      "simplifyRatio": 0.004,
+      "simplifyError": 0.003,
+      "textureSize": 4096,
+      "intendedUse": "instanced ultra forest tree",
+      "maxInstances": 512,
+      "path": "models/tree_small_02/tree_small_02_forest-lod2.glb",
+      "processedPath": "desktop-packs/polyhaven/desktop-4k/models/tree_small_02/tree_small_02_forest-lod2.glb",
+      "processedChecksum": "sha256:af26962262a5628feafdfa2251a9cc2737757d10a10f6bbbf38ef23d0b23d904",
+      "processedBytes": 66979904
+    },
+    {
+      "id": "hero-lod0",
+      "simplifyRatio": 0.12,
+      "simplifyError": 0.0015,
+      "textureSize": 4096,
+      "intendedUse": "near-camera photo-mode tree",
+      "maxInstances": 3,
+      "path": "models/tree_small_02/tree_small_02_hero-lod0.glb",
+      "processedPath": "desktop-packs/polyhaven/desktop-4k/models/tree_small_02/tree_small_02_hero-lod0.glb",
+      "processedChecksum": "sha256:594c576708eda939e223567138d1f9e1a4a4bc563b5e5a1480fe68dd2a8b23f8",
+      "processedBytes": 69231396
+    }
+  ]
+}

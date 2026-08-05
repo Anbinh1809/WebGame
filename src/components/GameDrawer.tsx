@@ -26,6 +26,7 @@ export function GameDrawer({ id, label, side, onClose, children }: GameDrawerPro
     const handleKeyDown = (event: KeyboardEvent): void => {
       if (event.key === 'Escape') {
         event.preventDefault()
+        event.stopPropagation()
         onClose()
         return
       }

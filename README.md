@@ -1,38 +1,33 @@
 # Aetheria: World Shaper
 
-Game sandbox/god-simulator 3D chạy hoàn toàn local bằng React, Vite và Three.js. Thế giới, mô phỏng và biến thể đồ họa đều xác định theo seed; không có backend, API key, analytics, tracking hay asset bên thứ ba.
+Aetheria là sandbox/god-simulator 3D deterministic dùng React, Vite và Three.js. Người chơi tạo địa hình, dẫn cư dân, quản lý thời tiết và đọc biên niên sử procedural của một thế giới theo seed.
 
-## Trải nghiệm
+## Routes và bản phát hành
 
-- Canvas chiếm toàn bộ viewport; HUD, drawer và tool dock phủ trực tiếp trên game.
-- Drawer Thế giới và Mô phỏng có `aria-expanded`, focus trap, nút đóng và phím `Escape`.
-- Fullscreen API có đồng bộ trạng thái và CSS fallback.
-- World generation deterministic theo seed; seed luôn được đồng bộ vào URL (`?seed=...`).
-- Tool terrain có undo/redo snapshot an toàn qua cả thao tác tái tạo thế giới.
-- Thả cư dân dùng đúng ô đã bấm: từ chối biển/bờ cát, nhập vào làng gần nhất hoặc lập tiền đồn mới.
-- Mưa lớn là tác động toàn cõi, có nút kích hoạt riêng thay vì giả vờ phụ thuộc ô bấm.
-- Nghiên cứu, phòng vệ và lãnh thổ được hiển thị và tác động thu hoạch/thiệt hại bão.
-- Lưu cục bộ, nạp, đặt lại, thế giới mới, xuất và nhập JSON với schema version + kiểm tra dữ liệu trước khi hydrate.
-- Photo mode render qua `WebGLRenderTarget` sang PNG độ phân giải cao hơn drawing buffer.
+- `/` là landing page nhẹ, có thể cuộn/đọc bằng bàn phím và không tải Three.js.
+- `/play` lazy-load web demo sau khi người chơi chọn “Chơi thử”. Game vẫn dùng fullscreen canvas, HUD và drawer riêng.
+- Web demo bị giới hạn theo hợp đồng ở `web-1k`; nếu WebGL/GPU yếu, AssetPackManager dùng fallback 512px hoặc material procedural.
+- Desktop 2K/4K selection is wired to local pack manifests and falls back safely to Web 1K when a pack is absent, corrupt, or unsupported. Cinema 8K and Patron remain “Coming soon”; there is no checkout, payment provider, recurring charge, server entitlement, or secret in this repository.
 
-## Đồ họa và hiệu năng
+`1K / 2K / 4K / 8K` là độ phân giải texture source/asset pack — không phải độ phân giải màn hình. `renderQuality` (`auto`/`low`/`medium`/`high`) tách hoàn toàn khỏi `assetPackQuality`; chọn High không thể tự kích hoạt 8K.
 
-- Terrain vertex color có variation theo seed, normal được tính lại, bờ cát và độ sâu nước có màu chuyển tiếp.
-- `MeshStandardMaterial`/`MeshPhysicalMaterial`, day/night, fog, sun/moon tint, mây procedural và mưa instanced/batched.
-- Tree, rock, house và settler dùng `InstancedMesh`, scale/rotation deterministic và bounding-sphere culling.
-- Quality profile: `auto`, `low` (DPR 1), `medium` (DPR 1.5), `high` (DPR 2). Auto hạ chất lượng khi FPS giảm.
-- Renderer dừng animation loop khi tab ẩn, dọn listener/observer/geometry/material/render target/context khi unmount, và cập nhật DPR khi resize/zoom.
-- Chunk renderer được lazy-load; Three.js tách thành vendor chunk để HUD tải trước.
+## Gameplay và kỹ thuật
 
-Kết quả profile local ở viewport 1366×768, chất lượng Auto (máy kiểm tra):
+- World generation, ecology, objectives, council choice và simulation fixed-tick đều deterministic theo seed.
+- Terrain tool có undo/redo; settlers dùng đúng tile được chọn; storm là tác động toàn cõi.
+- Chronicle procedural chỉ đọc seed, tick và digest trạng thái; không có đường thay đổi gameplay.
+- Renderer giữ shared geometry và `InstancedMesh` cho terrain detail, tree, rock, house, farm, road, lantern, settler và rain.
+- Auto quality có FPS hysteresis/cooldown, mobile cap, DPR cap, visibility pause và `prefers-reduced-motion`.
+- Renderer xuất telemetry cục bộ theo giây: FPS, draw calls, triangles, texture count và asset load duration. Đây là số so sánh trên cùng máy, không phải benchmark phần cứng chung.
+- WebGL fallback, photo PNG guard, focus trap drawer, Escape, skip link và forced-colors/reduced-motion đều được giữ trong demo.
 
-| Bản đồ | FPS | Draw calls | Triangles |
-| --- | ---: | ---: | ---: |
-| 28 × 28 | 92 | 36 | 14,240 |
-| 36 × 36 | 92 | 36 | 20,836 |
-| 44 × 44 | 113 | 36 | 21,456 |
+## Asset pipeline
 
-Các số này là chỉ báo máy cục bộ, không phải benchmark phần cứng chung.
+`src/assets/` chứa manifest type, validator, registry và license copy. `src/renderer/AssetPackManager.ts` tách entitlement, capability, asset availability và fallback/disposal.
+
+`ASSET_MANIFEST` now contains a verified 12-asset Poly Haven Web 1K material/HDRI pilot: terrain biomes, instanced tree foliage/trunks/rocks, settlement surfaces, and PMREM environment lighting. It is served entirely from local `public/assets/polyhaven/web-1k/` files (13,314,502 bytes); the browser never hotlinks Poly Haven. Procedural geometry and instancing remain intentionally in place so game readability and draw-call behavior stay stable. The ledger and offline packing commands are in [docs/ASSET_PIPELINE.md](docs/ASSET_PIPELINE.md).
+
+Các asset Poly Haven được dùng theo CC0/public-domain. Người chơi mua game, tích hợp kỹ thuật, pack đã tối ưu và nội dung Aetheria — không mua quyền sở hữu độc quyền đối với asset nguồn.
 
 ## Chạy local
 
@@ -41,18 +36,7 @@ npm.cmd install
 npm.cmd run dev
 ```
 
-Mở URL Vite in ra (mặc định `http://127.0.0.1:5173`).
-
-## Phím tắt
-
-| Hành động | Điều khiển |
-| --- | --- |
-| Chọn công cụ | `1`–`8` |
-| Tạm dừng / tiếp tục | `Space` |
-| Hoàn tác | `Ctrl/Cmd + Z` |
-| Làm lại | `Ctrl/Cmd + Y` hoặc `Ctrl/Cmd + Shift + Z` |
-| Đóng drawer | `Escape` |
-| Camera | kéo để xoay, cuộn để zoom |
+Mở URL Vite trên HTTP loopback. Dùng `/` để kiểm tra landing và `/play` để vào demo; không dùng `file://` cho module build.
 
 ## Kiểm tra
 
@@ -61,26 +45,29 @@ npm.cmd run typecheck
 npm.cmd run lint
 npm.cmd test
 npm.cmd run build
-npm.cmd audit --omit=dev
+git diff --check
 ```
 
-Vitest bao phủ world generation deterministic, simulation, unique event ID cùng tick, heatmap theo tọa độ x/z, cư dân hợp lệ/không hợp lệ, mưa toàn cõi, history undo/redo/revision, save/load/corrupt save, quality profiles, WebGL fallback guard, PNG data URL và component HUD drawer/fullscreen.
-
-E2E thủ công được chạy trong browser local ở 1366×768, 1920×1080, 1024×768 và 390×844: canvas chiếm toàn viewport, không overflow trang, drawer mở/đóng bằng Escape, fullscreen hoạt động, và HUD mobile giữ tool dock cuộn nội bộ.
+Vitest bao phủ world/simulation/save, chronicle deterministic, quality, WebGL fallback, asset manifest/selection/fallback/disposal, entitlement boundary, route/landing semantic và HUD keyboard/focus primitives.
 
 ## Cấu trúc
 
 ```text
 src/
-├── game/          # session snapshot history và save schema
-├── world/         # PRNG, generation, mutation commands
-├── simulation/    # fixed-tick engine, settlement, metrics
-├── renderer/      # Three.js ownership, quality, WebGL lifecycle
-└── components/    # HUD, drawers, viewport, controls
+├── assets/       # provenance manifest, variant selection, pack validation
+├── commerce/     # entitlement/download interfaces; no live provider
+├── game/         # session history, save schema, procedural chronicle
+├── renderer/     # Three.js lifecycle, quality and pack resource scope
+├── simulation/   # fixed-tick settlement and objectives
+├── world/        # PRNG, generation and mutation commands
+└── components/   # landing, HUD, drawers and viewport bridge
+tools/assets/     # offline curation, hash verification; never runtime fetch
 ```
 
-## Giới hạn hiện tại
+## Owner decisions still required
 
-- Game vẫn là single-player local; không có multiplayer, cloud save, ngoại giao hay chiến đấu.
-- Bản đồ tối đa 44×44 trong UI hiện tại. Map lớn hơn nên dùng chunk/LOD terrain trước khi mở giới hạn.
-- Photo PNG được kiểm tra bằng guard unit test và thao tác browser không lỗi console; hành vi download cuối cùng phụ thuộc quyền download của trình duyệt.
+1. Distribution platform, desktop wrapper/installer and release/CDN hosting.
+2. Choose desktop wrapper/installer and release/CDN placement for the already materialized 2K/4K packs; approve KTX2/BasisU build tooling before broad 2K/4K distribution.
+3. Price, payment provider, merchant/legal entity, tax, refund and cancellation policy.
+4. Whether Cinema is a one-time pack or subscription, plus a real recurring content cadence.
+5. Patron benefits, beta process, offline/grace behavior and server-side entitlement design.

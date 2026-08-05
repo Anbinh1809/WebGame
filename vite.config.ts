@@ -3,6 +3,9 @@ import { defineConfig } from 'vitest/config'
 
 export default defineConfig({
   plugins: [react()],
+  // Loopback hosting keeps local browser smoke tests deterministic.
+  server: { host: '127.0.0.1' },
+  preview: { host: '127.0.0.1' },
   build: {
     rolldownOptions: {
       output: {

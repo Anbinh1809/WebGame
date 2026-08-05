@@ -7,16 +7,18 @@ import { isInteractiveShortcutTarget } from './components/keyboard'
 import { SimulationPanel } from './components/SimulationPanel'
 import { ToolDock } from './components/ToolDock'
 import { WorldControls } from './components/WorldControls'
-import { applyTerrainChange, commitGameChange, createGameState, recreateWorld, redoGameChange, undoGameChange } from './game/session'
+import { applyMapToolAction, resolveCouncilAction, triggerGlobalStormAction } from './game/actions'
+import { createGameState, recreateWorld, redoGameChange, undoGameChange } from './game/session'
 import { decodeSave, loadFromLocalStorage, MAX_SAVE_BYTES, saveToLocalStorage, serializeSave } from './game/save'
 import type { HoveredTile, RenderStats } from './renderer/WorldRenderer'
 import { QUALITY_LABELS } from './renderer/quality'
 import type { QualityProfile } from './renderer/quality'
-import { advanceSimulation, setSimulationSpeed, spawnSettlersAt, toggleSimulationPause, triggerStorm } from './simulation/engine'
+import { advanceSimulation, setSimulationSpeed, toggleSimulationPause } from './simulation/engine'
 import type { SimulationSpeed } from './simulation/types'
-import { applyTerrainTool } from './world/commands'
 import { DEFAULT_WORLD_CONFIG, TERRAIN_TOOL_LABELS } from './world/types'
 import type { HeatmapMode, ToolId, WorldConfig } from './world/types'
+import type { AssetPackQuality } from './assets/types'
+import { DESKTOP_TEXTURE_PACKS, GAME_EDITION, IS_DESKTOP_EDITION } from './runtime/edition'
 
 const WorldViewport = lazy(async () => {
   const module = await import('./components/WorldViewport')
@@ -31,6 +33,13 @@ const worldLoadingFallback = (
 )
 
 type DrawerSide = 'left' | 'right' | null
+
+const ASSET_PACK_LABELS: Record<AssetPackQuality, string> = {
+  'web-1k': '1K',
+  'desktop-2k': '2K',
+  'desktop-4k': '4K',
+  'cinema-8k': 'Cinema 8K',
+}
 
 function initialConfig(): WorldConfig {
   const fromUrl = new URLSearchParams(window.location.search).get('seed')
@@ -69,9 +78,10 @@ export default function App(): JSX.Element {
   const [tool, setTool] = useState<ToolId>('raise')
   const [heatmap, setHeatmap] = useState<HeatmapMode>('địa hình')
   const [quality, setQuality] = useState<QualityProfile>('auto')
+  const [assetPackQuality, setAssetPackQuality] = useState<AssetPackQuality>('web-1k')
   const [hoveredTile, setHoveredTile] = useState<HoveredTile | undefined>(undefined)
   const [selectedTileIndex, setSelectedTileIndex] = useState<number | undefined>(undefined)
-  const [renderStats, setRenderStats] = useState<RenderStats>({ fps: 0, drawCalls: 0, triangles: 0 })
+  const [renderStats, setRenderStats] = useState<RenderStats>({ fps: 0, drawCalls: 0, triangles: 0, textures: 0, assetLoadDurationMs: 0, assetPack: 'procedural', assetPackFallback: true, assetPackReason: 'Đang chờ asset pack.', assetLoadState: 'idle' })
   const [notice, setNotice] = useState('Thế giới đã sẵn sàng. Chọn một quyền năng rồi nhấp lên bản đồ.')
   const [photoSignal, setPhotoSignal] = useState(0)
   const [openDrawer, setOpenDrawer] = useState<DrawerSide>(null)
@@ -82,10 +92,15 @@ export default function App(): JSX.Element {
   const activeImportRef = useRef<FileReader | null>(null)
   const leftToggleRef = useRef<HTMLButtonElement>(null)
   const rightToggleRef = useRef<HTMLButtonElement>(null)
+  const openDrawerRef = useRef<DrawerSide>(null)
 
   useEffect(() => {
     gameRef.current = game
   }, [game])
+
+  useEffect(() => {
+    openDrawerRef.current = openDrawer
+  }, [openDrawer])
 
   useEffect(() => () => activeImportRef.current?.abort(), [])
 
@@ -130,13 +145,12 @@ export default function App(): JSX.Element {
   }, [])
 
   const closeDrawer = useCallback((side?: Exclude<DrawerSide, null>): void => {
-    setOpenDrawer((current) => {
-      const closing = side ?? current
-      if (closing) {
-        window.requestAnimationFrame(() => (closing === 'left' ? leftToggleRef.current : rightToggleRef.current)?.focus())
-      }
-      return null
-    })
+    const closing = side ?? openDrawerRef.current
+    // Move focus before React unmounts the active drawer; delaying this can
+    // leave keyboard users on document.body in Chromium.
+    if (closing === 'left') leftToggleRef.current?.focus()
+    if (closing === 'right') rightToggleRef.current?.focus()
+    setOpenDrawer(null)
   }, [])
 
   const toggleDrawer = useCallback((side: Exclude<DrawerSide, null>): void => {
@@ -173,36 +187,27 @@ export default function App(): JSX.Element {
       return
     }
     setGame((current) => {
-      if (tool === 'settler') {
-        const result = spawnSettlersAt(current.session.simulation, current.session.world, tileIndex)
-        if (!result.ok) {
-          setNotice(result.reason)
-          return current
-        }
-        const world = result.createdVillage
-          ? { ...current.session.world, villages: [...current.session.world.villages, result.villageSite], revision: current.session.world.revision + 1 }
-          : current.session.world
-        const label = result.createdVillage ? `Lập ${result.villageSite.name}` : `Đón cư dân đến ${result.villageSite.name}`
-        setNotice(result.createdVillage ? `Đã lập ${result.villageSite.name}.` : `Cư dân đã nhập vào ${result.villageSite.name}.`)
-        return commitGameChange(current, { world, simulation: result.simulation }, label)
-      }
-      const result = applyTerrainTool(current.session.world, tileIndex, tool, TERRAIN_TOOL_LABELS[tool])
-      if (!result) {
-        setNotice('Quyền năng này không thể thay đổi ô đất đang chọn.')
-        return current
-      }
-      setNotice(`${result.command.label}: thay đổi đã được lưu vào lịch sử.`)
-      return applyTerrainChange(current, result.command, result.world)
+      const result = applyMapToolAction(current, tool, tileIndex)
+      setNotice(result.notice)
+      return result.game
     })
   }, [tool])
 
   const handleGlobalStorm = useCallback((): void => {
-    setGame((current) => commitGameChange(
-      current,
-      { ...current.session, simulation: triggerStorm(current.session.simulation) },
-      'Gọi mưa lớn toàn cõi',
-    ))
+    setGame((current) => triggerGlobalStormAction(current))
     setNotice('Mưa lớn đang ảnh hưởng toàn bộ Aetheria trong 18 tick.')
+  }, [])
+
+  const handleCouncilDecision = useCallback((choice: 'stockpile' | 'raise-ward'): void => {
+    setGame((current) => {
+      const next = resolveCouncilAction(current, choice)
+      if (next === current) {
+        setNotice('Quyết định này không còn hiệu lực.')
+        return current
+      }
+      setNotice(choice === 'stockpile' ? 'Dân làng niêm phong một phần kho lương để tăng sức hồi phục.' : 'Dân làng gia cố nơi trú ẩn, đổi bằng lương thực và niềm vui.')
+      return next
+    })
   }, [])
 
   const handleUndo = useCallback((): void => {
@@ -385,6 +390,11 @@ export default function App(): JSX.Element {
   const lensTile = hoveredTile ?? (selectedTile ? { index: selectedTileIndex ?? 0, tile: selectedTile } : undefined)
   const day = Math.floor(session.simulation.tick / 6) + 1
   const fullscreenActive = isFullscreen || fullscreenFallback
+  const assetPackLabel = renderStats.assetLoadState === 'loading'
+    ? 'Đang nạp Poly Haven…'
+    : renderStats.assetPack === 'procedural'
+      ? 'fallback procedural'
+      : `${ASSET_PACK_LABELS[renderStats.assetPack]}${renderStats.assetPackFallback ? ' · fallback' : ''}`
 
   return (
     <main className={`game-shell ${fullscreenActive ? 'is-fullscreen-fallback' : ''}`}>
@@ -398,6 +408,8 @@ export default function App(): JSX.Element {
               tool={tool}
               heatmap={heatmap}
               quality={quality}
+              assetPackQuality={assetPackQuality}
+              edition={GAME_EDITION}
               photoSignal={photoSignal}
               onTileHover={setHoveredTile}
               onTileActivate={handleTileActivate}
@@ -419,13 +431,15 @@ export default function App(): JSX.Element {
           </header>
 
           <div className="hud-actions">
-            <span className="performance-badge" title="Chỉ số render gần đúng, cập nhật mỗi giây">{renderStats.fps || '—'} FPS · {renderStats.drawCalls} lệnh vẽ · {renderStats.triangles} tam giác</span>
+            <span className="performance-badge" title="Chỉ số render gần đúng, cập nhật mỗi giây">{renderStats.fps || '—'} FPS · {renderStats.drawCalls} lệnh vẽ · {renderStats.triangles} tam giác · {renderStats.textures} texture</span>
+            <span className="asset-pack-badge" title={renderStats.assetPackReason}>Asset · {assetPackLabel}</span>
+            {IS_DESKTOP_EDITION ? <label className="quality-select" htmlFor="asset-pack-quality">Texture pack<select id="asset-pack-quality" value={assetPackQuality} onChange={(event) => setAssetPackQuality(event.target.value as AssetPackQuality)}>{DESKTOP_TEXTURE_PACKS.map((pack) => <option key={pack} value={pack}>{ASSET_PACK_LABELS[pack]}</option>)}</select></label> : null}
             <label className="quality-select" htmlFor="quality-profile">Chất lượng<select id="quality-profile" value={quality} onChange={(event) => setQuality(event.target.value as QualityProfile)}>{(Object.keys(QUALITY_LABELS) as QualityProfile[]).map((profile) => <option key={profile} value={profile}>{QUALITY_LABELS[profile]}</option>)}</select></label>
             <FullscreenButton active={fullscreenActive} onToggle={toggleFullscreen} />
           </div>
 
           <button ref={leftToggleRef} type="button" className="drawer-toggle drawer-toggle-left" onClick={() => toggleDrawer('left')} aria-expanded={openDrawer === 'left'} aria-controls="world-controls-drawer" aria-label={openDrawer === 'left' ? 'Đóng điều khiển thế giới' : 'Mở điều khiển thế giới'}>☰ <span>Thế giới</span></button>
-          <button ref={rightToggleRef} type="button" className="drawer-toggle drawer-toggle-right" onClick={() => toggleDrawer('right')} aria-expanded={openDrawer === 'right'} aria-controls="simulation-drawer" aria-label={openDrawer === 'right' ? 'Đóng mô phỏng' : 'Mở mô phỏng'}>◈ <span>Mô phỏng</span></button>
+          <button ref={rightToggleRef} type="button" className="drawer-toggle drawer-toggle-right" onClick={() => toggleDrawer('right')} aria-expanded={openDrawer === 'right'} aria-controls="simulation-drawer" aria-label={openDrawer === 'right' ? 'Đóng biên niên sử và mô phỏng' : 'Mở biên niên sử và mô phỏng'}>◈ <span>Biên niên sử</span></button>
 
           {openDrawer === 'left' ? (
             <GameDrawer id="world-controls-drawer" label="Điều khiển thế giới" side="left" onClose={() => closeDrawer('left')}>
@@ -434,8 +448,8 @@ export default function App(): JSX.Element {
           ) : null}
 
           {openDrawer === 'right' ? (
-            <GameDrawer id="simulation-drawer" label="Mô phỏng và biên niên sử" side="right" onClose={() => closeDrawer('right')}>
-              <SimulationPanel world={session.world} simulation={session.simulation} selectedTile={lensTile} heatmap={heatmap} onHeatmapChange={setHeatmap} onPauseToggle={handlePauseToggle} onSpeedChange={handleSpeedChange} onPhoto={() => setPhotoSignal((current) => current + 1)} />
+            <GameDrawer id="simulation-drawer" label="Biên niên sử thế giới và mô phỏng" side="right" onClose={() => closeDrawer('right')}>
+              <SimulationPanel world={session.world} simulation={session.simulation} selectedTile={lensTile} heatmap={heatmap} onHeatmapChange={setHeatmap} onPauseToggle={handlePauseToggle} onSpeedChange={handleSpeedChange} onPhoto={() => setPhotoSignal((current) => current + 1)} onCouncilDecision={handleCouncilDecision} />
             </GameDrawer>
           ) : null}
 
@@ -444,7 +458,7 @@ export default function App(): JSX.Element {
           <div className="hud-tool-dock"><ToolDock activeTool={tool} onToolChange={setTool} onUndo={handleUndo} onRedo={handleRedo} canUndo={game.undoStack.length > 0} canRedo={game.redoStack.length > 0} onGlobalStorm={handleGlobalStorm} /></div>
         </div>
       </section>
-      <input ref={importRef} className="sr-only" type="file" accept="application/json,.json" onChange={handleImportFile} aria-label="Nhập bản lưu JSON" />
+      <input ref={importRef} className="sr-only" type="file" accept="application/json,.json" onChange={handleImportFile} aria-label="Nhập bản lưu JSON" tabIndex={-1} />
       <p className="sr-only" aria-live="polite" aria-atomic="true">{notice}</p>
     </main>
   )

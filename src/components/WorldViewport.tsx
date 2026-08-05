@@ -5,6 +5,8 @@ import type { HoveredTile, RenderStats } from '../renderer/WorldRenderer'
 import type { SimulationState } from '../simulation/types'
 import type { HeatmapMode, ToolId, World } from '../world/types'
 import type { QualityProfile } from '../renderer/quality'
+import type { AssetPackQuality } from '../assets/types'
+import type { GameEdition } from '../renderer/AssetPackManager'
 
 interface WorldViewportProps {
   world: World
@@ -13,6 +15,8 @@ interface WorldViewportProps {
   heatmap: HeatmapMode
   photoSignal: number
   quality: QualityProfile
+  assetPackQuality: AssetPackQuality
+  edition: GameEdition
   onTileHover: (tile: HoveredTile | undefined) => void
   onTileActivate: (tileIndex: number) => void
   onStats: (stats: RenderStats) => void
@@ -27,6 +31,8 @@ export function WorldViewport({
   heatmap,
   photoSignal,
   quality,
+  assetPackQuality,
+  edition,
   onTileHover,
   onTileActivate,
   onStats,
@@ -39,6 +45,7 @@ export function WorldViewport({
   const worldRef = useRef(world)
   const simulationRef = useRef(simulation)
   const qualityRef = useRef(quality)
+  const assetPackRef = useRef(assetPackQuality)
   const [error, setError] = useState<string | null>(null)
   const [attempt, setAttempt] = useState(0)
 
@@ -50,7 +57,8 @@ export function WorldViewport({
     worldRef.current = world
     simulationRef.current = simulation
     qualityRef.current = quality
-  }, [quality, simulation, world])
+    assetPackRef.current = assetPackQuality
+  }, [assetPackQuality, quality, simulation, world])
 
   useEffect(() => {
     const host = hostRef.current
@@ -62,7 +70,8 @@ export function WorldViewport({
         onTileActivate: (tileIndex) => callbacksRef.current.onTileActivate(tileIndex),
         onStats: (stats) => callbacksRef.current.onStats(stats),
         onWebGlError: (message) => setError(message),
-      }, qualityRef.current)
+       }, qualityRef.current, edition)
+       renderer.setAssetPack(assetPackRef.current)
       rendererRef.current = renderer
 
       return () => {
@@ -74,7 +83,7 @@ export function WorldViewport({
       const timeout = window.setTimeout(() => setError(message), 0)
       return () => window.clearTimeout(timeout)
     }
-  }, [attempt])
+  }, [attempt, edition])
 
   useEffect(() => {
     rendererRef.current?.updateWorld(world)
@@ -95,6 +104,10 @@ export function WorldViewport({
   useEffect(() => {
     rendererRef.current?.setQuality(quality)
   }, [quality])
+
+  useEffect(() => {
+    rendererRef.current?.setAssetPack(assetPackQuality)
+  }, [assetPackQuality])
 
   useEffect(() => {
     if (photoSignal === 0) return

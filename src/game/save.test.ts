@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { decodeSave, MAX_SAVE_BYTES, serializeSave } from './save'
+import { decodeSave, MAX_SAVE_BYTES, migrateSaveDocument, serializeSave } from './save'
 import { applyTerrainChange, createGameState } from './session'
 import { applyTerrainTool } from '../world/commands'
 import type { WorldConfig } from '../world/types'
@@ -70,5 +70,45 @@ describe('local save schema', () => {
     const withHistory = JSON.parse(serializeSave(createGameState(config))) as { game: { undoStack: unknown[] } }
     withHistory.game.undoStack.push({})
     expect(decodeSave(JSON.stringify(withHistory)).ok).toBe(false)
+  })
+
+  it('migrates v1 saves deterministically to the current objective and resilience schema', () => {
+    const legacy = JSON.parse(serializeSave(createGameState(config))) as {
+      schemaVersion: number
+      game: {
+        session: {
+          world: unknown
+          simulation: {
+            villages: Array<Record<string, unknown>>
+            objectives?: unknown
+            godToolUses?: unknown
+          }
+        }
+      }
+    }
+    legacy.schemaVersion = 1
+    for (const village of legacy.game.session.simulation.villages) delete village.resilience
+    delete legacy.game.session.simulation.objectives
+    delete legacy.game.session.simulation.godToolUses
+
+    const migratedDocument = migrateSaveDocument(legacy) as {
+      schemaVersion: number
+      game: {
+        session: {
+          world: unknown
+          simulation: { villages: Array<Record<string, unknown>> }
+        }
+      }
+    }
+    expect(migratedDocument.schemaVersion).toBe(2)
+    expect(migratedDocument.game.session.world).toEqual(legacy.game.session.world)
+    expect(migratedDocument.game.session.simulation.villages[0]?.resilience).toBe(42)
+    const migrated = decodeSave(JSON.stringify(legacy))
+    if (!migrated.ok) throw new Error(migrated.reason)
+    expect(migrated.ok).toBe(true)
+    if (!migrated.ok) return
+    expect(migrated.game.session.simulation.villages[0]!.resilience).toBe(42)
+    expect(migrated.game.session.simulation.objectives).toHaveLength(3)
+    expect(migrated.game.session.simulation.godToolUses.forest).toBe(0)
   })
 })

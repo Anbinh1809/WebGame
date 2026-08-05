@@ -115,7 +115,9 @@ function normalizeElevation(tiles: Tile[], config: WorldConfig, seed: number): T
       hash2d(seed ^ 0x4cf5ad43, tile.x, tile.z) > 0.43
     const elevatedTile = { ...tile, height, forest }
 
-    return { ...elevatedTile, biome: classifyBiome(elevatedTile, config) }
+    // Generation must establish the same ecology invariant used by terrain
+    // tools and save validation: ocean tiles cannot keep mineable resources.
+    return refreshTileBiome(elevatedTile, config)
   })
 }
 
