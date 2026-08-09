@@ -19,29 +19,29 @@ export function ChroniclePanel({ world, simulation }: ChroniclePanelProps): JSX.
       <div className="panel-heading compact-heading">
         <div>
           <span className="eyebrow">Ký ức theo seed</span>
-          <h2 id="chronicle-heading">Biên Niên Sử Thế Giới</h2>
+          <h2 id="chronicle-heading">Biên niên sử thế giới</h2>
         </div>
       </div>
 
       <div className="chronicle-status" role="status" aria-live="polite" aria-atomic="true">
-        <strong>Biên niên sử procedural</strong>
-        <p>Dựa trên seed, tick, chỉ số làng và các dấu ấn thần hiện tại; không thay đổi gameplay.</p>
+        <strong>Biên niên sử theo quy tắc</strong>
+        <p>Dựa trên seed, nhịp mô phỏng, chỉ số làng và những dấu ấn hiện tại của người chơi; không thay đổi mô phỏng.</p>
       </div>
 
       <div className="chronicle-actions">
         <button type="button" className="primary-button" onClick={() => setGeneratedTick(digest.tick)}>
-          Tạo Biên Niên Sử
+          Tạo biên niên sử
         </button>
       </div>
 
-      <article className={`chronicle-result chronicle-${chronicle.tone}`} aria-label="Biên niên sử procedural">
+      <article className={`chronicle-result chronicle-${chronicle.tone}`} aria-label="Biên niên sử theo quy tắc">
         <span className="eyebrow">{chronicle.legend}</span>
         <p>{chronicle.chronicle}</p>
         <ul>
           {chronicle.causalInsights.map((insight) => <li key={insight}>{insight}</li>)}
         </ul>
         {chronicle.godOpportunity ? <small>Cơ hội thần linh: {worldObjectiveLabel(chronicle.godOpportunity)}</small> : null}
-        {generatedTick === digest.tick ? <small className="chronicle-generated">Đã tạo lại từ tick {digest.tick}.</small> : null}
+        {generatedTick === digest.tick ? <small className="chronicle-generated">Đã tạo lại ở nhịp {digest.tick}.</small> : null}
       </article>
     </section>
   )

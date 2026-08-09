@@ -1,0 +1,66 @@
+{
+  "schemaVersion": 1,
+  "asset": {
+    "id": "boulder-01",
+    "slug": "boulder_01",
+    "license": "CC0-1.0",
+    "attribution": "Poly Haven — boulder_01 (CC0 1.0)",
+    "sourceUrl": "https://polyhaven.com/a/boulder_01"
+  },
+  "pack": "cinema-8k",
+  "textureSourceResolution": "8k",
+  "sourceCache": ".asset-cache/polyhaven-models/boulder_01/8k",
+  "sourceFiles": [
+    {
+      "path": "boulder_01_8k.gltf",
+      "sourceUrl": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/8k/boulder_01/boulder_01_8k.gltf",
+      "sourceMd5": "2566861c0a55322f2ca59d169a1d3b63",
+      "sourceChecksum": "sha256:bb9ab25f9f547d27cd6847409133718e16e5eb612138396c750c9e3d8e0d80e7",
+      "sourceBytes": 2773
+    },
+    {
+      "path": "textures/boulder_01_nor_gl_8k.jpg",
+      "sourceUrl": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/8k/boulder_01/boulder_01_nor_gl_8k.jpg",
+      "sourceMd5": "dba4e0065b5165f6087ae41133ac87f7",
+      "sourceChecksum": "sha256:b1f693b926d9af8f280591a0ced1bfb90be8b5e02b65a09be6bf4f00d2f49b97",
+      "sourceBytes": 80985955
+    },
+    {
+      "path": "boulder_01.bin",
+      "sourceUrl": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/8k/boulder_01/boulder_01.bin",
+      "sourceMd5": "27a19fa031d8b4c3a09261f19c444dc5",
+      "sourceChecksum": "sha256:7f5b06503d62bd95bfe9c6b8a354a5cc8ff04a4d271a8cf87a3e3125db4232d7",
+      "sourceBytes": 2938808
+    },
+    {
+      "path": "textures/boulder_01_arm_8k.jpg",
+      "sourceUrl": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/8k/boulder_01/boulder_01_arm_8k.jpg",
+      "sourceMd5": "e55253969f14c5c0117fe9c8c7f43d5a",
+      "sourceChecksum": "sha256:6bbab10a14b699902c594cb44995af9ea343ea1e9b55a6ef16971301f7495b3f",
+      "sourceBytes": 26401593
+    },
+    {
+      "path": "textures/boulder_01_diff_8k.jpg",
+      "sourceUrl": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/8k/boulder_01/boulder_01_diff_8k.jpg",
+      "sourceMd5": "dee5ebdad3bbc6619015a56ecc21120e",
+      "sourceChecksum": "sha256:36e3f8b181ccd3630b4a821c8e29af000d6cfa8f0ab80c23e7fc78bc790e24da",
+      "sourceBytes": 47005128
+    }
+  ],
+  "sourceBytes": 157334257,
+  "runtimeBytes": 155093620,
+  "variants": [
+    {
+      "id": "formation-lod1",
+      "simplifyRatio": 0.3,
+      "simplifyError": 0.0015,
+      "textureSize": 8192,
+      "intendedUse": "instanced cinema hillside boulder",
+      "maxInstances": 28,
+      "path": "models/boulder_01/boulder_01_formation-lod1.glb",
+      "processedPath": "desktop-packs/polyhaven/cinema-8k/models/boulder_01/boulder_01_formation-lod1.glb",
+      "processedChecksum": "sha256:7d6bec0ebed8b9a5de91ac8e38868b9210782aab262aa8650af838e05f3b0b27",
+      "processedBytes": 155093620
+    }
+  ]
+}

@@ -1,7 +1,15 @@
 import { validateAssetManifest } from './registry'
 import type { AssetManifestEntry, AssetPackQuality } from './types'
 
-const DESKTOP_PACKS = new Set<AssetPackQuality>(['desktop-2k', 'desktop-4k'])
+export type DesktopAssetPackQuality = Exclude<AssetPackQuality, 'web-1k'>
+export type DesktopPackAvailability = Record<DesktopAssetPackQuality, boolean>
+
+const DESKTOP_PACK_LIST: readonly DesktopAssetPackQuality[] = ['desktop-2k', 'desktop-4k', 'cinema-8k']
+const DESKTOP_PACKS = new Set<DesktopAssetPackQuality>(DESKTOP_PACK_LIST)
+
+function emptyDesktopPackAvailability(): DesktopPackAvailability {
+  return { 'desktop-2k': false, 'desktop-4k': false, 'cinema-8k': false }
+}
 
 export function desktopPackRoot(): string {
   const configured = import.meta.env.VITE_AETHERIA_DESKTOP_PACK_ROOT?.trim()
@@ -10,7 +18,7 @@ export function desktopPackRoot(): string {
 
 export function normalizeDesktopPackManifest(
   entries: readonly AssetManifestEntry[],
-  pack: Extract<AssetPackQuality, 'desktop-2k' | 'desktop-4k'>,
+  pack: DesktopAssetPackQuality,
   root = '/assets/polyhaven',
 ): AssetManifestEntry[] {
   const baseUrl = `${root.replace(/\/$/, '')}/${pack}`
@@ -31,7 +39,7 @@ export function normalizeDesktopPackManifest(
 }
 
 /** Desktop-only path. The Web Demo never fetches these external pack manifests. */
-export async function loadDesktopPackManifest(pack: Extract<AssetPackQuality, 'desktop-2k' | 'desktop-4k'>): Promise<AssetManifestEntry[]> {
+export async function loadDesktopPackManifest(pack: DesktopAssetPackQuality): Promise<AssetManifestEntry[]> {
   if (!DESKTOP_PACKS.has(pack)) throw new Error(`Unsupported desktop pack: ${pack}.`)
   const root = desktopPackRoot()
   const response = await fetch(`${root}/${pack}/manifest.json`, { cache: 'no-store' })
@@ -39,4 +47,24 @@ export async function loadDesktopPackManifest(pack: Extract<AssetPackQuality, 'd
   const payload: unknown = await response.json()
   if (!Array.isArray(payload)) throw new Error(`Desktop pack ${pack} manifest must be an array.`)
   return normalizeDesktopPackManifest(payload as AssetManifestEntry[], pack, root)
+}
+
+/**
+ * A desktop selector opens only packs whose local manifest can be read and
+ * validated. It deliberately does not probe Cinema 8K before entitlement.
+ */
+export async function probeDesktopPackAvailability(
+  packs: readonly DesktopAssetPackQuality[] = DESKTOP_PACK_LIST,
+): Promise<DesktopPackAvailability> {
+  const checks = await Promise.all(packs.map(async (pack) => {
+    try {
+      await loadDesktopPackManifest(pack)
+      return [pack, true] as const
+    } catch {
+      return [pack, false] as const
+    }
+  }))
+  const availability = emptyDesktopPackAvailability()
+  for (const [pack, available] of checks) availability[pack] = available
+  return availability
 }

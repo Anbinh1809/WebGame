@@ -96,7 +96,7 @@ export function WorldControls({
           <button type="submit" className="primary-button">Tái tạo</button>
           <button type="button" className="secondary-button" onClick={onRandomWorld}>Thế giới mới</button>
         </div>
-        <div className="save-actions" aria-label="Lưu và nạp thế giới cục bộ">
+        <div className="save-actions" role="group" aria-label="Lưu và nạp thế giới cục bộ">
           <button type="button" className="secondary-button" onClick={onSave}>Lưu</button>
           <button type="button" className="secondary-button" onClick={onLoad}>Nạp</button>
           <button type="button" className="secondary-button" onClick={onReset}>Đặt lại</button>

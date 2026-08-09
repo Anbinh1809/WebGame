@@ -1,6 +1,7 @@
 import { commitGameChange } from './session'
 import type { GameState } from './session'
-import { recordGodToolUse, resolveCouncilDecision, spawnSettlersAt, triggerStorm } from '../simulation/engine'
+import { developVillageTool, recordGodToolUse, resolveCouncilDecision, spawnSettlersAt, submitVillageKnowledge, triggerStorm } from '../simulation/engine'
+import { villageEraLabel } from '../simulation/progression'
 import type { CouncilChoiceId } from '../simulation/types'
 import { applyTerrainTool } from '../world/commands'
 import { TERRAIN_TOOL_LABELS } from '../world/types'
@@ -49,4 +50,24 @@ export function resolveCouncilAction(game: GameState, choice: CouncilChoiceId): 
   if (simulation === game.session.simulation) return game
   const label = choice === 'stockpile' ? 'Chuẩn bị kho lương' : 'Gia cố phòng vệ'
   return commitGameChange(game, { ...game.session, simulation }, label)
+}
+
+/** Settlement crafting is an undoable player decision, separate from god tools. */
+export function developPrimaryVillageToolAction(game: GameState): GameActionResult {
+  const result = developVillageTool(game.session.simulation)
+  if (!result.ok) return { game, notice: result.reason }
+  return {
+    game: commitGameChange(game, { ...game.session, simulation: result.simulation }, `Rèn ${result.toolLabel}`),
+    notice: `Đã rèn ${result.toolLabel}; ${villageEraLabel(result.era)} đã mở ra.`,
+  }
+}
+
+/** Teaching is undoable only after the deterministic compatibility check passes. */
+export function submitPrimaryVillageKnowledgeAction(game: GameState, proposal: string): GameActionResult {
+  const result = submitVillageKnowledge(game.session.simulation, proposal)
+  if (!result.ok) return { game, notice: result.reason }
+  return {
+    game: commitGameChange(game, { ...game.session, simulation: result.simulation }, `Truyền ${result.knowledgeLabel}`),
+    notice: `Đã truyền ${result.knowledgeLabel}. ${result.assessment.detail}`,
+  }
 }

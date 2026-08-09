@@ -9,6 +9,7 @@ const PACKS = new Map([
   ['web-1k', '1k'],
   ['desktop-2k', '2k'],
   ['desktop-4k', '4k'],
+  ['cinema-8k', '8k'],
 ])
 
 const MATERIALS = [
@@ -17,12 +18,16 @@ const MATERIALS = [
   { id: 'terrain-rock', slug: 'rocky_terrain_02', surface: 'terrainRock', biome: 'núi', useCase: 'rocky terrain and instanced rocks', repeat: [4, 4], maxInstances: 220, residentMiB: 7 },
   { id: 'terrain-sand', slug: 'coast_sand_02', surface: 'terrainSand', biome: 'bờ cát', useCase: 'coastal terrain material', repeat: [5, 5], maxInstances: 1, residentMiB: 7 },
   { id: 'terrain-snow', slug: 'snow_02', surface: 'terrainSnow', biome: 'tuyết', useCase: 'snow terrain material', repeat: [5, 5], maxInstances: 1, residentMiB: 6 },
-  { id: 'tree-foliage', slug: 'leafy_grass', surface: 'foliage', biome: 'rừng', useCase: 'instanced tree foliage', repeat: [1, 2], maxInstances: 240, residentMiB: 6 },
+  { id: 'tree-foliage', slug: 'leafy_grass', surface: 'foliage', biome: 'rừng', useCase: 'instanced tree foliage', repeat: [1, 2], maxInstances: 240, residentMiB: 6, preload: false },
   { id: 'tree-bark', slug: 'bark_brown_02', surface: 'trunk', biome: 'rừng', useCase: 'instanced tree trunks', repeat: [2, 3], maxInstances: 240, residentMiB: 6 },
   { id: 'settlement-wood', slug: 'dark_wooden_planks', surface: 'house', biome: 'settlement', useCase: 'procedural house walls', repeat: [2, 2], maxInstances: 48, residentMiB: 6 },
   { id: 'settlement-roof', slug: 'roof_slates_02', surface: 'roof', biome: 'settlement', useCase: 'procedural roofs', repeat: [2, 2], maxInstances: 48, residentMiB: 6 },
   { id: 'farm-soil', slug: 'brown_mud_dry', surface: 'farm', biome: 'settlement', useCase: 'procedural farms', repeat: [2, 2], maxInstances: 64, residentMiB: 5 },
   { id: 'road-gravel', slug: 'gravel_ground_01', surface: 'road', biome: 'settlement', useCase: 'procedural roads', repeat: [2, 4], maxInstances: 48, residentMiB: 6 },
+  { id: 'era-thatch-roof', slug: 'thatch_roof_angled', surface: 'thatchRoof', biome: 'stone-age', useCase: 'primitive hut roofs after the first crafted axe', repeat: [2, 2], maxInstances: 48, residentMiB: 5, preload: false },
+  { id: 'era-workshop-wood', slug: 'wooden_rough_planks', surface: 'workshopWood', biome: 'wood-age', useCase: 'instanced wood workshops after the first crafted axe', repeat: [2, 2], maxInstances: 24, residentMiB: 5, preload: false },
+  { id: 'era-metalwork', slug: 'metal_plate', surface: 'metalwork', biome: 'metal-age', useCase: 'instanced copper and iron forges after metallurgy', repeat: [2, 2], maxInstances: 24, residentMiB: 6, preload: false },
+  { id: 'era-stonework', slug: 'medieval_blocks_03', surface: 'stonework', biome: 'town', useCase: 'instanced town halls after ironworking', repeat: [2, 2], maxInstances: 12, residentMiB: 7, preload: false },
 ]
 
 const MAPS = [
@@ -31,12 +36,15 @@ const MAPS = [
   { key: 'roughness', apiKey: 'Rough', colorSpace: 'linear', quality: 90 },
 ]
 
-const HDRI = { id: 'environment-kloppenheim', slug: 'kloppenheim_02', surface: 'environment', biome: 'global', useCase: 'PMREM environment lighting', maxInstances: 1, residentMiB: 8 }
+const HDRIS = [
+  { id: 'environment-kloppenheim', slug: 'kloppenheim_02', surface: 'environment', environmentRole: 'lighting', biome: 'global', useCase: 'PMREM environment lighting', maxInstances: 1, residentMiB: 8, preload: true },
+  { id: 'environment-cloud-layers', slug: 'cloud_layers', surface: 'environment', environmentRole: 'sky', biome: 'global', useCase: 'detailed equirectangular cloud background after /play', maxInstances: 1, residentMiB: 18, preload: false },
+]
 
 function parseArguments(argv) {
   const packIndex = argv.indexOf('--pack')
   const pack = packIndex >= 0 ? argv[packIndex + 1] : 'web-1k'
-  if (!PACKS.has(pack)) throw new Error(`Unsupported pack: ${pack}. Expected web-1k, desktop-2k, or desktop-4k.`)
+  if (!PACKS.has(pack)) throw new Error(`Unsupported pack: ${pack}. Expected web-1k, desktop-2k, desktop-4k, or cinema-8k.`)
   return { pack, resolution: PACKS.get(pack) }
 }
 
@@ -110,6 +118,32 @@ function runtimeAssetPath(projectRoot, outputRoot, pack, outputPath) {
     : relative(outputRoot, outputPath).replaceAll('\\', '/')
 }
 
+/**
+ * A timed-out 8K curation run can resume safely: the source is checksum-backed
+ * and an existing WebP is reused only when it preserves the source dimensions.
+ */
+async function encodeRuntimeMap(input, outputPath, map) {
+  const sourceInfo = await sharp(input, { animated: false }).metadata()
+  let output
+  let info
+  try {
+    output = await readFile(outputPath)
+    info = await sharp(output, { animated: false }).metadata()
+  } catch {
+    output = undefined
+    info = undefined
+  }
+
+  if (!output || !info || info.width !== sourceInfo.width || info.height !== sourceInfo.height) {
+    await mkdir(dirname(outputPath), { recursive: true })
+    await sharp(input, { animated: false }).webp({ quality: map.quality, effort: 4 }).toFile(outputPath)
+    output = await readFile(outputPath)
+    info = await sharp(output, { animated: false }).metadata()
+  }
+  if (!info.width || !info.height) throw new Error(`Could not read processed image metadata: ${outputPath}`)
+  return { output, info }
+}
+
 async function processMaterial(projectRoot, sourceRoot, outputRoot, pack, resolution, material) {
   const metadata = await fileMetadata(material.slug)
   const files = []
@@ -123,10 +157,7 @@ async function processMaterial(projectRoot, sourceRoot, outputRoot, pack, resolu
     const sourcePath = resolve(sourceRoot, material.slug, `${map.key}.jpg`)
     const input = await downloadSource(sourcePath, source.url, source.md5)
     const outputPath = resolve(outputRoot, material.slug, `${map.key}.webp`)
-    await mkdir(dirname(outputPath), { recursive: true })
-    await sharp(input, { animated: false }).webp({ quality: map.quality, effort: 4 }).toFile(outputPath)
-    const output = await readFile(outputPath)
-    const info = await sharp(output).metadata()
+    const { output, info } = await encodeRuntimeMap(input, outputPath, map)
     const sourceSha = `sha256:${checksum(input)}`
     const processedSha = `sha256:${checksum(output)}`
     sourceChecksums.push(`${map.key}:${sourceSha}`)
@@ -161,12 +192,12 @@ async function processMaterial(projectRoot, sourceRoot, outputRoot, pack, resolu
     sourceChecksum: aggregateChecksum(sourceChecksums),
     processedChecksum: aggregateChecksum(processedChecksums),
     fileSizes: { sourceBytes, processedBytes, runtimeBytes: processedBytes },
-    runtimeBudget: { maxInstances: material.maxInstances, residentMiB: material.residentMiB, preload: true, intendedUse: material.useCase },
+    runtimeBudget: { maxInstances: material.maxInstances, residentMiB: material.residentMiB, preload: material.preload !== false, intendedUse: material.useCase },
     files,
   }
 }
 
-async function processHdri(projectRoot, sourceRoot, outputRoot, pack, resolution) {
+async function processHdri(projectRoot, sourceRoot, outputRoot, pack, resolution, HDRI) {
   const metadata = await fileMetadata(HDRI.slug)
   const source = hdriFile(metadata, resolution, HDRI.slug)
   const sourcePath = resolve(sourceRoot, HDRI.slug, 'environment.hdr')
@@ -178,6 +209,7 @@ async function processHdri(projectRoot, sourceRoot, outputRoot, pack, resolution
   return {
     id: `${HDRI.id}-${pack}`,
     surface: HDRI.surface,
+    environmentRole: HDRI.environmentRole,
     provider: 'polyhaven',
     polyHavenSlug: HDRI.slug,
     sourceUrl: `https://polyhaven.com/a/${HDRI.slug}`,
@@ -188,7 +220,7 @@ async function processHdri(projectRoot, sourceRoot, outputRoot, pack, resolution
     sourceChecksum: sha,
     processedChecksum: sha,
     fileSizes: { sourceBytes: input.byteLength, processedBytes: input.byteLength, runtimeBytes: input.byteLength },
-    runtimeBudget: { maxInstances: HDRI.maxInstances, residentMiB: HDRI.residentMiB, preload: true, intendedUse: HDRI.useCase },
+    runtimeBudget: { maxInstances: HDRI.maxInstances, residentMiB: HDRI.residentMiB, preload: HDRI.preload, intendedUse: HDRI.useCase },
     files: [{
       role: 'environment',
       sourceUrl: source.url,
@@ -211,7 +243,7 @@ async function main() {
   const outputRoot = runtimeRoot(projectRoot, pack)
   const entries = []
   for (const material of MATERIALS) entries.push(await processMaterial(projectRoot, sourceRoot, outputRoot, pack, resolution, material))
-  entries.push(await processHdri(projectRoot, sourceRoot, outputRoot, pack, resolution))
+  for (const hdri of HDRIS) entries.push(await processHdri(projectRoot, sourceRoot, outputRoot, pack, resolution, hdri))
 
   const report = {
     schemaVersion: 1,
@@ -246,6 +278,7 @@ async function main() {
     runtime: {
       kind: entry.surface === 'environment' ? 'environment' : 'material',
       surface: entry.surface,
+      ...(entry.environmentRole ? { environmentRole: entry.environmentRole } : {}),
       ...(entry.repeat ? { repeat: entry.repeat } : {}),
       files: entry.files.map((file) => ({ role: file.role, path: file.runtimePath, colorSpace: file.colorSpace })),
     },

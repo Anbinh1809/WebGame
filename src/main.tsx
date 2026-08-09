@@ -1,5 +1,6 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
+import { PlayerAuthProvider } from './auth/PlayerAuthContext'
 import { AetheriaRouter } from './components/AetheriaRouter'
 import './styles.css'
 
@@ -11,6 +12,8 @@ if (!root) {
 
 createRoot(root).render(
   <StrictMode>
-    <AetheriaRouter />
+    <PlayerAuthProvider>
+      <AetheriaRouter />
+    </PlayerAuthProvider>
   </StrictMode>,
 )

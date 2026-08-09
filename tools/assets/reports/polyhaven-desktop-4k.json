@@ -4,7 +4,7 @@
   "sourceResolution": "4k",
   "runtimeRoot": "desktop-packs/polyhaven/desktop-4k",
   "sourceCache": ".asset-cache/polyhaven/desktop-4k",
-  "runtimeBytes": 192011496,
+  "runtimeBytes": 267443784,
   "entries": [
     {
       "id": "terrain-grass-desktop-4k",
@@ -360,7 +360,7 @@
       "runtimeBudget": {
         "maxInstances": 240,
         "residentMiB": 6,
-        "preload": true,
+        "preload": false,
         "intendedUse": "instanced tree foliage"
       },
       "files": [
@@ -733,8 +733,273 @@
       ]
     },
     {
+      "id": "era-thatch-roof-desktop-4k",
+      "surface": "thatchRoof",
+      "provider": "polyhaven",
+      "polyHavenSlug": "thatch_roof_angled",
+      "sourceUrl": "https://polyhaven.com/a/thatch_roof_angled",
+      "license": "CC0-1.0",
+      "attribution": "Poly Haven — thatch_roof_angled (CC0 1.0)",
+      "biome": "stone-age",
+      "useCase": "primitive hut roofs after the first crafted axe",
+      "repeat": [
+        2,
+        2
+      ],
+      "sourceChecksum": "sha256:221ca00b60baf6400cc4452b19aa034ed4410c9cc2c45e84fe109d77a96fed33",
+      "processedChecksum": "sha256:9405bb8e7aef895150e80cd3b135b5e934944e9207734c0e5d94ab5dc8136443",
+      "fileSizes": {
+        "sourceBytes": 36978970,
+        "processedBytes": 13460698,
+        "runtimeBytes": 13460698
+      },
+      "runtimeBudget": {
+        "maxInstances": 48,
+        "residentMiB": 5,
+        "preload": false,
+        "intendedUse": "primitive hut roofs after the first crafted axe"
+      },
+      "files": [
+        {
+          "role": "albedo",
+          "sourceUrl": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/4k/thatch_roof_angled/thatch_roof_angled_diff_4k.jpg",
+          "sourceChecksum": "sha256:9d7eaf754a24da9b783ff77c0e091aa20e419a9bbfbc892a60a69beb6b6b3c73",
+          "processedChecksum": "sha256:508ab02ce5bc1b4996575b5037fe49f39dc472fd8c1a1fc035032d15c357a3f9",
+          "sourceBytes": 10863647,
+          "runtimeBytes": 2316958,
+          "runtimePath": "thatch_roof_angled/albedo.webp",
+          "colorSpace": "srgb",
+          "width": 4096,
+          "height": 4096
+        },
+        {
+          "role": "normal",
+          "sourceUrl": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/4k/thatch_roof_angled/thatch_roof_angled_nor_gl_4k.jpg",
+          "sourceChecksum": "sha256:57f8047256153fb74d06dfce4c9f277f7bc323550d05474b5100f9a2ea1aace9",
+          "processedChecksum": "sha256:a8eecbbdd512274918522e64a658e480ac9a6d5cc030fbb8d708edcaa3e4a72a",
+          "sourceBytes": 18621203,
+          "runtimeBytes": 9261940,
+          "runtimePath": "thatch_roof_angled/normal.webp",
+          "colorSpace": "linear",
+          "width": 4096,
+          "height": 4096
+        },
+        {
+          "role": "roughness",
+          "sourceUrl": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/4k/thatch_roof_angled/thatch_roof_angled_rough_4k.jpg",
+          "sourceChecksum": "sha256:b69d5d9b5b7a24b06588327c6be4ed64cea54cc141ab876d0328efcdf8a81033",
+          "processedChecksum": "sha256:3f1b34b26722303ff74b67ce70f9cb033c3570e246db6a70dec5478945993736",
+          "sourceBytes": 7494120,
+          "runtimeBytes": 1881800,
+          "runtimePath": "thatch_roof_angled/roughness.webp",
+          "colorSpace": "linear",
+          "width": 4096,
+          "height": 4096
+        }
+      ]
+    },
+    {
+      "id": "era-workshop-wood-desktop-4k",
+      "surface": "workshopWood",
+      "provider": "polyhaven",
+      "polyHavenSlug": "wooden_rough_planks",
+      "sourceUrl": "https://polyhaven.com/a/wooden_rough_planks",
+      "license": "CC0-1.0",
+      "attribution": "Poly Haven — wooden_rough_planks (CC0 1.0)",
+      "biome": "wood-age",
+      "useCase": "instanced wood workshops after the first crafted axe",
+      "repeat": [
+        2,
+        2
+      ],
+      "sourceChecksum": "sha256:91b9f0e717e178017dfd70f9bf3a6a82b2e08703a4c127f6fa48e79f666997c8",
+      "processedChecksum": "sha256:c2ccd4c422e264a16ad5257e5affc60afd91287f059330b6f03f67b4cd31afe3",
+      "fileSizes": {
+        "sourceBytes": 17735726,
+        "processedBytes": 10237172,
+        "runtimeBytes": 10237172
+      },
+      "runtimeBudget": {
+        "maxInstances": 24,
+        "residentMiB": 5,
+        "preload": false,
+        "intendedUse": "instanced wood workshops after the first crafted axe"
+      },
+      "files": [
+        {
+          "role": "albedo",
+          "sourceUrl": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/4k/wooden_rough_planks/wooden_rough_planks_diff_4k.jpg",
+          "sourceChecksum": "sha256:9f8a077abf4343cf98b57e750577bdabee52550041c21f3324e82d4b44812980",
+          "processedChecksum": "sha256:302c35a2e33dc56d4d1124605eb6ba3ff58ee09ec8b03df74507bcb115c8abb4",
+          "sourceBytes": 10439109,
+          "runtimeBytes": 4773574,
+          "runtimePath": "wooden_rough_planks/albedo.webp",
+          "colorSpace": "srgb",
+          "width": 4096,
+          "height": 4096
+        },
+        {
+          "role": "normal",
+          "sourceUrl": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/4k/wooden_rough_planks/wooden_rough_planks_nor_gl_4k.jpg",
+          "sourceChecksum": "sha256:c041a80f05737b3b1ae1965d859de14e1d71393c089943b1c081eb099a07ec96",
+          "processedChecksum": "sha256:9f8d1055b03a9c2be7073c1ade202975a65c7fc2413dec93ea3e0200ddfbc8a3",
+          "sourceBytes": 3826450,
+          "runtimeBytes": 1979852,
+          "runtimePath": "wooden_rough_planks/normal.webp",
+          "colorSpace": "linear",
+          "width": 4096,
+          "height": 4096
+        },
+        {
+          "role": "roughness",
+          "sourceUrl": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/4k/wooden_rough_planks/wooden_rough_planks_rough_4k.jpg",
+          "sourceChecksum": "sha256:9f93a785302c8089e335641451528a2338e41cebcbb22601e4d42bec62689f6e",
+          "processedChecksum": "sha256:092999342be3f31261be4b363c34fc33d6913e04916afeaeb4661d5fc5bcb746",
+          "sourceBytes": 3470167,
+          "runtimeBytes": 3483746,
+          "runtimePath": "wooden_rough_planks/roughness.webp",
+          "colorSpace": "linear",
+          "width": 4096,
+          "height": 4096
+        }
+      ]
+    },
+    {
+      "id": "era-metalwork-desktop-4k",
+      "surface": "metalwork",
+      "provider": "polyhaven",
+      "polyHavenSlug": "metal_plate",
+      "sourceUrl": "https://polyhaven.com/a/metal_plate",
+      "license": "CC0-1.0",
+      "attribution": "Poly Haven — metal_plate (CC0 1.0)",
+      "biome": "metal-age",
+      "useCase": "instanced copper and iron forges after metallurgy",
+      "repeat": [
+        2,
+        2
+      ],
+      "sourceChecksum": "sha256:6fbad32523742e6c5b64cf47cbc6ebbabd0138973dc705896f5e60a03ad00011",
+      "processedChecksum": "sha256:ad7618cf02ca62022fd8a76481ee9fb69b7c26e7715a62cc42f49222ff81f230",
+      "fileSizes": {
+        "sourceBytes": 28820423,
+        "processedBytes": 9030720,
+        "runtimeBytes": 9030720
+      },
+      "runtimeBudget": {
+        "maxInstances": 24,
+        "residentMiB": 6,
+        "preload": false,
+        "intendedUse": "instanced copper and iron forges after metallurgy"
+      },
+      "files": [
+        {
+          "role": "albedo",
+          "sourceUrl": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/4k/metal_plate/metal_plate_diff_4k.jpg",
+          "sourceChecksum": "sha256:400ca39b8a01084ad23b2a0754e7efe84cad24bf415f25f318f450298e54bd4b",
+          "processedChecksum": "sha256:1826b0e5d8183e23dfab5c9dbae8f8aa5817188ce1fa8c24f407e1b3c7c2d5ed",
+          "sourceBytes": 9734135,
+          "runtimeBytes": 1470852,
+          "runtimePath": "metal_plate/albedo.webp",
+          "colorSpace": "srgb",
+          "width": 4096,
+          "height": 4096
+        },
+        {
+          "role": "normal",
+          "sourceUrl": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/4k/metal_plate/metal_plate_nor_gl_4k.jpg",
+          "sourceChecksum": "sha256:d36d2ec0f3b1980286758adea50ca7205f712209bbb1baa8c25bada35398b502",
+          "processedChecksum": "sha256:db779368ae73a1f594557d63844af8ed6343907d298696bc241d333555337631",
+          "sourceBytes": 7515712,
+          "runtimeBytes": 2920486,
+          "runtimePath": "metal_plate/normal.webp",
+          "colorSpace": "linear",
+          "width": 4096,
+          "height": 4096
+        },
+        {
+          "role": "roughness",
+          "sourceUrl": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/4k/metal_plate/metal_plate_rough_4k.jpg",
+          "sourceChecksum": "sha256:20a839c3f98e0ef8181a5914d99db689c13a7744f5f9cb615eaa873ac41a382c",
+          "processedChecksum": "sha256:6d8573047a7407cdbd55777b31a8b6a1f46a84375c5a2cb6468f9045611f8e4b",
+          "sourceBytes": 11570576,
+          "runtimeBytes": 4639382,
+          "runtimePath": "metal_plate/roughness.webp",
+          "colorSpace": "linear",
+          "width": 4096,
+          "height": 4096
+        }
+      ]
+    },
+    {
+      "id": "era-stonework-desktop-4k",
+      "surface": "stonework",
+      "provider": "polyhaven",
+      "polyHavenSlug": "medieval_blocks_03",
+      "sourceUrl": "https://polyhaven.com/a/medieval_blocks_03",
+      "license": "CC0-1.0",
+      "attribution": "Poly Haven — medieval_blocks_03 (CC0 1.0)",
+      "biome": "town",
+      "useCase": "instanced town halls after ironworking",
+      "repeat": [
+        2,
+        2
+      ],
+      "sourceChecksum": "sha256:f49822e2d52691e7c74ca2842bf2a90b5cf9230fe2fdbdc823213e0090a37e8f",
+      "processedChecksum": "sha256:941c7e14a56195289ec1d194fb8edb75476d25d2ad969ab44d78d73a96840515",
+      "fileSizes": {
+        "sourceBytes": 39928850,
+        "processedBytes": 14940444,
+        "runtimeBytes": 14940444
+      },
+      "runtimeBudget": {
+        "maxInstances": 12,
+        "residentMiB": 7,
+        "preload": false,
+        "intendedUse": "instanced town halls after ironworking"
+      },
+      "files": [
+        {
+          "role": "albedo",
+          "sourceUrl": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/4k/medieval_blocks_03/medieval_blocks_03_diff_4k.jpg",
+          "sourceChecksum": "sha256:2113b803fd1d992b1d4776c1f003105970c4c75e3741d51348c040037186349e",
+          "processedChecksum": "sha256:d295b3789abd08c04b90284ea828f10f537e2a62a67a45b1d61cc4f48edecfe5",
+          "sourceBytes": 14712151,
+          "runtimeBytes": 4377240,
+          "runtimePath": "medieval_blocks_03/albedo.webp",
+          "colorSpace": "srgb",
+          "width": 4096,
+          "height": 4096
+        },
+        {
+          "role": "normal",
+          "sourceUrl": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/4k/medieval_blocks_03/medieval_blocks_03_nor_gl_4k.jpg",
+          "sourceChecksum": "sha256:873dc89f9c9b653f2504c60e0e6763239f56930a5d09714eab4796eb1db1509c",
+          "processedChecksum": "sha256:2533416c1144a6032c826242350692f67df58c06412ef92d5cce60230dd76cb4",
+          "sourceBytes": 18141764,
+          "runtimeBytes": 9110796,
+          "runtimePath": "medieval_blocks_03/normal.webp",
+          "colorSpace": "linear",
+          "width": 4096,
+          "height": 4096
+        },
+        {
+          "role": "roughness",
+          "sourceUrl": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/4k/medieval_blocks_03/medieval_blocks_03_rough_4k.jpg",
+          "sourceChecksum": "sha256:c7fccc4f3a36bd325870fb5b314efc73f9d90d3a1a7b38e083db69e4338365e4",
+          "processedChecksum": "sha256:635a86fd99ff40a8ef5f6787fb29bc7c2043db1c88b73febb39da2e3c7e95b1b",
+          "sourceBytes": 7074935,
+          "runtimeBytes": 1452408,
+          "runtimePath": "medieval_blocks_03/roughness.webp",
+          "colorSpace": "linear",
+          "width": 4096,
+          "height": 4096
+        }
+      ]
+    },
+    {
       "id": "environment-kloppenheim-desktop-4k",
       "surface": "environment",
+      "environmentRole": "lighting",
       "provider": "polyhaven",
       "polyHavenSlug": "kloppenheim_02",
       "sourceUrl": "https://polyhaven.com/a/kloppenheim_02",
@@ -764,6 +1029,43 @@
           "sourceBytes": 27641994,
           "runtimeBytes": 27641994,
           "runtimePath": "kloppenheim_02/environment.hdr",
+          "colorSpace": "linear"
+        }
+      ]
+    },
+    {
+      "id": "environment-cloud-layers-desktop-4k",
+      "surface": "environment",
+      "environmentRole": "sky",
+      "provider": "polyhaven",
+      "polyHavenSlug": "cloud_layers",
+      "sourceUrl": "https://polyhaven.com/a/cloud_layers",
+      "license": "CC0-1.0",
+      "attribution": "Poly Haven — cloud_layers (CC0 1.0)",
+      "biome": "global",
+      "useCase": "detailed equirectangular cloud background after /play",
+      "sourceChecksum": "sha256:1c2433a73ea245e376f0f57471938c3f2a713c3a6101ef962fa6022389ee7e6f",
+      "processedChecksum": "sha256:1c2433a73ea245e376f0f57471938c3f2a713c3a6101ef962fa6022389ee7e6f",
+      "fileSizes": {
+        "sourceBytes": 27763254,
+        "processedBytes": 27763254,
+        "runtimeBytes": 27763254
+      },
+      "runtimeBudget": {
+        "maxInstances": 1,
+        "residentMiB": 18,
+        "preload": false,
+        "intendedUse": "detailed equirectangular cloud background after /play"
+      },
+      "files": [
+        {
+          "role": "environment",
+          "sourceUrl": "https://dl.polyhaven.org/file/ph-assets/HDRIs/hdr/4k/cloud_layers_4k.hdr",
+          "sourceChecksum": "sha256:1c2433a73ea245e376f0f57471938c3f2a713c3a6101ef962fa6022389ee7e6f",
+          "processedChecksum": "sha256:1c2433a73ea245e376f0f57471938c3f2a713c3a6101ef962fa6022389ee7e6f",
+          "sourceBytes": 27763254,
+          "runtimeBytes": 27763254,
+          "runtimePath": "cloud_layers/environment.hdr",
           "colorSpace": "linear"
         }
       ]

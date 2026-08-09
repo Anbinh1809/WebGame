@@ -1,4 +1,4 @@
-export const WORLD_SIZES = [28, 36, 44] as const
+export const WORLD_SIZES = [28, 36, 48, 60] as const
 
 export type Climate = 'ôn hòa' | 'ấm' | 'lạnh'
 export type TerrainKind = 'biển' | 'bờ cát' | 'đồng cỏ' | 'rừng' | 'đồi' | 'núi' | 'tuyết'
@@ -54,7 +54,7 @@ export interface TileMutationCommand {
 
 export const DEFAULT_WORLD_CONFIG: WorldConfig = {
   seed: 'aetheria-bình-minh',
-  size: 36,
+  size: 48,
   climate: 'ôn hòa',
   water: 0.54,
   resources: 0.62,

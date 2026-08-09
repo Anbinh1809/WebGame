@@ -1,0 +1,65 @@
+{
+  "schemaVersion": 1,
+  "asset": {
+    "id": "rock-face-01",
+    "slug": "rock_face_01",
+    "license": "CC0-1.0",
+    "attribution": "Poly Haven — rock_face_01 by Dario Barresi (CC0 1.0)",
+    "sourceUrl": "https://polyhaven.com/a/rock_face_01"
+  },
+  "pack": "web-1k",
+  "textureSourceResolution": "1k",
+  "sourceCache": ".asset-cache/polyhaven-models/rock_face_01/1k",
+  "sourceFiles": [
+    {
+      "path": "rock_face_01_1k.gltf",
+      "sourceUrl": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/1k/rock_face_01/rock_face_01_1k.gltf",
+      "sourceMd5": "b4855bc7e841a17a94332561a9b301c0",
+      "sourceChecksum": "sha256:96c332c01d173a2431115f3bac29be101fba341e5500e2a08e384f4edd17299e",
+      "sourceBytes": 2793
+    },
+    {
+      "path": "textures/rock_face_01_arm_1k.jpg",
+      "sourceUrl": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/rock_face_01/rock_face_01_arm_1k.jpg",
+      "sourceMd5": "5799e7f5546350576b87bf67c34fb49f",
+      "sourceChecksum": "sha256:59128c79d207a50a69a38002986135ade3b19642d26158cec141eca41578c9ca",
+      "sourceBytes": 693610
+    },
+    {
+      "path": "textures/rock_face_01_nor_gl_1k.jpg",
+      "sourceUrl": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/rock_face_01/rock_face_01_nor_gl_1k.jpg",
+      "sourceMd5": "46e01f5c3b8ac4463aeef2b4c61d1cd4",
+      "sourceChecksum": "sha256:9a9d85b9a01f4e24fc9ceec8baf96c019f552bca69591ff544c7a725e28b1d97",
+      "sourceBytes": 1023400
+    },
+    {
+      "path": "textures/rock_face_01_diff_1k.jpg",
+      "sourceUrl": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/rock_face_01/rock_face_01_diff_1k.jpg",
+      "sourceMd5": "98ee9f024a6383d7e6cab44ed41e1f15",
+      "sourceChecksum": "sha256:41bd26ed2db1332b1ebb4b1326fd8af4d21f0f0eb57b8ea385033115c722cfdb",
+      "sourceBytes": 853749
+    },
+    {
+      "path": "rock_face_01.bin",
+      "sourceUrl": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/8k/rock_face_01/rock_face_01.bin",
+      "sourceMd5": "06caed23e725af568b64f8cbee210c1c",
+      "sourceChecksum": "sha256:873eac0319333e92bc96ddeedf8ebf69dc3c68ff1dfe32d8c14ddc165cdb20ac",
+      "sourceBytes": 476436
+    }
+  ],
+  "sourceBytes": 3049988,
+  "runtimeBytes": 2703184,
+  "variants": [
+    {
+      "id": "formation-lod0",
+      "simplify": false,
+      "textureSize": 1024,
+      "intendedUse": "instanced Web rock formation",
+      "maxInstances": 12,
+      "path": "/assets/polyhaven/web-1k/models/rock_face_01/rock_face_01_formation-lod0.glb",
+      "processedPath": "public/assets/polyhaven/web-1k/models/rock_face_01/rock_face_01_formation-lod0.glb",
+      "processedChecksum": "sha256:2fac2c236c0892a9642ffd248d2c02da68c00b52887ab9013a489961786c7dd1",
+      "processedBytes": 2703184
+    }
+  ]
+}

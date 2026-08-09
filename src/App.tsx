@@ -1,24 +1,31 @@
-import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { ChangeEvent, JSX } from 'react'
+import { usePlayerAuth } from './auth/usePlayerAuth'
 import { GameDrawer } from './components/GameDrawer'
 import { GameErrorBoundary } from './components/GameErrorBoundary'
 import { FullscreenButton } from './components/FullscreenButton'
+import { GraphicsSettings } from './components/GraphicsSettings'
 import { isInteractiveShortcutTarget } from './components/keyboard'
+import { PlayerAccountPanel } from './components/PlayerAccountPanel'
 import { SimulationPanel } from './components/SimulationPanel'
 import { ToolDock } from './components/ToolDock'
 import { WorldControls } from './components/WorldControls'
-import { applyMapToolAction, resolveCouncilAction, triggerGlobalStormAction } from './game/actions'
+import { applyMapToolAction, developPrimaryVillageToolAction, resolveCouncilAction, submitPrimaryVillageKnowledgeAction, triggerGlobalStormAction } from './game/actions'
 import { createGameState, recreateWorld, redoGameChange, undoGameChange } from './game/session'
 import { decodeSave, loadFromLocalStorage, MAX_SAVE_BYTES, saveToLocalStorage, serializeSave } from './game/save'
 import type { HoveredTile, RenderStats } from './renderer/WorldRenderer'
-import { QUALITY_LABELS } from './renderer/quality'
-import type { QualityProfile } from './renderer/quality'
+import { createGraphicsQualityOverrides, QUALITY_LABELS } from './renderer/quality'
+import type { GraphicsQualityOverrides, QualityProfile } from './renderer/quality'
 import { advanceSimulation, setSimulationSpeed, toggleSimulationPause } from './simulation/engine'
 import type { SimulationSpeed } from './simulation/types'
 import { DEFAULT_WORLD_CONFIG, TERRAIN_TOOL_LABELS } from './world/types'
 import type { HeatmapMode, ToolId, WorldConfig } from './world/types'
 import type { AssetPackQuality } from './assets/types'
-import { DESKTOP_TEXTURE_PACKS, GAME_EDITION, IS_DESKTOP_EDITION } from './runtime/edition'
+import { probeDesktopPackAvailability } from './assets/desktopPackManifest'
+import type { DesktopPackAvailability } from './assets/desktopPackManifest'
+import { resolveDesktopAssetPackEntitlements } from './commerce/entitlements'
+import type { AssetPackEntitlements } from './renderer/AssetPackManager'
+import { ASSET_PACK_LABELS, assetPackForQualityProfile, GAME_EDITION, IS_DESKTOP_EDITION } from './runtime/edition'
 
 const WorldViewport = lazy(async () => {
   const module = await import('./components/WorldViewport')
@@ -33,12 +40,12 @@ const worldLoadingFallback = (
 )
 
 type DrawerSide = 'left' | 'right' | null
+type DrawerTrigger = 'world' | 'player' | 'simulation'
 
-const ASSET_PACK_LABELS: Record<AssetPackQuality, string> = {
-  'web-1k': '1K',
-  'desktop-2k': '2K',
-  'desktop-4k': '4K',
-  'cinema-8k': 'Cinema 8K',
+const EMPTY_DESKTOP_PACK_AVAILABILITY: DesktopPackAvailability = {
+  'desktop-2k': false,
+  'desktop-4k': false,
+  'cinema-8k': false,
 }
 
 function initialConfig(): WorldConfig {
@@ -73,15 +80,21 @@ function toolInstruction(tool: ToolId): string {
 }
 
 export default function App(): JSX.Element {
+  const { session: playerSession } = usePlayerAuth()
   const [game, setGame] = useState(() => createGameState(initialConfig()))
   const [draft, setDraft] = useState<WorldConfig>(() => initialConfig())
   const [tool, setTool] = useState<ToolId>('raise')
   const [heatmap, setHeatmap] = useState<HeatmapMode>('địa hình')
   const [quality, setQuality] = useState<QualityProfile>('auto')
+  const [graphicsOverrides, setGraphicsOverrides] = useState<GraphicsQualityOverrides>(() => createGraphicsQualityOverrides())
   const [assetPackQuality, setAssetPackQuality] = useState<AssetPackQuality>('web-1k')
+  const [desktopPackAvailability, setDesktopPackAvailability] = useState<DesktopPackAvailability>(EMPTY_DESKTOP_PACK_AVAILABILITY)
+  const [isCheckingDesktopPacks, setIsCheckingDesktopPacks] = useState(IS_DESKTOP_EDITION)
+  const [cinema8kEntitled, setCinema8kEntitled] = useState(false)
+  const [isCheckingCinemaEntitlement, setIsCheckingCinemaEntitlement] = useState(IS_DESKTOP_EDITION)
   const [hoveredTile, setHoveredTile] = useState<HoveredTile | undefined>(undefined)
   const [selectedTileIndex, setSelectedTileIndex] = useState<number | undefined>(undefined)
-  const [renderStats, setRenderStats] = useState<RenderStats>({ fps: 0, drawCalls: 0, triangles: 0, textures: 0, assetLoadDurationMs: 0, assetPack: 'procedural', assetPackFallback: true, assetPackReason: 'Đang chờ asset pack.', assetLoadState: 'idle' })
+  const [renderStats, setRenderStats] = useState<RenderStats>({ fps: 0, drawCalls: 0, triangles: 0, textures: 0, assetLoadDurationMs: 0, assetPack: 'procedural', assetPackFallback: true, assetPackReason: 'Đang chờ gói đồ họa.', assetLoadState: 'idle' })
   const [notice, setNotice] = useState('Thế giới đã sẵn sàng. Chọn một quyền năng rồi nhấp lên bản đồ.')
   const [photoSignal, setPhotoSignal] = useState(0)
   const [openDrawer, setOpenDrawer] = useState<DrawerSide>(null)
@@ -92,7 +105,9 @@ export default function App(): JSX.Element {
   const activeImportRef = useRef<FileReader | null>(null)
   const leftToggleRef = useRef<HTMLButtonElement>(null)
   const rightToggleRef = useRef<HTMLButtonElement>(null)
+  const playerProfileToggleRef = useRef<HTMLButtonElement>(null)
   const openDrawerRef = useRef<DrawerSide>(null)
+  const drawerTriggerRef = useRef<DrawerTrigger | null>(null)
 
   useEffect(() => {
     gameRef.current = game
@@ -101,6 +116,37 @@ export default function App(): JSX.Element {
   useEffect(() => {
     openDrawerRef.current = openDrawer
   }, [openDrawer])
+
+  useEffect(() => {
+    if (!IS_DESKTOP_EDITION) return undefined
+    let active = true
+    void resolveDesktopAssetPackEntitlements(true).then((entitlements) => {
+      if (!active) return
+      if (entitlements.cinema8k) setIsCheckingDesktopPacks(true)
+      setCinema8kEntitled(entitlements.cinema8k)
+      setIsCheckingCinemaEntitlement(false)
+    })
+    return () => { active = false }
+  }, [])
+
+  useEffect(() => {
+    if (!IS_DESKTOP_EDITION) return undefined
+    let active = true
+    const packs = cinema8kEntitled
+      ? ['desktop-2k', 'desktop-4k', 'cinema-8k'] as const
+      : ['desktop-2k', 'desktop-4k'] as const
+    void probeDesktopPackAvailability(packs).then((availability) => {
+      if (!active) return
+      setDesktopPackAvailability(availability)
+      setIsCheckingDesktopPacks(false)
+    })
+    return () => { active = false }
+  }, [cinema8kEntitled])
+
+  const assetPackEntitlements = useMemo<AssetPackEntitlements>(() => ({
+    desktopGame: IS_DESKTOP_EDITION,
+    cinema8k: IS_DESKTOP_EDITION && cinema8kEntitled,
+  }), [cinema8kEntitled])
 
   useEffect(() => () => activeImportRef.current?.abort(), [])
 
@@ -148,12 +194,17 @@ export default function App(): JSX.Element {
     const closing = side ?? openDrawerRef.current
     // Move focus before React unmounts the active drawer; delaying this can
     // leave keyboard users on document.body in Chromium.
-    if (closing === 'left') leftToggleRef.current?.focus()
+    if (closing === 'left') {
+      if (drawerTriggerRef.current === 'player') playerProfileToggleRef.current?.focus()
+      else leftToggleRef.current?.focus()
+    }
     if (closing === 'right') rightToggleRef.current?.focus()
+    drawerTriggerRef.current = null
     setOpenDrawer(null)
   }, [])
 
-  const toggleDrawer = useCallback((side: Exclude<DrawerSide, null>): void => {
+  const toggleDrawer = useCallback((side: Exclude<DrawerSide, null>, trigger: DrawerTrigger): void => {
+    if (openDrawerRef.current !== side) drawerTriggerRef.current = trigger
     setOpenDrawer((current) => current === side ? null : side)
   }, [])
 
@@ -195,7 +246,7 @@ export default function App(): JSX.Element {
 
   const handleGlobalStorm = useCallback((): void => {
     setGame((current) => triggerGlobalStormAction(current))
-    setNotice('Mưa lớn đang ảnh hưởng toàn bộ Aetheria trong 18 tick.')
+    setNotice('Mưa lớn đang ảnh hưởng toàn bộ Aetheria trong 18 nhịp mô phỏng.')
   }, [])
 
   const handleCouncilDecision = useCallback((choice: 'stockpile' | 'raise-ward'): void => {
@@ -207,6 +258,22 @@ export default function App(): JSX.Element {
       }
       setNotice(choice === 'stockpile' ? 'Dân làng niêm phong một phần kho lương để tăng sức hồi phục.' : 'Dân làng gia cố nơi trú ẩn, đổi bằng lương thực và niềm vui.')
       return next
+    })
+  }, [])
+
+  const handleDevelopVillageTool = useCallback((): void => {
+    setGame((current) => {
+      const result = developPrimaryVillageToolAction(current)
+      setNotice(result.notice)
+      return result.game
+    })
+  }, [])
+
+  const handleSubmitVillageKnowledge = useCallback((proposal: string): void => {
+    setGame((current) => {
+      const result = submitPrimaryVillageKnowledgeAction(current, proposal)
+      setNotice(result.notice)
+      return result.game
     })
   }, [])
 
@@ -244,6 +311,33 @@ export default function App(): JSX.Element {
       return { ...current, session: { ...current.session, simulation: { ...updated, paused: false } } }
     })
   }, [])
+
+  const handleAssetPackQualityChange = useCallback((pack: AssetPackQuality): void => {
+    if (!IS_DESKTOP_EDITION) {
+      setNotice('Bản web chỉ dùng gói texture 1K.')
+      return
+    }
+    if (pack === 'cinema-8k' && !cinema8kEntitled) {
+      setNotice(isCheckingCinemaEntitlement
+        ? 'Đang xác minh quyền Aetheria Cinema 8K cho bản cài đặt này.'
+        : 'Aetheria Cinema 8K là gói trả phí; quyền mua phải được dịch vụ desktop xác minh trước khi mở gói.')
+      return
+    }
+    if (pack !== 'web-1k' && !desktopPackAvailability[pack]) {
+      setNotice(isCheckingDesktopPacks
+        ? `Đang kiểm tra gói ${ASSET_PACK_LABELS[pack]} cục bộ.`
+        : `Gói ${ASSET_PACK_LABELS[pack]} chưa được tải vào bản cài đặt này. Hãy cài gói rồi khởi động lại game.`)
+      return
+    }
+    setAssetPackQuality(pack)
+  }, [cinema8kEntitled, desktopPackAvailability, isCheckingCinemaEntitlement, isCheckingDesktopPacks])
+
+  /** Global render tiers request the matching source pack only when it is legitimately available. */
+  const handleQualityChange = useCallback((next: QualityProfile): void => {
+    setQuality(next)
+    const matchingPack = assetPackForQualityProfile(next)
+    if (IS_DESKTOP_EDITION && matchingPack) handleAssetPackQualityChange(matchingPack)
+  }, [handleAssetPackQualityChange])
 
   const handlePhotoReady = useCallback((dataUrl: string): void => {
     const seed = safeFileSegment(gameRef.current.session.world.config.seed)
@@ -327,7 +421,7 @@ export default function App(): JSX.Element {
     }
     if (!document.fullscreenEnabled) {
       setFullscreenFallback((value) => !value)
-      setNotice('Trình duyệt không hỗ trợ Fullscreen API; đã dùng chế độ toàn màn hình của game.')
+      setNotice('Trình duyệt không hỗ trợ API toàn màn hình; đã dùng chế độ toàn màn hình của game.')
       return
     }
     if (document.fullscreenElement) {
@@ -335,7 +429,7 @@ export default function App(): JSX.Element {
     } else {
       void document.documentElement.requestFullscreen().catch(() => {
         setFullscreenFallback(true)
-        setNotice('Trình duyệt chặn Fullscreen API; game vẫn dùng lớp phủ toàn màn hình.')
+        setNotice('Trình duyệt chặn API toàn màn hình; game vẫn dùng lớp phủ toàn màn hình.')
       })
     }
   }, [fullscreenFallback])
@@ -393,8 +487,8 @@ export default function App(): JSX.Element {
   const assetPackLabel = renderStats.assetLoadState === 'loading'
     ? 'Đang nạp Poly Haven…'
     : renderStats.assetPack === 'procedural'
-      ? 'fallback procedural'
-      : `${ASSET_PACK_LABELS[renderStats.assetPack]}${renderStats.assetPackFallback ? ' · fallback' : ''}`
+      ? 'Tạo theo quy tắc'
+      : `${ASSET_PACK_LABELS[renderStats.assetPack]}${renderStats.assetPackFallback ? ' · dự phòng' : ''}`
 
   return (
     <main className={`game-shell ${fullscreenActive ? 'is-fullscreen-fallback' : ''}`}>
@@ -408,7 +502,9 @@ export default function App(): JSX.Element {
               tool={tool}
               heatmap={heatmap}
               quality={quality}
+              graphicsOverrides={graphicsOverrides}
               assetPackQuality={assetPackQuality}
+              assetPackEntitlements={assetPackEntitlements}
               edition={GAME_EDITION}
               photoSignal={photoSignal}
               onTileHover={setHoveredTile}
@@ -420,7 +516,7 @@ export default function App(): JSX.Element {
           </Suspense>
         </GameErrorBoundary>
 
-        <div className="hud-layer" aria-label="HUD điều khiển game">
+        <div className={`hud-layer ${tool === 'storm' ? 'has-global-tool-action' : ''}`}>
           <header className="hud-brand">
             <span className="brand-mark" aria-hidden="true">A</span>
             <div>
@@ -431,25 +527,43 @@ export default function App(): JSX.Element {
           </header>
 
           <div className="hud-actions">
-            <span className="performance-badge" title="Chỉ số render gần đúng, cập nhật mỗi giây">{renderStats.fps || '—'} FPS · {renderStats.drawCalls} lệnh vẽ · {renderStats.triangles} tam giác · {renderStats.textures} texture</span>
-            <span className="asset-pack-badge" title={renderStats.assetPackReason}>Asset · {assetPackLabel}</span>
-            {IS_DESKTOP_EDITION ? <label className="quality-select" htmlFor="asset-pack-quality">Texture pack<select id="asset-pack-quality" value={assetPackQuality} onChange={(event) => setAssetPackQuality(event.target.value as AssetPackQuality)}>{DESKTOP_TEXTURE_PACKS.map((pack) => <option key={pack} value={pack}>{ASSET_PACK_LABELS[pack]}</option>)}</select></label> : null}
-            <label className="quality-select" htmlFor="quality-profile">Chất lượng<select id="quality-profile" value={quality} onChange={(event) => setQuality(event.target.value as QualityProfile)}>{(Object.keys(QUALITY_LABELS) as QualityProfile[]).map((profile) => <option key={profile} value={profile}>{QUALITY_LABELS[profile]}</option>)}</select></label>
+            <span className="performance-badge" title="Chỉ số kết xuất gần đúng, cập nhật mỗi giây">{renderStats.fps || '—'} FPS · {renderStats.drawCalls} lệnh vẽ · {renderStats.triangles} tam giác · {renderStats.textures} texture</span>
+            <span className="asset-pack-badge" title={renderStats.assetPackReason}>Gói · {assetPackLabel}</span>
+            <label className="quality-select" htmlFor="quality-profile">Chất lượng<select id="quality-profile" value={quality} onChange={(event) => handleQualityChange(event.target.value as QualityProfile)}>{(Object.keys(QUALITY_LABELS) as QualityProfile[]).map((profile) => <option key={profile} value={profile}>{QUALITY_LABELS[profile]}</option>)}</select></label>
+            <button ref={playerProfileToggleRef} type="button" className="player-profile-chip" onClick={() => toggleDrawer('left', 'player')} aria-expanded={openDrawer === 'left'} aria-controls="world-controls-drawer" aria-haspopup="dialog" aria-label={playerSession.status === 'authenticated' ? `Mở hồ sơ của ${playerSession.player.displayName}` : 'Mở hồ sơ người chơi'}>
+              {playerSession.status === 'authenticated' ? playerSession.player.displayName : 'Hồ sơ'}
+            </button>
             <FullscreenButton active={fullscreenActive} onToggle={toggleFullscreen} />
           </div>
 
-          <button ref={leftToggleRef} type="button" className="drawer-toggle drawer-toggle-left" onClick={() => toggleDrawer('left')} aria-expanded={openDrawer === 'left'} aria-controls="world-controls-drawer" aria-label={openDrawer === 'left' ? 'Đóng điều khiển thế giới' : 'Mở điều khiển thế giới'}>☰ <span>Thế giới</span></button>
-          <button ref={rightToggleRef} type="button" className="drawer-toggle drawer-toggle-right" onClick={() => toggleDrawer('right')} aria-expanded={openDrawer === 'right'} aria-controls="simulation-drawer" aria-label={openDrawer === 'right' ? 'Đóng biên niên sử và mô phỏng' : 'Mở biên niên sử và mô phỏng'}>◈ <span>Biên niên sử</span></button>
+          <button ref={leftToggleRef} type="button" className="drawer-toggle drawer-toggle-left" onClick={() => toggleDrawer('left', 'world')} aria-expanded={openDrawer === 'left'} aria-controls="world-controls-drawer" aria-haspopup="dialog" aria-label={openDrawer === 'left' ? 'Đóng điều khiển thế giới' : 'Mở điều khiển thế giới'}>☰ <span>Thế giới</span></button>
+          <button ref={rightToggleRef} type="button" className="drawer-toggle drawer-toggle-right" onClick={() => toggleDrawer('right', 'simulation')} aria-expanded={openDrawer === 'right'} aria-controls="simulation-drawer" aria-haspopup="dialog" aria-label={openDrawer === 'right' ? 'Đóng biên niên sử và mô phỏng' : 'Mở biên niên sử và mô phỏng'}>◈ <span>Biên niên sử</span></button>
+
+          {openDrawer ? <div className="drawer-scrim" aria-hidden="true" onPointerDown={() => closeDrawer()} /> : null}
 
           {openDrawer === 'left' ? (
             <GameDrawer id="world-controls-drawer" label="Điều khiển thế giới" side="left" onClose={() => closeDrawer('left')}>
               <WorldControls draft={draft} activeSeed={session.world.config.seed} onDraftChange={setDraft} onGenerate={handleGenerate} onRandomWorld={handleRandomWorld} onCopySeed={handleCopySeed} onSave={handleSave} onLoad={handleLoad} onReset={() => recreate(session.world.config, 'Đã đặt lại thế giới hiện tại; bạn có thể hoàn tác thao tác này.')} onExport={handleExport} onImport={() => importRef.current?.click()} />
+              <GraphicsSettings
+                quality={quality}
+                overrides={graphicsOverrides}
+                assetPackQuality={assetPackQuality}
+                desktopEdition={IS_DESKTOP_EDITION}
+                desktopPackAvailability={desktopPackAvailability}
+                cinema8kEntitled={cinema8kEntitled}
+                isCheckingDesktopPacks={isCheckingDesktopPacks}
+                isCheckingCinemaEntitlement={isCheckingCinemaEntitlement}
+                onQualityChange={handleQualityChange}
+                onOverridesChange={setGraphicsOverrides}
+                onAssetPackQualityChange={handleAssetPackQualityChange}
+              />
+              <PlayerAccountPanel />
             </GameDrawer>
           ) : null}
 
           {openDrawer === 'right' ? (
-            <GameDrawer id="simulation-drawer" label="Biên niên sử thế giới và mô phỏng" side="right" onClose={() => closeDrawer('right')}>
-              <SimulationPanel world={session.world} simulation={session.simulation} selectedTile={lensTile} heatmap={heatmap} onHeatmapChange={setHeatmap} onPauseToggle={handlePauseToggle} onSpeedChange={handleSpeedChange} onPhoto={() => setPhotoSignal((current) => current + 1)} onCouncilDecision={handleCouncilDecision} />
+            <GameDrawer id="simulation-drawer" label="Mô phỏng và biên niên sử" side="right" onClose={() => closeDrawer('right')}>
+              <SimulationPanel world={session.world} simulation={session.simulation} selectedTile={lensTile} heatmap={heatmap} onHeatmapChange={setHeatmap} onPauseToggle={handlePauseToggle} onSpeedChange={handleSpeedChange} onPhoto={() => setPhotoSignal((current) => current + 1)} onCouncilDecision={handleCouncilDecision} onDevelopVillageTool={handleDevelopVillageTool} onSubmitKnowledge={handleSubmitVillageKnowledge} />
             </GameDrawer>
           ) : null}
 

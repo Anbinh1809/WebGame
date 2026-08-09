@@ -50,19 +50,186 @@ const JACARANDA_PACKS = {
     root: ['public', 'assets', 'polyhaven', 'web-1k', 'models', JACARANDA_ASSET.slug],
     // Jacaranda is already a 312K-triangle wide-canopy tree. Keeping that
     // geometry preserves its leaf silhouette at the isometric game distance.
-    variants: [{ id: 'forest-lod1', simplifyRatio: 0.01, simplifyError: 0.002, textureSize: 1024, intendedUse: 'instanced wide-canopy Web forest tree', maxInstances: 8 }],
+    variants: [{ id: 'forest-lod2', simplifyRatio: 0.001, simplifyError: 0.003, textureSize: 1024, intendedUse: 'instanced wide-canopy Web forest tree', maxInstances: 8 }],
   },
   'desktop-2k': {
     resolution: '2k',
     root: ['desktop-packs', 'polyhaven', 'desktop-2k', 'models', JACARANDA_ASSET.slug],
-    variants: [{ id: 'forest-lod1', simplifyRatio: 0.01, simplifyError: 0.002, textureSize: 2048, intendedUse: 'instanced wide-canopy desktop forest tree', maxInstances: 10 }],
+    variants: [{ id: 'forest-lod2', simplifyRatio: 0.001, simplifyError: 0.003, textureSize: 2048, intendedUse: 'instanced wide-canopy desktop forest tree', maxInstances: 8 }],
   },
   'desktop-4k': {
     resolution: '4k',
     root: ['desktop-packs', 'polyhaven', 'desktop-4k', 'models', JACARANDA_ASSET.slug],
-    variants: [{ id: 'forest-lod1', simplifyRatio: 0.01, simplifyError: 0.002, textureSize: 4096, intendedUse: 'instanced wide-canopy Ultra forest tree', maxInstances: 10 }],
+    variants: [{ id: 'forest-lod2', simplifyRatio: 0.001, simplifyError: 0.003, textureSize: 4096, intendedUse: 'instanced wide-canopy Ultra forest tree', maxInstances: 8 }],
   },
 }
+
+const ROCK_FACE_ASSET = {
+  id: 'rock-face-01',
+  slug: 'rock_face_01',
+  license: 'CC0-1.0',
+  attribution: 'Poly Haven — rock_face_01 by Dario Barresi (CC0 1.0)',
+  sourceUrl: 'https://polyhaven.com/a/rock_face_01',
+}
+
+const ROCK_FACE_PACKS = {
+  'web-1k': {
+    resolution: '1k',
+    root: ['public', 'assets', 'polyhaven', 'web-1k', 'models', ROCK_FACE_ASSET.slug],
+    variants: [{ id: 'formation-lod0', simplify: false, textureSize: 1024, intendedUse: 'instanced Web rock formation', maxInstances: 12 }],
+  },
+  'desktop-2k': {
+    resolution: '2k',
+    root: ['desktop-packs', 'polyhaven', 'desktop-2k', 'models', ROCK_FACE_ASSET.slug],
+    variants: [{ id: 'formation-lod0', simplify: false, textureSize: 2048, intendedUse: 'instanced desktop rock formation', maxInstances: 16 }],
+  },
+  'desktop-4k': {
+    resolution: '4k',
+    root: ['desktop-packs', 'polyhaven', 'desktop-4k', 'models', ROCK_FACE_ASSET.slug],
+    variants: [{ id: 'formation-lod0', simplify: false, textureSize: 4096, intendedUse: 'instanced Ultra rock formation', maxInstances: 16 }],
+  },
+}
+
+/**
+ * These four models expand the environment beyond the original tree/rock
+ * pilot. They were selected from Poly Haven's outdoor collections because
+ * each has a real local glTF at all four source resolutions. Keep them
+ * sparse and instanced: source texture quality is not a license to place a
+ * hero mesh on every simulation tile.
+ */
+const ISLAND_TREE_ASSET = {
+  id: 'island-tree-01',
+  slug: 'island_tree_01',
+  license: 'CC0-1.0',
+  attribution: 'Poly Haven — island_tree_01 (CC0 1.0)',
+  sourceUrl: 'https://polyhaven.com/a/island_tree_01',
+}
+
+const ISLAND_TREE_PACKS = {
+  'web-1k': {
+    resolution: '1k',
+    root: ['public', 'assets', 'polyhaven', 'web-1k', 'models', ISLAND_TREE_ASSET.slug],
+    variants: [{ id: 'forest-lod1', simplifyRatio: 0.012, simplifyError: 0.0025, textureSize: 1024, intendedUse: 'instanced island forest tree', maxInstances: 6 }],
+  },
+  'desktop-2k': {
+    resolution: '2k',
+    root: ['desktop-packs', 'polyhaven', 'desktop-2k', 'models', ISLAND_TREE_ASSET.slug],
+    variants: [{ id: 'forest-lod1', simplifyRatio: 0.016, simplifyError: 0.002, textureSize: 2048, intendedUse: 'instanced desktop island forest tree', maxInstances: 10 }],
+  },
+  'desktop-4k': {
+    resolution: '4k',
+    root: ['desktop-packs', 'polyhaven', 'desktop-4k', 'models', ISLAND_TREE_ASSET.slug],
+    variants: [{ id: 'forest-lod1', simplifyRatio: 0.022, simplifyError: 0.0018, textureSize: 4096, intendedUse: 'instanced ultra island forest tree', maxInstances: 14 }],
+  },
+  'cinema-8k': {
+    resolution: '8k',
+    root: ['desktop-packs', 'polyhaven', 'cinema-8k', 'models', ISLAND_TREE_ASSET.slug],
+    variants: [{ id: 'forest-lod1', simplifyRatio: 0.03, simplifyError: 0.0015, textureSize: 8192, intendedUse: 'instanced cinema island forest tree', maxInstances: 18 }],
+  },
+}
+
+const FERN_ASSET = {
+  id: 'fern-02',
+  slug: 'fern_02',
+  license: 'CC0-1.0',
+  attribution: 'Poly Haven — fern_02 (CC0 1.0)',
+  sourceUrl: 'https://polyhaven.com/a/fern_02',
+}
+
+const FERN_PACKS = {
+  'web-1k': {
+    resolution: '1k',
+    root: ['public', 'assets', 'polyhaven', 'web-1k', 'models', FERN_ASSET.slug],
+    variants: [{ id: 'ground-lod1', simplifyRatio: 0.16, simplifyError: 0.003, textureSize: 1024, intendedUse: 'instanced forest floor fern', maxInstances: 20 }],
+  },
+  'desktop-2k': {
+    resolution: '2k',
+    root: ['desktop-packs', 'polyhaven', 'desktop-2k', 'models', FERN_ASSET.slug],
+    variants: [{ id: 'ground-lod1', simplifyRatio: 0.2, simplifyError: 0.0025, textureSize: 2048, intendedUse: 'instanced desktop forest floor fern', maxInstances: 36 }],
+  },
+  'desktop-4k': {
+    resolution: '4k',
+    root: ['desktop-packs', 'polyhaven', 'desktop-4k', 'models', FERN_ASSET.slug],
+    variants: [{ id: 'ground-lod1', simplifyRatio: 0.24, simplifyError: 0.002, textureSize: 4096, intendedUse: 'instanced ultra forest floor fern', maxInstances: 52 }],
+  },
+  'cinema-8k': {
+    resolution: '8k',
+    root: ['desktop-packs', 'polyhaven', 'cinema-8k', 'models', FERN_ASSET.slug],
+    variants: [{ id: 'ground-lod1', simplifyRatio: 0.28, simplifyError: 0.0015, textureSize: 8192, intendedUse: 'instanced cinema forest floor fern', maxInstances: 72 }],
+  },
+}
+
+const COAST_ROCKS_ASSET = {
+  id: 'coast-rocks-05',
+  slug: 'coast_rocks_05',
+  license: 'CC0-1.0',
+  attribution: 'Poly Haven — coast_rocks_05 (CC0 1.0)',
+  sourceUrl: 'https://polyhaven.com/a/coast_rocks_05',
+}
+
+const COAST_ROCKS_PACKS = {
+  'web-1k': {
+    resolution: '1k',
+    root: ['public', 'assets', 'polyhaven', 'web-1k', 'models', COAST_ROCKS_ASSET.slug],
+    variants: [{ id: 'coast-lod1', simplifyRatio: 0.14, simplifyError: 0.003, textureSize: 1024, intendedUse: 'instanced coastal rock detail', maxInstances: 12 }],
+  },
+  'desktop-2k': {
+    resolution: '2k',
+    root: ['desktop-packs', 'polyhaven', 'desktop-2k', 'models', COAST_ROCKS_ASSET.slug],
+    variants: [{ id: 'coast-lod1', simplifyRatio: 0.18, simplifyError: 0.0025, textureSize: 2048, intendedUse: 'instanced desktop coastal rock detail', maxInstances: 18 }],
+  },
+  'desktop-4k': {
+    resolution: '4k',
+    root: ['desktop-packs', 'polyhaven', 'desktop-4k', 'models', COAST_ROCKS_ASSET.slug],
+    variants: [{ id: 'coast-lod1', simplifyRatio: 0.22, simplifyError: 0.002, textureSize: 4096, intendedUse: 'instanced ultra coastal rock detail', maxInstances: 24 }],
+  },
+  'cinema-8k': {
+    resolution: '8k',
+    root: ['desktop-packs', 'polyhaven', 'cinema-8k', 'models', COAST_ROCKS_ASSET.slug],
+    variants: [{ id: 'coast-lod1', simplifyRatio: 0.28, simplifyError: 0.0015, textureSize: 8192, intendedUse: 'instanced cinema coastal rock detail', maxInstances: 32 }],
+  },
+}
+
+const BOULDER_ASSET = {
+  id: 'boulder-01',
+  slug: 'boulder_01',
+  license: 'CC0-1.0',
+  attribution: 'Poly Haven — boulder_01 (CC0 1.0)',
+  sourceUrl: 'https://polyhaven.com/a/boulder_01',
+}
+
+const BOULDER_PACKS = {
+  'web-1k': {
+    resolution: '1k',
+    root: ['public', 'assets', 'polyhaven', 'web-1k', 'models', BOULDER_ASSET.slug],
+    variants: [{ id: 'formation-lod1', simplifyRatio: 0.16, simplifyError: 0.003, textureSize: 1024, intendedUse: 'instanced hillside boulder', maxInstances: 10 }],
+  },
+  'desktop-2k': {
+    resolution: '2k',
+    root: ['desktop-packs', 'polyhaven', 'desktop-2k', 'models', BOULDER_ASSET.slug],
+    variants: [{ id: 'formation-lod1', simplifyRatio: 0.2, simplifyError: 0.0025, textureSize: 2048, intendedUse: 'instanced desktop hillside boulder', maxInstances: 16 }],
+  },
+  'desktop-4k': {
+    resolution: '4k',
+    root: ['desktop-packs', 'polyhaven', 'desktop-4k', 'models', BOULDER_ASSET.slug],
+    variants: [{ id: 'formation-lod1', simplifyRatio: 0.24, simplifyError: 0.002, textureSize: 4096, intendedUse: 'instanced ultra hillside boulder', maxInstances: 20 }],
+  },
+  'cinema-8k': {
+    resolution: '8k',
+    root: ['desktop-packs', 'polyhaven', 'cinema-8k', 'models', BOULDER_ASSET.slug],
+    variants: [{ id: 'formation-lod1', simplifyRatio: 0.3, simplifyError: 0.0015, textureSize: 8192, intendedUse: 'instanced cinema hillside boulder', maxInstances: 28 }],
+  },
+}
+
+const CURATED_ASSETS = new Map([
+  [ASSET.slug, { asset: ASSET, packs: PACKS }],
+  [JACARANDA_ASSET.slug, { asset: JACARANDA_ASSET, packs: JACARANDA_PACKS }],
+  [ROCK_FACE_ASSET.slug, { asset: ROCK_FACE_ASSET, packs: ROCK_FACE_PACKS }],
+  [ISLAND_TREE_ASSET.slug, { asset: ISLAND_TREE_ASSET, packs: ISLAND_TREE_PACKS }],
+  [FERN_ASSET.slug, { asset: FERN_ASSET, packs: FERN_PACKS }],
+  [COAST_ROCKS_ASSET.slug, { asset: COAST_ROCKS_ASSET, packs: COAST_ROCKS_PACKS }],
+  [BOULDER_ASSET.slug, { asset: BOULDER_ASSET, packs: BOULDER_PACKS }],
+])
 
 function checksum(buffer) {
   return createHash('sha256').update(buffer).digest('hex')
@@ -75,9 +242,9 @@ function md5(buffer) {
 function parseAsset(argumentsList) {
   const assetIndex = argumentsList.indexOf('--asset')
   const assetId = assetIndex >= 0 ? argumentsList[assetIndex + 1] : 'tree_small_02'
-  if (assetId === 'tree_small_02') return { asset: ASSET, packs: PACKS }
-  if (assetId === 'jacaranda_tree') return { asset: JACARANDA_ASSET, packs: JACARANDA_PACKS }
-  throw new Error(`Expected --asset tree_small_02 or jacaranda_tree; received ${String(assetId)}.`)
+  const selected = CURATED_ASSETS.get(assetId)
+  if (selected) return selected
+  throw new Error(`Expected --asset ${[...CURATED_ASSETS.keys()].join(', ')}; received ${String(assetId)}.`)
 }
 
 function parsePack(argumentsList, packs) {

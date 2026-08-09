@@ -2,22 +2,51 @@ import * as THREE from 'three'
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js'
 import type { SimulationState } from '../simulation/types'
+import { villageToolTier } from '../simulation/progression'
 import { happinessAtTile } from '../simulation/metrics'
 import { createPrng, hash2d, seedToUint32 } from '../world/prng'
 import { getWaterLevel } from '../world/generator'
 import type { HeatmapMode, Tile, ToolId, World } from '../world/types'
 import { ASSET_MANIFEST } from '../assets/manifest'
 import { desktopPackRoot, loadDesktopPackManifest } from '../assets/desktopPackManifest'
+import { desktopEnvironmentModelEntries } from '../assets/environmentModelManifest'
 import { desktopTreeModelEntries } from '../assets/modelManifest'
+import { desktopRockModelEntries } from '../assets/rockModelManifest'
 import { assetsForPack } from '../assets/registry'
-import type { AssetManifestEntry, AssetPackQuality } from '../assets/types'
+import type { AssetManifestEntry, AssetMaterialSurface, AssetPackQuality } from '../assets/types'
 import { AssetPackManager } from './AssetPackManager'
-import type { AssetLoadProgress, GameEdition, ResolvedAssetPack } from './AssetPackManager'
+import type { AssetLoadProgress, AssetPackEntitlements, GameEdition, ResolvedAssetPack } from './AssetPackManager'
 import { PolyHavenArtBundle, clearPolyHavenArt, createProceduralArtFallback, loadPolyHavenArt } from './PolyHavenArt'
 import type { PolyHavenArtTargets } from './PolyHavenArt'
-import { InstancedTreeModelLayer, canLoadTreeModel, loadInstancedTreeModel, treeModelAssetForPack, treeModelInstanceLimit } from './TreeModelLayer'
-import { canApplyAutoQualityChange, capQualityForMobile, effectiveQualityFor, qualityForProfileChange, qualitySettings, waterSegmentsFor } from './quality'
-import type { EffectiveQuality, QualityProfile } from './quality'
+import { FaunaLayer } from './FaunaLayer'
+import { SettlerLayer } from './SettlerLayer'
+import type { SettlerPlacement } from './SettlerLayer'
+import {
+  InstancedModelLayer,
+  canLoadTreeModel,
+  coastRockModelAssetForPack,
+  groundCoverModelAssetForPack,
+  loadInstancedCoastRockModel,
+  loadInstancedGroundCoverModel,
+  loadInstancedRockModel,
+  loadInstancedTreeModel,
+  rockModelAssetForPack,
+  treeModelAssetForPack,
+  groundCoverModelInstanceLimit,
+  sparseEnvironmentModelInstanceLimit,
+} from './TreeModelLayer'
+import {
+  canApplyAutoQualityChange,
+  capQualityForMobile,
+  createGraphicsQualityOverrides,
+  effectiveQualityFor,
+  GRAPHICS_QUALITY_COMPONENTS,
+  qualityForProfileChange,
+  qualitySettings,
+  resolveGraphicsQuality,
+  waterSegmentsFor,
+} from './quality'
+import type { EffectiveQuality, GraphicsQualityComponent, GraphicsQualityOverrides, QualityProfile } from './quality'
 
 const TILE_SCALE = 0.72
 const MAX_SETTLERS = 180
@@ -25,12 +54,20 @@ const MAX_HOUSES = 48
 const MAX_FARMS = 64
 const MAX_ROADS = 48
 const MAX_LANTERNS = 48
+const MAX_WORKSHOPS = 24
+const MAX_FORGES = 24
+const MAX_TOWN_HALLS = 12
 const MAX_RAIN_DROPS = 360
 /** Keeps photo mode below a predictable browser/GPU memory budget. */
 export const MAX_PHOTO_PIXELS = 8_000_000
+/** Extends the ocean beyond the simulation board so its edge never reads as a square playfield. */
+const OCEAN_MARGIN_TILES = 160
 const NIGHT_SKY = new THREE.Color(0x172842)
 const DAY_SKY = new THREE.Color(0x9ccfe5)
 const STORM_SKY = new THREE.Color(0x536b7f)
+const SKY_ZENITH = new THREE.Color(0x2f78b7)
+const SKY_HORIZON = new THREE.Color(0x72bee2)
+const SKY_BASE = new THREE.Color(0x89c9e5)
 const CLEAR_CLOUD = new THREE.Color(0xf4fbff)
 const STORM_CLOUD = new THREE.Color(0x9eb5c4)
 type TerrainSurface = 'terrainGrass' | 'terrainForest' | 'terrainRock' | 'terrainSand' | 'terrainSnow'
@@ -55,12 +92,52 @@ interface TreePlacement {
   variation: number
 }
 
-/** One pack resource owns both PBR maps and an optional instanced tree model. */
+interface RockPlacement {
+  id: number
+  priority: number
+  x: number
+  y: number
+  z: number
+  scaleX: number
+  scaleY: number
+  scaleZ: number
+  rotationX: number
+  rotationY: number
+  variation: number
+}
+
+interface DetailPlacement {
+  id: number
+  priority: number
+  x: number
+  y: number
+  z: number
+  scale: number
+  rotation: number
+  color: number
+}
+
+interface WaterRipple {
+  baseX: number
+  baseZ: number
+  scale: number
+  rotation: number
+  speed: number
+  phase: number
+}
+
+/** One pack resource owns PBR maps plus optional instanced environment models. */
 class WorldArtBundle {
   public constructor(
     private readonly materials: PolyHavenArtBundle,
-    public readonly treeLayer: InstancedTreeModelLayer | undefined,
+    public readonly treeLayer: InstancedModelLayer | undefined,
+    public readonly rockLayer: InstancedModelLayer | undefined,
+    public readonly groundCoverLayer: InstancedModelLayer | undefined,
+    public readonly coastRockLayer: InstancedModelLayer | undefined,
     public readonly treeFallback: boolean,
+    public readonly rockFallback: boolean,
+    public readonly groundCoverFallback: boolean,
+    public readonly coastRockFallback: boolean,
   ) {}
 
   public apply(targets: PolyHavenArtTargets): void {
@@ -69,12 +146,35 @@ class WorldArtBundle {
 
   public dispose(): void {
     this.treeLayer?.dispose()
+    this.rockLayer?.dispose()
+    this.groundCoverLayer?.dispose()
+    this.coastRockLayer?.dispose()
     this.materials.dispose()
   }
 }
 
 function createTerrainMaterial(): THREE.MeshStandardMaterial {
-  return new THREE.MeshStandardMaterial({ vertexColors: true, flatShading: true, roughness: 0.92, metalness: 0.02 })
+  return new THREE.MeshStandardMaterial({
+    vertexColors: true,
+    flatShading: false,
+    roughness: 0.88,
+    metalness: 0.015,
+    normalScale: new THREE.Vector2(0.58, 0.58),
+  })
+}
+
+/** Crossed blades give ground cover a readable silhouette without alpha textures or extra draw calls. */
+function createGrassClumpGeometry(): THREE.BufferGeometry {
+  const blades = [0, Math.PI / 3, (Math.PI * 2) / 3].map((angle) => {
+    const blade = new THREE.PlaneGeometry(0.12, 0.32)
+    blade.translate(0, 0.16, 0)
+    blade.rotateY(angle)
+    return blade
+  })
+  const merged = mergeGeometries(blades, false)
+  for (const blade of blades) blade.dispose()
+  if (!merged) throw new Error('Could not build the grass-clump geometry.')
+  return merged
 }
 
 /** A clustered canopy keeps distant deterministic trees readable without a raw hero-mesh cost. */
@@ -94,6 +194,154 @@ function createStylizedCanopyGeometry(): THREE.BufferGeometry {
   for (const geometry of geometries) geometry.dispose()
   if (!merged) throw new Error('Could not build the clustered fallback canopy.')
   return merged
+}
+
+/** A compact cluster of pebbles and shell-like stones replaces grass-shaped cones on beaches. */
+function createBeachDetailGeometry(): THREE.BufferGeometry {
+  const pebbles = [
+    new THREE.DodecahedronGeometry(0.13, 0),
+    new THREE.DodecahedronGeometry(0.09, 0),
+    new THREE.DodecahedronGeometry(0.06, 0),
+  ]
+  pebbles[0]?.scale(1, 0.2, 0.68)
+  pebbles[0]?.translate(-0.075, 0.026, 0.035)
+  pebbles[1]?.scale(0.72, 0.16, 0.52)
+  pebbles[1]?.translate(0.09, 0.018, -0.055)
+  pebbles[2]?.scale(0.55, 0.13, 0.46)
+  pebbles[2]?.translate(0.025, 0.014, 0.1)
+  const merged = mergeGeometries(pebbles, false)
+  for (const pebble of pebbles) pebble.dispose()
+  if (!merged) throw new Error('Could not build the beach detail geometry.')
+  return merged
+}
+
+/** A compact tangent-space normal map makes the PBR water read as fine ripples at every quality tier. */
+function createWaterNormalTexture(): THREE.DataTexture {
+  const size = 128
+  const data = new Uint8Array(size * size * 4)
+  let cursor = 0
+
+  for (let y = 0; y < size; y += 1) {
+    for (let x = 0; x < size; x += 1) {
+      const u = x / size
+      const v = y / size
+      const slopeX = Math.cos((u * 4.2 + v * 1.7) * Math.PI * 2) * 0.24
+        + Math.cos((u * 9.6 - v * 3.4) * Math.PI * 2) * 0.1
+        + Math.sin((u * 2.1 + v * 7.8) * Math.PI * 2) * 0.06
+      const slopeY = Math.sin((u * 4.2 + v * 1.7) * Math.PI * 2) * 0.24
+        - Math.sin((u * 9.6 - v * 3.4) * Math.PI * 2) * 0.1
+        + Math.cos((u * 2.1 + v * 7.8) * Math.PI * 2) * 0.06
+      const normalLength = Math.hypot(slopeX, 1, slopeY)
+      data[cursor] = Math.round(((-slopeX / normalLength) * 0.5 + 0.5) * 255)
+      data[cursor + 1] = Math.round(((-slopeY / normalLength) * 0.5 + 0.5) * 255)
+      data[cursor + 2] = Math.round((0.5 + 0.5 / normalLength) * 255)
+      data[cursor + 3] = 255
+      cursor += 4
+    }
+  }
+
+  const texture = new THREE.DataTexture(data, size, size, THREE.RGBAFormat)
+  texture.colorSpace = THREE.NoColorSpace
+  texture.wrapS = THREE.RepeatWrapping
+  texture.wrapT = THREE.RepeatWrapping
+  texture.repeat.set(1.25, 1.25)
+  texture.minFilter = THREE.LinearMipmapLinearFilter
+  texture.magFilter = THREE.LinearFilter
+  texture.needsUpdate = true
+  return texture
+}
+
+/** Thin water-side strips break the hard land/water boundary with a low-cost foam line. */
+function createCoastFoamGeometry(): THREE.PlaneGeometry {
+  const geometry = new THREE.PlaneGeometry(TILE_SCALE * 0.94, 0.1)
+  geometry.rotateX(-Math.PI / 2)
+  return geometry
+}
+
+/** A short, curved crest reads as a wave from the isometric camera while remaining instanced in one draw call. */
+function createWaterRippleGeometry(): THREE.TorusGeometry {
+  const geometry = new THREE.TorusGeometry(0.32, 0.014, 5, 20, Math.PI * 0.72)
+  geometry.rotateX(-Math.PI / 2)
+  return geometry
+}
+
+function waterPlaneSize(size: number): number {
+  return Math.max(2, (size - 1 + OCEAN_MARGIN_TILES * 2) * TILE_SCALE)
+}
+
+function waterNormalRepeat(waterSize: number): number {
+  return Math.min(5, Math.max(3, waterSize / (TILE_SCALE * 45)))
+}
+
+function oceanSegmentsFor(quality: EffectiveQuality, worldSize: number): number {
+  const base = waterSegmentsFor(quality, worldSize)
+  if (quality === 'ultra') return Math.max(base, 72)
+  if (quality === 'high') return Math.max(base, 56)
+  if (quality === 'medium') return Math.max(base, 40)
+  return Math.max(base, 32)
+}
+
+function cloudPuffCount(quality: EffectiveQuality): number {
+  if (quality === 'ultra') return 10
+  if (quality === 'high') return 8
+  if (quality === 'medium') return 6
+  return 5
+}
+
+/** Use shared height samples so separately batched biome meshes still shade as one smooth landform. */
+function terrainNormalAt(world: World, x: number, z: number, target: THREE.Vector3): THREE.Vector3 {
+  const size = world.config.size
+  const sampleHeight = (sampleX: number, sampleZ: number): number => {
+    const clampedX = clamp(sampleX, 0, size - 1)
+    const clampedZ = clamp(sampleZ, 0, size - 1)
+    return world.tiles[clampedZ * size + clampedX]?.height ?? 0
+  }
+  const left = Math.max(0, x - 1)
+  const right = Math.min(size - 1, x + 1)
+  const north = Math.max(0, z - 1)
+  const south = Math.min(size - 1, z + 1)
+  const xSpan = Math.max(TILE_SCALE, (right - left) * TILE_SCALE)
+  const zSpan = Math.max(TILE_SCALE, (south - north) * TILE_SCALE)
+  const slopeX = (sampleHeight(right, z) - sampleHeight(left, z)) / xSpan
+  const slopeZ = (sampleHeight(x, south) - sampleHeight(x, north)) / zSpan
+  return target.set(-slopeX, 1, -slopeZ).normalize()
+}
+
+/** A light-weight horizon gradient gives the open world depth without a full-screen texture. */
+function createSkyDome(): THREE.Mesh<THREE.SphereGeometry, THREE.ShaderMaterial> {
+  const geometry = new THREE.SphereGeometry(1, 32, 16)
+  const material = new THREE.ShaderMaterial({
+    uniforms: {
+      topColor: { value: SKY_ZENITH.clone() },
+      horizonColor: { value: SKY_HORIZON.clone() },
+      bottomColor: { value: SKY_BASE.clone() },
+    },
+    vertexShader: `
+      varying vec3 worldDirection;
+      void main() {
+        worldDirection = normalize((modelMatrix * vec4(position, 0.0)).xyz);
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+      }
+    `,
+    fragmentShader: `
+      uniform vec3 topColor;
+      uniform vec3 horizonColor;
+      uniform vec3 bottomColor;
+      varying vec3 worldDirection;
+      void main() {
+        float height = clamp(worldDirection.y * 0.5 + 0.5, 0.0, 1.0);
+        vec3 color = mix(bottomColor, horizonColor, smoothstep(0.08, 0.48, height));
+        color = mix(color, topColor, smoothstep(0.42, 1.0, height));
+        gl_FragColor = vec4(color, 1.0);
+        #include <tonemapping_fragment>
+        #include <colorspace_fragment>
+      }
+    `,
+    side: THREE.BackSide,
+    depthWrite: false,
+    fog: false,
+  })
+  return new THREE.Mesh(geometry, material)
 }
 
 /** Surface selection is deterministic and keeps biome readability independent from texture resolution. */
@@ -163,7 +411,7 @@ function terrainColor(tile: Tile, mode: HeatmapMode, simulation: SimulationState
     return new THREE.Color(0x286f99).lerp(new THREE.Color(0x0c365d), depth).offsetHSL((variation - 0.5) * 0.018, 0, 0)
   }
   if (tile.biome === 'bờ cát') {
-    return new THREE.Color(0xd9c47f).lerp(new THREE.Color(0x9fb58a), clamp(tile.moisture * 0.34, 0, 0.34)).offsetHSL(0, 0, (variation - 0.5) * 0.05)
+    return new THREE.Color(0xe1c47f).lerp(new THREE.Color(0x9d956d), clamp(tile.moisture * 0.22, 0, 0.22)).offsetHSL(0.008, 0, (variation - 0.5) * 0.06)
   }
   return new THREE.Color(palette[tile.biome]).offsetHSL((variation - 0.5) * 0.025, 0, (variation - 0.5) * 0.065)
 }
@@ -230,15 +478,15 @@ export class WorldRenderer {
     terrainSnow: createTerrainMaterial(),
   }
   private readonly terrainHitMaterial = new THREE.MeshBasicMaterial({ colorWrite: false, depthWrite: false })
-  private readonly waterMaterial = new THREE.MeshStandardMaterial({
-    color: 0x287dae,
-    transparent: true,
-    opacity: 0.74,
-    roughness: 0.24,
-    metalness: 0.12,
-    emissive: 0x0c3555,
-    emissiveIntensity: 0.12,
-    side: THREE.DoubleSide,
+  private readonly waterNormalMap = createWaterNormalTexture()
+  private readonly waterMaterial = new THREE.MeshPhongMaterial({
+    color: 0x1679ad,
+    specular: 0x8ad8ff,
+    shininess: 92,
+    normalMap: this.waterNormalMap,
+    normalScale: new THREE.Vector2(0.3, 0.24),
+    emissive: 0x06263f,
+    emissiveIntensity: 0.1,
   })
   private readonly treeGeometry = createStylizedCanopyGeometry()
   // Distant canopies preserve the game's readable stylized silhouette while
@@ -250,51 +498,79 @@ export class WorldRenderer {
   private readonly rockMaterial = new THREE.MeshStandardMaterial({ color: 0x87909a, flatShading: true, roughness: 0.84, metalness: 0.08 })
   private readonly resourceGeometry = new THREE.ConeGeometry(0.12, 0.45, 5)
   private readonly resourceMaterial = new THREE.MeshStandardMaterial({ color: 0xf4be64, flatShading: true, roughness: 0.47, metalness: 0.36 })
-  private readonly groundDetailGeometry = new THREE.ConeGeometry(0.075, 0.28, 4)
-  private readonly groundDetailMaterial = new THREE.MeshStandardMaterial({ vertexColors: true, flatShading: true, roughness: 0.96 })
+  private readonly groundDetailGeometry = createGrassClumpGeometry()
+  private readonly groundDetailMaterial = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.92, side: THREE.DoubleSide })
+  private readonly sandDetailGeometry = createBeachDetailGeometry()
+  private readonly sandDetailMaterial = new THREE.MeshStandardMaterial({ vertexColors: true, flatShading: true, roughness: 0.98 })
+  private readonly coastFoamGeometry = createCoastFoamGeometry()
+  private readonly coastFoamMaterial = new THREE.MeshBasicMaterial({ color: 0xd8f1f8, vertexColors: true, transparent: true, opacity: 0.34, depthWrite: false, blending: THREE.AdditiveBlending })
+  private readonly waterRippleGeometry = createWaterRippleGeometry()
+  private readonly waterRippleMaterial = new THREE.MeshBasicMaterial({ color: 0xc6ebf7, transparent: true, opacity: 0.28, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide })
   private readonly houseGeometry = new THREE.BoxGeometry(0.38, 0.32, 0.36)
   private readonly houseMaterial = new THREE.MeshStandardMaterial({ color: 0xb8714e, flatShading: true, roughness: 0.82 })
   private readonly roofGeometry = new THREE.ConeGeometry(0.35, 0.34, 4)
   private readonly roofMaterial = new THREE.MeshStandardMaterial({ color: 0x5e3c34, flatShading: true, roughness: 0.9 })
+  private readonly thatchRoofGeometry = new THREE.ConeGeometry(0.38, 0.38, 4)
+  private readonly thatchRoofMaterial = new THREE.MeshStandardMaterial({ color: 0x9b7b42, flatShading: true, roughness: 0.98 })
   private readonly farmGeometry = new THREE.BoxGeometry(0.56, 0.026, 0.3)
   private readonly farmMaterial = new THREE.MeshStandardMaterial({ color: 0x9fb652, flatShading: true, roughness: 0.95 })
   private readonly roadGeometry = new THREE.BoxGeometry(0.16, 0.018, 0.78)
   private readonly roadMaterial = new THREE.MeshStandardMaterial({ color: 0x92795c, flatShading: true, roughness: 0.99 })
+  private readonly workshopGeometry = new THREE.BoxGeometry(0.52, 0.34, 0.44)
+  private readonly workshopMaterial = new THREE.MeshStandardMaterial({ color: 0x7a5138, flatShading: true, roughness: 0.88 })
+  private readonly forgeGeometry = new THREE.CylinderGeometry(0.18, 0.23, 0.28, 6)
+  private readonly forgeMaterial = new THREE.MeshStandardMaterial({ color: 0x6b6660, flatShading: true, roughness: 0.58, metalness: 0.38 })
+  private readonly townHallGeometry = new THREE.BoxGeometry(0.74, 0.56, 0.64)
+  private readonly townHallMaterial = new THREE.MeshStandardMaterial({ color: 0x858887, flatShading: true, roughness: 0.9 })
   private readonly lanternGeometry = new THREE.SphereGeometry(0.065, 6, 4)
   private readonly lanternMaterial = new THREE.MeshStandardMaterial({ color: 0xffcc73, emissive: 0x8d4d16, emissiveIntensity: 0.55, flatShading: true, roughness: 0.6 })
-  private readonly settlerGeometry = new THREE.SphereGeometry(0.09, 7, 5)
-  private readonly settlerMaterial = new THREE.MeshStandardMaterial({ vertexColors: true, flatShading: true, roughness: 0.72 })
   private readonly rainGeometry = new THREE.BufferGeometry()
   private readonly rainMaterial = new THREE.LineBasicMaterial({ color: 0xbdeaff, transparent: true, opacity: 0.84, depthWrite: false, depthTest: false })
   private readonly previewMaterial = new THREE.MeshBasicMaterial({ transparent: true, opacity: 0.68, side: THREE.DoubleSide })
   private readonly clouds: Array<{ baseX: number; baseZ: number; altitude: number; speed: number; variation: number }> = []
+  private readonly waterRipples: WaterRipple[] = []
   private readonly sun = new THREE.DirectionalLight(0xfff0bc, 2.3)
   private readonly skyLight = new THREE.HemisphereLight(0x9bd8ff, 0x4d5539, 1.55)
+  private readonly skyDome = createSkyDome()
   private readonly dummy = new THREE.Object3D()
   private readonly skyColor = new THREE.Color()
+  private readonly skyHorizonColor = new THREE.Color()
+  private polyHavenSkyTexture: THREE.Texture | undefined
+  private readonly faunaLayer = new FaunaLayer(TILE_SCALE)
+  private readonly settlerLayer = new SettlerLayer(TILE_SCALE, MAX_SETTLERS)
   /** Two vertices per drop make weather legible as rain streaks while retaining one draw call. */
   private readonly rainPositions = new Float32Array(MAX_RAIN_DROPS * 6)
   private terrainGroup!: THREE.Group
   private terrainHit!: THREE.Mesh<THREE.BufferGeometry, THREE.MeshBasicMaterial>
   private terrainSurfaces: Partial<Record<TerrainSurface, TerrainSurfaceMesh>> = {}
-  private water!: THREE.Mesh<THREE.PlaneGeometry, THREE.MeshStandardMaterial>
+  private water!: THREE.Mesh<THREE.PlaneGeometry, THREE.MeshPhongMaterial>
+  private coastFoam!: THREE.InstancedMesh<THREE.PlaneGeometry, THREE.MeshBasicMaterial>
+  private waterRippleMesh!: THREE.InstancedMesh<THREE.TorusGeometry, THREE.MeshBasicMaterial>
   private trees!: THREE.InstancedMesh
   private trunks!: THREE.InstancedMesh
-  private treeModelLayer: InstancedTreeModelLayer | undefined
+  private treeModelLayer: InstancedModelLayer | undefined
+  private rockModelLayer: InstancedModelLayer | undefined
+  private groundCoverModelLayer: InstancedModelLayer | undefined
+  private coastRockModelLayer: InstancedModelLayer | undefined
   private rocks!: THREE.InstancedMesh
   private resources!: THREE.InstancedMesh
   private groundDetails!: THREE.InstancedMesh
+  private sandDetails!: THREE.InstancedMesh
   private houses!: THREE.InstancedMesh
   private roofs!: THREE.InstancedMesh
+  private thatchRoofs!: THREE.InstancedMesh
   private farms!: THREE.InstancedMesh
   private roads!: THREE.InstancedMesh
+  private workshops!: THREE.InstancedMesh
+  private forges!: THREE.InstancedMesh
+  private townHalls!: THREE.InstancedMesh
   private lanterns!: THREE.InstancedMesh
-  private settlers!: THREE.InstancedMesh
   private rain!: THREE.LineSegments<THREE.BufferGeometry, THREE.LineBasicMaterial>
   private preview!: THREE.Mesh<THREE.RingGeometry, THREE.MeshBasicMaterial>
-  private cloudGeometry: THREE.DodecahedronGeometry | undefined
-  private cloudMaterial: THREE.MeshStandardMaterial | undefined
-  private cloudMesh: THREE.InstancedMesh | undefined
+  private cloudGeometry: THREE.IcosahedronGeometry | undefined
+  private cloudMaterial: THREE.MeshPhysicalMaterial | undefined
+  private cloudMesh: THREE.InstancedMesh<THREE.IcosahedronGeometry, THREE.MeshPhysicalMaterial> | undefined
+  private cloudPuffsPerCloud = 0
   private world: World
   private simulation: SimulationState
   private heatmap: HeatmapMode = 'địa hình'
@@ -308,14 +584,24 @@ export class WorldRenderer {
   private pointerDown: { x: number; y: number; pointerId: number } | undefined
   private qualityProfile: QualityProfile = 'auto'
   private effectiveQuality: EffectiveQuality = 'medium'
+  private graphicsOverrides: GraphicsQualityOverrides = createGraphicsQualityOverrides()
   private lastQualityChangeAt = 0
   private waterWaveFrame = 0
   private waterSegments = 0
   private requestedAssetPack: AssetPackQuality | undefined
+  private assetPackEntitlements: AssetPackEntitlements
   private artLoadRevision = 0
+  private evolutionArtRevision = 0
+  private evolutionArtKey: string | undefined
+  private evolutionArtBundle: PolyHavenArtBundle | undefined
+  private activeAssetEntries: readonly AssetManifestEntry[] = ASSET_MANIFEST
+  private resolvedAssetPack: AssetPackQuality | undefined
   private isDisposed = false
   private hasPolyHavenTerrainArt = false
   private treeModelFallback = false
+  private rockModelFallback = false
+  private groundCoverModelFallback = false
+  private coastRockModelFallback = false
 
   public constructor(
     private readonly host: HTMLElement,
@@ -324,6 +610,8 @@ export class WorldRenderer {
     private readonly callbacks: RendererCallbacks,
     quality: QualityProfile = 'auto',
     private readonly edition: GameEdition = 'web-demo',
+    graphicsOverrides: GraphicsQualityOverrides = createGraphicsQualityOverrides(),
+    assetPackEntitlements: AssetPackEntitlements = { desktopGame: edition === 'desktop', cinema8k: false },
   ) {
     if (!WorldRenderer.supportsWebGl()) {
       throw new Error('Trình duyệt này không hỗ trợ WebGL.')
@@ -333,19 +621,25 @@ export class WorldRenderer {
     this.simulation = simulation
     this.qualityProfile = quality
     this.effectiveQuality = this.capQualityForViewport(quality === 'auto' ? 'low' : quality)
+    this.graphicsOverrides = createGraphicsQualityOverrides(graphicsOverrides)
+    this.assetPackEntitlements = {
+      desktopGame: edition === 'desktop',
+      cinema8k: edition === 'desktop' && assetPackEntitlements.cinema8k,
+    }
     this.renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' })
     this.renderer.outputColorSpace = THREE.SRGBColorSpace
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping
-    this.renderer.toneMappingExposure = 1.15
+    this.renderer.toneMappingExposure = 1.02
     this.renderer.shadowMap.enabled = true
     this.renderer.shadowMap.type = THREE.PCFShadowMap
+    this.waterNormalMap.anisotropy = Math.min(4, this.renderer.capabilities.getMaxAnisotropy())
     this.renderer.domElement.className = 'world-canvas'
     this.renderer.domElement.tabIndex = 0
     this.renderer.domElement.setAttribute('aria-label', 'Bản đồ 3D Aetheria. Dùng chuột để xoay, kéo và phóng to; nhấp để áp dụng quyền năng.')
     this.host.appendChild(this.renderer.domElement)
 
     this.scene.background = new THREE.Color(0x9acde2)
-    this.scene.fog = new THREE.Fog(0x9acde2, 20, 52)
+    this.scene.fog = new THREE.Fog(0x9acde2, 28, 68)
     this.camera.position.set(14, 25, 17)
 
     this.controls = new OrbitControls(this.camera, this.renderer.domElement)
@@ -369,8 +663,11 @@ export class WorldRenderer {
     this.sun.shadow.camera.top = 15
     this.sun.shadow.camera.bottom = -15
     this.sun.shadow.normalBias = 0.025
+    this.skyDome.scale.setScalar(86)
+    this.skyDome.frustumCulled = false
+    this.frameWorld(world)
     this.applyQuality()
-    this.scene.add(this.skyLight, this.sun, this.sun.target)
+    this.scene.add(this.skyDome, this.skyLight, this.sun, this.sun.target)
 
     this.createWorldObjects(world)
     this.setAssetPack('web-1k')
@@ -393,6 +690,7 @@ export class WorldRenderer {
 
     if (sizeChanged || seedChanged) {
       this.disposeWorldObjects()
+      this.frameWorld(world)
       this.createWorldObjects(world)
       this.controls.target.set(0, 0, 0)
       return
@@ -428,17 +726,49 @@ export class WorldRenderer {
     this.refreshQualityDependentScene()
   }
 
-  /** Web is hard-limited to 1K; desktop resolves local 2K/4K manifests and safe fallbacks. */
+  /** Applies only presentation overrides; world generation and simulation stay deterministic. */
+  public setGraphicsOverrides(overrides: GraphicsQualityOverrides): void {
+    const next = createGraphicsQualityOverrides(overrides)
+    const unchanged = GRAPHICS_QUALITY_COMPONENTS.every((component) => next[component] === this.graphicsOverrides[component])
+    if (unchanged) return
+    this.graphicsOverrides = next
+    this.refreshQualityDependentScene()
+  }
+
+  /** A server-verified Cinema purchase may change during a desktop session. */
+  public setAssetPackEntitlements(entitlements: AssetPackEntitlements): void {
+    const next: AssetPackEntitlements = {
+      desktopGame: this.edition === 'desktop',
+      cinema8k: this.edition === 'desktop' && entitlements.cinema8k,
+    }
+    if (next.desktopGame === this.assetPackEntitlements.desktopGame && next.cinema8k === this.assetPackEntitlements.cinema8k) return
+    this.assetPackEntitlements = next
+    const requestedPack = this.requestedAssetPack ?? 'web-1k'
+    this.requestedAssetPack = undefined
+    this.setAssetPack(requestedPack)
+  }
+
+  /** Web is hard-limited to 1K; desktop resolves installed 2K/4K manifests and entitled 8K safely. */
   public setAssetPack(requestedPack: AssetPackQuality): void {
     if (this.requestedAssetPack === requestedPack) return
     this.requestedAssetPack = requestedPack
-    if (this.edition === 'desktop' && (requestedPack === 'desktop-2k' || requestedPack === 'desktop-4k')) {
-      const requestedDesktopPacks = requestedPack === 'desktop-4k' ? ['desktop-4k', 'desktop-2k'] as const : ['desktop-2k'] as const
+    if (this.edition === 'desktop' && requestedPack !== 'web-1k') {
+      const requestedDesktopPacks = requestedPack === 'cinema-8k' && this.assetPackEntitlements.cinema8k
+        ? ['cinema-8k', 'desktop-4k', 'desktop-2k'] as const
+        : requestedPack === 'cinema-8k'
+          ? ['desktop-4k', 'desktop-2k'] as const
+        : requestedPack === 'desktop-4k'
+          ? ['desktop-4k', 'desktop-2k'] as const
+          : ['desktop-2k'] as const
       void Promise.allSettled(requestedDesktopPacks.map((pack) => loadDesktopPackManifest(pack))).then((results) => {
         if (this.isDisposed || this.requestedAssetPack !== requestedPack) return
         const desktopEntries = results.flatMap((result) => result.status === 'fulfilled' ? result.value : [])
         const availableDesktopPacks = requestedDesktopPacks.filter((_, index) => results[index]?.status === 'fulfilled')
-        const desktopModels = desktopTreeModelEntries(desktopPackRoot())
+        const desktopModels = [
+          ...desktopTreeModelEntries(desktopPackRoot()),
+          ...desktopRockModelEntries(desktopPackRoot()),
+          ...desktopEnvironmentModelEntries(desktopPackRoot()),
+        ]
           .filter((entry) => availableDesktopPacks.some((pack) => pack === entry.pack))
         this.applyAssetPack(requestedPack, [...ASSET_MANIFEST, ...desktopEntries, ...desktopModels])
       })
@@ -449,7 +779,13 @@ export class WorldRenderer {
 
   private applyAssetPack(requestedPack: AssetPackQuality, entries: readonly AssetManifestEntry[]): void {
     const artLoadRevision = ++this.artLoadRevision
+    this.activeAssetEntries = entries
+    this.resolvedAssetPack = undefined
+    this.clearEvolutionArt()
     this.detachTreeModelLayer()
+    this.detachRockModelLayer()
+    this.detachGroundCoverModelLayer()
+    this.detachCoastRockModelLayer()
     this.hasPolyHavenTerrainArt = false
     this.refreshTerrainMaterialColoring()
     clearPolyHavenArt(this.polyHavenArtTargets)
@@ -457,12 +793,12 @@ export class WorldRenderer {
       edition: this.edition,
       requestedPack,
       capabilities: { maxTextureSize: this.renderer.capabilities.maxTextureSize },
-      entitlements: { desktopGame: this.edition === 'desktop', cinema8k: false },
+      entitlements: this.assetPackEntitlements,
       availability: {
         'web-1k': assetsForPack(entries, 'web-1k').length > 0,
         'desktop-2k': assetsForPack(entries, 'desktop-2k').length > 0,
         'desktop-4k': assetsForPack(entries, 'desktop-4k').length > 0,
-        'cinema-8k': false,
+        'cinema-8k': assetsForPack(entries, 'cinema-8k').length > 0,
       },
     })
     const selectedPack = selection.selectedPack
@@ -475,33 +811,142 @@ export class WorldRenderer {
           const treeAsset = canLoadTreeModel(selection.textureSourceResolution)
             ? treeModelAssetForPack(entries, selectedPack)
             : undefined
-          const [materials, treeResult] = await Promise.all([
+          const rockAsset = canLoadTreeModel(selection.textureSourceResolution)
+            ? rockModelAssetForPack(entries, selectedPack)
+            : undefined
+          const groundCoverAsset = canLoadTreeModel(selection.textureSourceResolution)
+            ? groundCoverModelAssetForPack(entries, selectedPack)
+            : undefined
+          const coastRockAsset = canLoadTreeModel(selection.textureSourceResolution)
+            ? coastRockModelAssetForPack(entries, selectedPack)
+            : undefined
+          const [materials, treeResult, rockResult, groundCoverResult, coastRockResult] = await Promise.all([
             loadPolyHavenArt(this.renderer, this.polyHavenArtTargets, entries, selectedPack),
             treeAsset
               ? loadInstancedTreeModel(treeAsset)
                 .then((layer) => ({ layer, fallback: false }))
                 .catch(() => ({ layer: undefined, fallback: true }))
               : Promise.resolve({ layer: undefined, fallback: true }),
+            rockAsset
+              ? loadInstancedRockModel(rockAsset)
+                .then((layer) => ({ layer, fallback: false }))
+                .catch(() => ({ layer: undefined, fallback: true }))
+              : Promise.resolve({ layer: undefined, fallback: true }),
+            groundCoverAsset
+              ? loadInstancedGroundCoverModel(groundCoverAsset)
+                .then((layer) => ({ layer, fallback: false }))
+                .catch(() => ({ layer: undefined, fallback: true }))
+              : Promise.resolve({ layer: undefined, fallback: true }),
+            coastRockAsset
+              ? loadInstancedCoastRockModel(coastRockAsset)
+                .then((layer) => ({ layer, fallback: false }))
+                .catch(() => ({ layer: undefined, fallback: true }))
+              : Promise.resolve({ layer: undefined, fallback: true }),
           ])
-          return new WorldArtBundle(materials, treeResult.layer, treeResult.fallback)
+          return new WorldArtBundle(
+            materials,
+            treeResult.layer,
+            rockResult.layer,
+            groundCoverResult.layer,
+            coastRockResult.layer,
+            treeResult.fallback,
+            rockResult.fallback,
+            groundCoverResult.fallback,
+            coastRockResult.fallback,
+          )
         },
       },
-      { id: 'procedural-art-fallback', load: async () => new WorldArtBundle(createProceduralArtFallback(), undefined, true) },
+      {
+        id: 'procedural-art-fallback',
+        load: async () => new WorldArtBundle(
+          createProceduralArtFallback(),
+          undefined,
+          undefined,
+          undefined,
+          undefined,
+          true,
+          true,
+          true,
+          true,
+        ),
+      },
     ).then((result) => {
       if (this.isDisposed || artLoadRevision !== this.artLoadRevision) {
         result.value.dispose()
         return
       }
       result.value.apply(this.polyHavenArtTargets)
+      this.resolvedAssetPack = selectedPack
       this.treeModelLayer = result.value.treeLayer
+      this.rockModelLayer = result.value.rockLayer
+      this.groundCoverModelLayer = result.value.groundCoverLayer
+      this.coastRockModelLayer = result.value.coastRockLayer
       this.treeModelFallback = result.usedFallback || result.value.treeFallback
+      this.rockModelFallback = result.usedFallback || result.value.rockFallback
+      this.groundCoverModelFallback = result.usedFallback || result.value.groundCoverFallback
+      this.coastRockModelFallback = result.usedFallback || result.value.coastRockFallback
       this.treeModelLayer?.attach(this.scene)
+      this.rockModelLayer?.attach(this.scene)
+      this.groundCoverModelLayer?.attach(this.scene)
+      this.coastRockModelLayer?.attach(this.scene)
       this.updateStaticInstances()
       this.hasPolyHavenTerrainArt = !result.usedFallback
       this.refreshTerrainMaterialColoring()
+      this.refreshEvolutionArt()
     }).catch(() => {
       // The asset manager records an error state; the procedural materials stay playable.
     })
+  }
+
+  /** Loads only the deferred PBR maps whose era geometry is currently visible. */
+  private refreshEvolutionArt(): void {
+    const selectedPack = this.resolvedAssetPack
+    if (!selectedPack || this.isDisposed) return
+    const highestToolTier = this.simulation.villages.reduce((highest, village) => Math.max(highest, villageToolTier(village.tools)), -1)
+    const surfaces = new Set<AssetMaterialSurface>()
+    if (highestToolTier >= 1) {
+      surfaces.add('thatchRoof')
+      surfaces.add('workshopWood')
+    }
+    if (highestToolTier >= 4) surfaces.add('metalwork')
+    if (highestToolTier >= 6) surfaces.add('stonework')
+
+    const entries = assetsForPack(this.activeAssetEntries, selectedPack).filter((entry) => (
+      entry.runtime.kind === 'material'
+      && entry.runtime.surface !== 'environment'
+      && entry.runtimeBudget.preload === false
+      && surfaces.has(entry.runtime.surface)
+    ))
+    const key = `${selectedPack}:${[...surfaces].join(',')}`
+    if (key === this.evolutionArtKey) return
+    this.evolutionArtKey = key
+    const revision = ++this.evolutionArtRevision
+    clearPolyHavenArt(this.evolutionArtTargets, { clearEnvironment: false })
+    this.evolutionArtBundle?.dispose()
+    this.evolutionArtBundle = undefined
+    if (entries.length === 0) return
+
+    void loadPolyHavenArt(this.renderer, this.evolutionArtTargets, entries, selectedPack, {
+      includeDeferred: true,
+      loadEnvironment: false,
+    }).then((bundle) => {
+      if (this.isDisposed || revision !== this.evolutionArtRevision) {
+        bundle.dispose()
+        return
+      }
+      bundle.apply(this.evolutionArtTargets)
+      this.evolutionArtBundle = bundle
+    }).catch(() => {
+      // Era geometry keeps its compact procedural material if an optional map fails.
+    })
+  }
+
+  private clearEvolutionArt(): void {
+    this.evolutionArtRevision += 1
+    this.evolutionArtKey = undefined
+    clearPolyHavenArt(this.evolutionArtTargets, { clearEnvironment: false })
+    this.evolutionArtBundle?.dispose()
+    this.evolutionArtBundle = undefined
   }
 
   /** The asset scope owns disposal; the renderer only detaches stale geometry. */
@@ -512,9 +957,32 @@ export class WorldRenderer {
     if (this.trees && this.trunks) this.updateStaticInstances()
   }
 
+  /** The asset scope owns disposal; the renderer only detaches stale geometry. */
+  private detachRockModelLayer(): void {
+    this.rockModelLayer?.detach()
+    this.rockModelLayer = undefined
+    this.rockModelFallback = false
+    if (this.rocks) this.updateStaticInstances()
+  }
+
+  private detachGroundCoverModelLayer(): void {
+    this.groundCoverModelLayer?.detach()
+    this.groundCoverModelLayer = undefined
+    this.groundCoverModelFallback = false
+    if (this.groundDetails) this.updateStaticInstances()
+  }
+
+  private detachCoastRockModelLayer(): void {
+    this.coastRockModelLayer?.detach()
+    this.coastRockModelLayer = undefined
+    this.coastRockModelFallback = false
+    if (this.sandDetails) this.updateStaticInstances()
+  }
+
   private get polyHavenArtTargets(): PolyHavenArtTargets {
     return {
       scene: this.scene,
+      setSkyTexture: (texture) => this.setPolyHavenSkyTexture(texture),
       materials: {
         terrainGrass: [this.terrainMaterials.terrainGrass],
         terrainForest: [this.terrainMaterials.terrainForest],
@@ -530,6 +998,27 @@ export class WorldRenderer {
     }
   }
 
+  /** Era-specific maps are a secondary scope, so they never replace the HDRI. */
+  private get evolutionArtTargets(): PolyHavenArtTargets {
+    return {
+      scene: this.scene,
+      materials: {
+        thatchRoof: [this.thatchRoofMaterial],
+        workshopWood: [this.workshopMaterial],
+        metalwork: [this.forgeMaterial],
+        stonework: [this.townHallMaterial],
+      },
+    }
+  }
+
+  /** The HDRI is a real local Poly Haven sky; the procedural dome is its safe fallback. */
+  private setPolyHavenSkyTexture(texture: THREE.Texture | undefined): void {
+    this.polyHavenSkyTexture = texture
+    this.skyDome.visible = texture === undefined
+    if (this.cloudMesh) this.cloudMesh.visible = texture === undefined
+    this.scene.background = texture ?? this.skyColor
+  }
+
   /** Terrain maps own the natural biome palette; heatmaps deliberately restore vertex-color overlays. */
   private refreshTerrainMaterialColoring(): void {
     const useVertexColors = !this.hasPolyHavenTerrainArt || this.heatmap !== 'địa hình'
@@ -542,6 +1031,33 @@ export class WorldRenderer {
 
   private capQualityForViewport(quality: EffectiveQuality): EffectiveQuality {
     return capQualityForMobile(quality, isMobileViewport())
+  }
+
+  private graphicsQuality(component: GraphicsQualityComponent): EffectiveQuality {
+    return this.capQualityForViewport(resolveGraphicsQuality(this.graphicsOverrides[component], this.effectiveQuality))
+  }
+
+  /** Frames expanded worlds on creation without taking away the player's zoom range. */
+  private frameWorld(world: World): void {
+    const worldSpan = Math.max(1, (world.config.size - 1) * TILE_SCALE)
+    const scale = Math.max(1, worldSpan / (35 * TILE_SCALE))
+    this.camera.position.set(14 * scale, 25 * scale, 17 * scale)
+    this.controls.minDistance = Math.max(11, 10 * scale)
+    this.controls.maxDistance = Math.max(42, 42 * scale)
+
+    const fog = this.scene.fog
+    if (fog instanceof THREE.Fog) {
+      fog.near = Math.max(28, worldSpan * 1.05)
+      fog.far = Math.max(76, worldSpan * 2.4)
+    }
+
+    const extent = Math.min(22, Math.max(15, worldSpan * 0.46))
+    const shadowCamera = this.sun.shadow.camera as THREE.OrthographicCamera
+    shadowCamera.left = -extent
+    shadowCamera.right = extent
+    shadowCamera.top = extent
+    shadowCamera.bottom = -extent
+    shadowCamera.updateProjectionMatrix()
   }
 
   public capturePhoto(): string {
@@ -580,17 +1096,20 @@ export class WorldRenderer {
   public dispose(): void {
     this.isDisposed = true
     this.artLoadRevision += 1
+    this.clearEvolutionArt()
     this.renderer.setAnimationLoop(null)
     this.resizeObserver.disconnect()
     this.detachInteractions()
     clearPolyHavenArt(this.polyHavenArtTargets)
     this.detachTreeModelLayer()
+    this.detachRockModelLayer()
     this.assetPackManager.dispose()
     this.disposeWorldObjects()
     this.previewMaterial.dispose()
     this.terrainHitMaterial.dispose()
     for (const material of Object.values(this.terrainMaterials)) material.dispose()
     this.waterMaterial.dispose()
+    this.waterNormalMap.dispose()
     this.rainGeometry.dispose()
     this.rainMaterial.dispose()
     this.treeGeometry.dispose()
@@ -603,18 +1122,34 @@ export class WorldRenderer {
     this.resourceMaterial.dispose()
     this.groundDetailGeometry.dispose()
     this.groundDetailMaterial.dispose()
+    this.sandDetailGeometry.dispose()
+    this.sandDetailMaterial.dispose()
+    this.coastFoamGeometry.dispose()
+    this.coastFoamMaterial.dispose()
+    this.waterRippleGeometry.dispose()
+    this.waterRippleMaterial.dispose()
+    this.faunaLayer.dispose()
     this.houseGeometry.dispose()
     this.houseMaterial.dispose()
     this.roofGeometry.dispose()
     this.roofMaterial.dispose()
+    this.thatchRoofGeometry.dispose()
+    this.thatchRoofMaterial.dispose()
     this.farmGeometry.dispose()
     this.farmMaterial.dispose()
     this.roadGeometry.dispose()
     this.roadMaterial.dispose()
+    this.workshopGeometry.dispose()
+    this.workshopMaterial.dispose()
+    this.forgeGeometry.dispose()
+    this.forgeMaterial.dispose()
+    this.townHallGeometry.dispose()
+    this.townHallMaterial.dispose()
     this.lanternGeometry.dispose()
     this.lanternMaterial.dispose()
-    this.settlerGeometry.dispose()
-    this.settlerMaterial.dispose()
+    this.settlerLayer.dispose()
+    this.skyDome.geometry.dispose()
+    this.skyDome.material.dispose()
     this.controls.dispose()
     this.renderer.dispose()
     this.renderer.forceContextLoss()
@@ -626,33 +1161,58 @@ export class WorldRenderer {
     this.createTerrainSurfaces(world)
 
     const size = world.config.size
-    const waterSize = Math.max(2, (size - 1) * TILE_SCALE)
-    this.waterSegments = waterSegmentsFor(this.effectiveQuality, size)
+    const capacity = size * size
+    const waterSize = waterPlaneSize(size)
+    const normalRepeat = waterNormalRepeat(waterSize)
+    this.waterNormalMap.repeat.set(normalRepeat, normalRepeat)
+    this.waterSegments = oceanSegmentsFor(this.graphicsQuality('water'), size)
     const waterGeometry = new THREE.PlaneGeometry(waterSize, waterSize, this.waterSegments, this.waterSegments)
     waterGeometry.rotateX(-Math.PI / 2)
     this.water = new THREE.Mesh(waterGeometry, this.waterMaterial)
     this.water.position.y = getWaterLevel(world.config) + 0.016
     this.scene.add(this.water)
 
-    const capacity = size * size
+    this.waterRippleMesh = new THREE.InstancedMesh(this.waterRippleGeometry, this.waterRippleMaterial, capacity)
+    this.waterRippleMesh.count = 0
+    this.waterRippleMesh.castShadow = false
+    this.waterRippleMesh.receiveShadow = false
+    this.waterRippleMesh.frustumCulled = false
+    this.waterRippleMesh.renderOrder = 1
+    this.scene.add(this.waterRippleMesh)
+
+    this.coastFoam = new THREE.InstancedMesh(this.coastFoamGeometry, this.coastFoamMaterial, Math.max(32, capacity * 2))
+    this.coastFoam.count = 0
+    this.coastFoam.castShadow = false
+    this.coastFoam.receiveShadow = false
+    this.coastFoam.frustumCulled = false
+    this.coastFoam.renderOrder = 1
+    this.scene.add(this.coastFoam)
+
     this.trees = new THREE.InstancedMesh(this.treeGeometry, this.treeMaterial, capacity)
     this.trunks = new THREE.InstancedMesh(this.trunkGeometry, this.trunkMaterial, capacity)
     this.rocks = new THREE.InstancedMesh(this.rockGeometry, this.rockMaterial, capacity)
     this.resources = new THREE.InstancedMesh(this.resourceGeometry, this.resourceMaterial, capacity)
     this.groundDetails = new THREE.InstancedMesh(this.groundDetailGeometry, this.groundDetailMaterial, capacity)
+    this.sandDetails = new THREE.InstancedMesh(this.sandDetailGeometry, this.sandDetailMaterial, capacity)
     this.houses = new THREE.InstancedMesh(this.houseGeometry, this.houseMaterial, MAX_HOUSES)
     this.roofs = new THREE.InstancedMesh(this.roofGeometry, this.roofMaterial, MAX_HOUSES)
+    this.thatchRoofs = new THREE.InstancedMesh(this.thatchRoofGeometry, this.thatchRoofMaterial, MAX_HOUSES)
     this.farms = new THREE.InstancedMesh(this.farmGeometry, this.farmMaterial, MAX_FARMS)
     this.roads = new THREE.InstancedMesh(this.roadGeometry, this.roadMaterial, MAX_ROADS)
+    this.workshops = new THREE.InstancedMesh(this.workshopGeometry, this.workshopMaterial, MAX_WORKSHOPS)
+    this.forges = new THREE.InstancedMesh(this.forgeGeometry, this.forgeMaterial, MAX_FORGES)
+    this.townHalls = new THREE.InstancedMesh(this.townHallGeometry, this.townHallMaterial, MAX_TOWN_HALLS)
     this.lanterns = new THREE.InstancedMesh(this.lanternGeometry, this.lanternMaterial, MAX_LANTERNS)
-    this.settlers = new THREE.InstancedMesh(this.settlerGeometry, this.settlerMaterial, MAX_SETTLERS)
 
-    for (const object of [this.trees, this.trunks, this.rocks, this.resources, this.groundDetails, this.houses, this.roofs, this.farms, this.roads, this.lanterns, this.settlers]) {
+    for (const object of [this.trees, this.trunks, this.rocks, this.resources, this.groundDetails, this.sandDetails, this.houses, this.roofs, this.thatchRoofs, this.farms, this.roads, this.workshops, this.forges, this.townHalls, this.lanterns]) {
       object.castShadow = true
       object.receiveShadow = true
       object.frustumCulled = true
       this.scene.add(object)
     }
+    this.settlerLayer.attach(this.scene)
+    this.sandDetails.castShadow = false
+    this.faunaLayer.attach(this.scene)
 
     this.rainGeometry.setAttribute('position', new THREE.BufferAttribute(this.rainPositions, 3))
     this.rain = new THREE.LineSegments(this.rainGeometry, this.rainMaterial)
@@ -694,15 +1254,16 @@ export class WorldRenderer {
     this.terrainGroup.add(this.terrainHit)
     this.scene.add(this.terrainGroup)
 
-    const builders = new Map<TerrainSurface, { positions: number[]; colors: number[]; uvs: number[]; indices: number[]; tileIndices: number[] }>()
-    const builderFor = (surface: TerrainSurface): { positions: number[]; colors: number[]; uvs: number[]; indices: number[]; tileIndices: number[] } => {
+    const builders = new Map<TerrainSurface, { positions: number[]; normals: number[]; colors: number[]; uvs: number[]; indices: number[]; tileIndices: number[] }>()
+    const builderFor = (surface: TerrainSurface): { positions: number[]; normals: number[]; colors: number[]; uvs: number[]; indices: number[]; tileIndices: number[] } => {
       const existing = builders.get(surface)
       if (existing) return existing
-      const created = { positions: [], colors: [], uvs: [], indices: [], tileIndices: [] }
+      const created = { positions: [], normals: [], colors: [], uvs: [], indices: [], tileIndices: [] }
       builders.set(surface, created)
       return created
     }
     const uvDenominator = Math.max(1, size - 1)
+    const normal = new THREE.Vector3()
 
     for (let z = 0; z < size - 1; z += 1) {
       for (let x = 0; x < size - 1; x += 1) {
@@ -717,7 +1278,9 @@ export class WorldRenderer {
           if (!tile) continue
           const position = this.tilePosition(tile)
           const color = terrainColor(tile, this.heatmap, this.simulation, world)
+          terrainNormalAt(world, tile.x, tile.z, normal)
           builder.positions.push(position.x, position.y, position.z)
+          builder.normals.push(normal.x, normal.y, normal.z)
           builder.colors.push(color.r, color.g, color.b)
           builder.uvs.push(tile.x / uvDenominator, tile.z / uvDenominator)
           builder.tileIndices.push(tileIndex)
@@ -731,6 +1294,7 @@ export class WorldRenderer {
       const geometry = new THREE.BufferGeometry()
       geometry.setIndex(builder.indices)
       geometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array(builder.positions), 3))
+      geometry.setAttribute('normal', new THREE.BufferAttribute(new Float32Array(builder.normals), 3))
       geometry.setAttribute('color', new THREE.BufferAttribute(new Float32Array(builder.colors), 3))
       geometry.setAttribute('uv', new THREE.BufferAttribute(new Float32Array(builder.uvs), 2))
       const mesh = new THREE.Mesh(geometry, this.terrainMaterials[surface])
@@ -752,9 +1316,14 @@ export class WorldRenderer {
       this.water.geometry.dispose()
       this.waterSegments = 0
     }
-    for (const object of [this.trees, this.trunks, this.rocks, this.resources, this.groundDetails, this.houses, this.roofs, this.farms, this.roads, this.lanterns, this.settlers]) {
+    if (this.waterRippleMesh) this.scene.remove(this.waterRippleMesh)
+    this.waterRipples.length = 0
+    if (this.coastFoam) this.scene.remove(this.coastFoam)
+    for (const object of [this.trees, this.trunks, this.rocks, this.resources, this.groundDetails, this.sandDetails, this.houses, this.roofs, this.thatchRoofs, this.farms, this.roads, this.workshops, this.forges, this.townHalls, this.lanterns]) {
       if (object) this.scene.remove(object)
     }
+    this.faunaLayer.detach()
+    this.settlerLayer.detach()
     if (this.rain) this.scene.remove(this.rain)
     if (this.preview) {
       this.scene.remove(this.preview)
@@ -775,29 +1344,133 @@ export class WorldRenderer {
       if (!terrainSurface) continue
       const geometry = terrainSurface.mesh.geometry
       const positions = geometry.getAttribute('position') as THREE.BufferAttribute
+      const normals = geometry.getAttribute('normal') as THREE.BufferAttribute
       const colors = geometry.getAttribute('color') as THREE.BufferAttribute
+      const normal = new THREE.Vector3()
       for (let index = 0; index < terrainSurface.tileIndices.length; index += 1) {
         const tile = this.world.tiles[terrainSurface.tileIndices[index] ?? 0]
         if (!tile) continue
         const color = terrainColor(tile, this.heatmap, this.simulation, this.world)
+        terrainNormalAt(this.world, tile.x, tile.z, normal)
         positions.setXYZ(index, (tile.x - half) * TILE_SCALE, tile.height, (tile.z - half) * TILE_SCALE)
+        normals.setXYZ(index, normal.x, normal.y, normal.z)
         colors.setXYZ(index, color.r, color.g, color.b)
       }
       positions.needsUpdate = true
+      normals.needsUpdate = true
       colors.needsUpdate = true
-      geometry.computeVertexNormals()
       geometry.computeBoundingSphere()
     }
     this.water.position.y = getWaterLevel(this.world.config) + 0.016
+    this.updateCoastFoam()
+    this.rebuildWaterRipples()
+  }
+
+  /** Picks a deterministic, quality-bounded set of open-water crest markers. */
+  private rebuildWaterRipples(): void {
+    if (!this.waterRippleMesh) return
+    const waterQuality = this.graphicsQuality('water')
+    const rippleLimit = waterQuality === 'low' ? 24 : waterQuality === 'medium' ? 52 : waterQuality === 'high' ? 84 : 116
+    const seed = seedToUint32(`${this.world.config.seed}-water-ripples`)
+    const candidates = this.world.tiles
+      .filter((tile) => terrainSurfaceForBiome(tile.biome) === undefined)
+      .map((tile) => ({ tile, priority: hash2d(seed, tile.x, tile.z) }))
+      .sort((left, right) => left.priority - right.priority)
+
+    this.waterRipples.length = 0
+    for (const candidate of candidates.slice(0, rippleLimit)) {
+      const position = this.tilePosition(candidate.tile)
+      const variation = hash2d(seed ^ 0x4c7e19, candidate.tile.z, candidate.tile.x)
+      this.waterRipples.push({
+        baseX: position.x,
+        baseZ: position.z,
+        scale: 0.72 + variation * 1.18,
+        rotation: variation * Math.PI * 2,
+        speed: 0.34 + hash2d(seed ^ 0x1b91c3, candidate.tile.x, candidate.tile.z) * 0.48,
+        phase: hash2d(seed ^ 0x7af312, candidate.tile.z, candidate.tile.x) * Math.PI * 2,
+      })
+    }
+    this.waterRippleMesh.count = this.waterRipples.length
+    this.updateWaterRipples(false)
+    this.waterRippleMesh.computeBoundingSphere()
+  }
+
+  /** One instanced layer supplies small moving crests without adding simulation state or physics. */
+  private updateWaterRipples(animate = true): void {
+    if (!this.waterRippleMesh) return
+    const waterLevel = getWaterLevel(this.world.config) + 0.07
+    for (let index = 0; index < this.waterRipples.length; index += 1) {
+      const ripple = this.waterRipples[index]
+      if (!ripple) continue
+      const drift = animate ? Math.sin(this.elapsed * ripple.speed + ripple.phase) * 0.14 : 0
+      this.dummy.position.set(
+        ripple.baseX + Math.cos(ripple.rotation) * drift,
+        waterLevel,
+        ripple.baseZ + Math.sin(ripple.rotation) * drift,
+      )
+      this.dummy.rotation.set(0, ripple.rotation + (animate ? Math.sin(this.elapsed * ripple.speed * 0.7 + ripple.phase) * 0.12 : 0), 0)
+      const aspect = 0.7 + (ripple.phase / (Math.PI * 2)) * 0.34
+      this.dummy.scale.set(ripple.scale * (1.05 + aspect * 0.18), 1, ripple.scale * aspect)
+      this.dummy.updateMatrix()
+      this.waterRippleMesh.setMatrixAt(index, this.dummy.matrix)
+    }
+    this.waterRippleMesh.instanceMatrix.needsUpdate = true
+  }
+
+  /** Places a single instanced foam strip at every deterministic land-to-water edge. */
+  private updateCoastFoam(): void {
+    if (!this.coastFoam) return
+    const size = this.world.config.size
+    const waterLevel = getWaterLevel(this.world.config)
+    const seed = seedToUint32(`${this.world.config.seed}-foam`)
+    const isWater = (x: number, z: number): boolean => {
+      if (x < 0 || z < 0 || x >= size || z >= size) return false
+      return this.world.tiles[z * size + x]?.biome === 'biển'
+    }
+    const directions = [
+      [0, -1, 0],
+      [1, 0, Math.PI / 2],
+      [0, 1, 0],
+      [-1, 0, Math.PI / 2],
+    ] as const
+    let count = 0
+
+    for (const tile of this.world.tiles) {
+      if (tile.biome === 'biển' || count >= this.coastFoam.instanceMatrix.count) continue
+      const position = this.tilePosition(tile)
+      for (const [directionX, directionZ, rotationY] of directions) {
+        if (!isWater(tile.x + directionX, tile.z + directionZ) || count >= this.coastFoam.instanceMatrix.count) continue
+        const variation = hash2d(seed, tile.x * 7 + directionX, tile.z * 11 + directionZ)
+        this.dummy.position.set(
+          position.x + directionX * TILE_SCALE * 0.47,
+          waterLevel + 0.03,
+          position.z + directionZ * TILE_SCALE * 0.47,
+        )
+        this.dummy.rotation.set(0, rotationY, 0)
+        this.dummy.scale.set(0.64 + variation * 0.38, 1, 0.72 + (1 - variation) * 0.32)
+        this.dummy.updateMatrix()
+        this.coastFoam.setMatrixAt(count, this.dummy.matrix)
+        this.coastFoam.setColorAt(count, new THREE.Color(variation > 0.5 ? 0xe8f8ff : 0xb9e3f5))
+        count += 1
+      }
+    }
+
+    this.coastFoam.count = count
+    this.coastFoam.instanceMatrix.needsUpdate = true
+    if (this.coastFoam.instanceColor) this.coastFoam.instanceColor.needsUpdate = true
+    this.coastFoam.computeBoundingSphere()
   }
 
   private updateStaticInstances(): void {
     const seed = seedToUint32(this.world.config.seed)
-    const settings = qualitySettings(this.effectiveQuality)
+    const natureQuality = this.graphicsQuality('nature')
+    const settings = qualitySettings(natureQuality)
     const treeCandidates: TreePlacement[] = []
-    let rockCount = 0
+    const rockCandidates: RockPlacement[] = []
+    const groundDetailCandidates: DetailPlacement[] = []
+    const sandDetailCandidates: DetailPlacement[] = []
     let resourceCount = 0
-    let detailCount = 0
+    const sandDetailLimit = natureQuality === 'low' ? 0 : natureQuality === 'medium' ? 72 : natureQuality === 'high' ? 150 : 240
 
     for (const tile of this.world.tiles) {
       const { x, y, z } = this.tilePosition(tile)
@@ -826,13 +1499,20 @@ export class WorldRenderer {
         })
       }
 
-      if ((tile.biome === 'đồi' || tile.biome === 'núi' || tile.biome === 'tuyết') && variation > 0.47 && hash2d(seed ^ 0x91f07c, tile.z, tile.x) < settings.rockDensity && rockCount < this.rocks.instanceMatrix.count) {
-        this.dummy.position.set(x, y + 0.08, z)
-        this.dummy.rotation.set(variation, variation * 4, 0)
-        this.dummy.scale.set(0.64 + variation * 0.72, 0.6 + hash2d(seed ^ 0x66dd11, tile.z, tile.x) * 0.78, 0.64 + hash2d(seed ^ 0x9016a4, tile.x, tile.z) * 0.72)
-        this.dummy.updateMatrix()
-        this.rocks.setMatrixAt(rockCount, this.dummy.matrix)
-        rockCount += 1
+      if ((tile.biome === 'đồi' || tile.biome === 'núi' || tile.biome === 'tuyết') && variation > 0.47 && hash2d(seed ^ 0x91f07c, tile.z, tile.x) < settings.rockDensity && rockCandidates.length < this.rocks.instanceMatrix.count) {
+        rockCandidates.push({
+          id: rockCandidates.length,
+          priority: x * x + z * z + hash2d(seed ^ 0x91f07c, tile.z, tile.x) * 0.2,
+          x,
+          y,
+          z,
+          scaleX: 0.64 + variation * 0.72,
+          scaleY: 0.6 + hash2d(seed ^ 0x66dd11, tile.z, tile.x) * 0.78,
+          scaleZ: 0.64 + hash2d(seed ^ 0x9016a4, tile.x, tile.z) * 0.72,
+          rotationX: variation,
+          rotationY: variation * 4,
+          variation,
+        })
       }
 
       if (tile.resources > 0.73 && tile.biome !== 'biển' && hash2d(seed ^ 0x6e2a59, tile.x, tile.z) < settings.resourceDensity && resourceCount < this.resources.instanceMatrix.count) {
@@ -844,34 +1524,53 @@ export class WorldRenderer {
         resourceCount += 1
       }
 
-      const supportsDetail = tile.biome === 'đồng cỏ' || tile.biome === 'rừng' || tile.biome === 'bờ cát' || tile.biome === 'tuyết'
-      if (supportsDetail && settings.groundDetailDensity > 0 && hash2d(seed ^ 0x1c53d7, tile.z, tile.x) < settings.groundDetailDensity && variation > 0.32 && detailCount < this.groundDetails.instanceMatrix.count) {
+      const supportsVegetationDetail = tile.biome === 'đồng cỏ' || tile.biome === 'rừng' || tile.biome === 'tuyết'
+      if (supportsVegetationDetail && settings.groundDetailDensity > 0 && hash2d(seed ^ 0x1c53d7, tile.z, tile.x) < settings.groundDetailDensity && variation > 0.32 && groundDetailCandidates.length < this.groundDetails.instanceMatrix.count) {
         const offsetX = (hash2d(seed ^ 0x37d8af, tile.z, tile.x) - 0.5) * 0.34
         const offsetZ = (hash2d(seed ^ 0xae21d9, tile.x, tile.z) - 0.5) * 0.34
-        this.dummy.position.set(x + offsetX, y + 0.11, z + offsetZ)
-        this.dummy.rotation.set(0, variation * Math.PI * 2, 0)
         const detailScale = tile.biome === 'rừng' ? 1.28 : tile.biome === 'đồng cỏ' ? 0.72 + tile.moisture * 0.56 : 0.5 + variation * 0.36
-        this.dummy.scale.set(detailScale, detailScale * (0.75 + tile.moisture * 0.35), detailScale)
-        this.dummy.updateMatrix()
-        this.groundDetails.setMatrixAt(detailCount, this.dummy.matrix)
         const detailColor = tile.biome === 'rừng'
-          ? new THREE.Color(0x3d7b46)
+          ? 0x3d7b46
           : tile.biome === 'đồng cỏ'
-            ? new THREE.Color(variation > 0.82 ? 0xe8c86c : 0x88ae54)
+            ? variation > 0.82 ? 0xe8c86c : 0x88ae54
             : tile.biome === 'bờ cát'
-              ? new THREE.Color(0xd9c483)
-              : new THREE.Color(0xeaf5fa)
-        this.groundDetails.setColorAt(detailCount, detailColor)
-        detailCount += 1
+              ? 0xd9c483
+              : 0xeaf5fa
+        groundDetailCandidates.push({
+          id: groundDetailCandidates.length,
+          priority: x * x + z * z + hash2d(seed ^ 0x1c53d7, tile.x, tile.z) * 0.2,
+          x: x + offsetX,
+          y,
+          z: z + offsetZ,
+          scale: detailScale * (0.75 + tile.moisture * 0.35),
+          rotation: variation * Math.PI * 2,
+          color: detailColor,
+        })
+      }
+
+      if (tile.biome === 'bờ cát' && settings.groundDetailDensity > 0 && hash2d(seed ^ 0xbe17a9, tile.x, tile.z) < Math.min(0.62, settings.groundDetailDensity * 0.5) && sandDetailCandidates.length < sandDetailLimit) {
+        const offsetX = (hash2d(seed ^ 0x5ca93e, tile.z, tile.x) - 0.5) * 0.46
+        const offsetZ = (hash2d(seed ^ 0xe11c72, tile.x, tile.z) - 0.5) * 0.46
+        const sandScale = 0.7 + variation * 0.7
+        sandDetailCandidates.push({
+          id: sandDetailCandidates.length,
+          priority: x * x + z * z + hash2d(seed ^ 0xbe17a9, tile.z, tile.x) * 0.2,
+          x: x + offsetX,
+          y,
+          z: z + offsetZ,
+          scale: sandScale * (0.76 + tile.moisture * 0.22),
+          rotation: variation * Math.PI * 2,
+          color: variation > 0.72 ? 0xb8aa84 : variation > 0.38 ? 0xd7bd7c : 0x8f8872,
+        })
       }
     }
 
     const modeledTreeIds = new Set<number>()
     const modelMatrices: THREE.Matrix4[] = []
     if (this.treeModelLayer) {
-      const modelLimit = treeModelInstanceLimit(this.effectiveQuality, this.treeModelLayer.maximumInstances)
+      const modelLimit = sparseEnvironmentModelInstanceLimit(natureQuality, this.treeModelLayer.maximumInstances)
       const modelCandidates: TreePlacement[] = []
-      const qualityMinimumSpacing = this.effectiveQuality === 'low' ? 1.55 : this.effectiveQuality === 'medium' ? 1.35 : 1.15
+      const qualityMinimumSpacing = natureQuality === 'low' ? 1.55 : natureQuality === 'medium' ? 1.35 : 1.15
       const minimumModelSpacing = Math.max(qualityMinimumSpacing, this.treeModelLayer.minimumSpacing)
       const minimumModelSpacingSquared = minimumModelSpacing * minimumModelSpacing
       for (const candidate of [...treeCandidates].sort((left, right) => left.priority - right.priority || left.id - right.id)) {
@@ -895,6 +1594,100 @@ export class WorldRenderer {
       this.treeModelLayer.setMatrices(modelMatrices, modelLimit)
     }
 
+    const modeledRockIds = new Set<number>()
+    const rockModelMatrices: THREE.Matrix4[] = []
+    if (this.rockModelLayer) {
+      const modelLimit = sparseEnvironmentModelInstanceLimit(this.graphicsQuality('nature'), this.rockModelLayer.maximumInstances)
+      const minimumModelSpacing = Math.max(0.45, this.rockModelLayer.minimumSpacing)
+      const minimumModelSpacingSquared = minimumModelSpacing * minimumModelSpacing
+      const modelCandidates: RockPlacement[] = []
+      for (const candidate of [...rockCandidates].sort((left, right) => left.priority - right.priority || left.id - right.id)) {
+        if (modelCandidates.length >= modelLimit) break
+        const overlapsSelectedRock = modelCandidates.some((selected) => {
+          const dx = candidate.x - selected.x
+          const dz = candidate.z - selected.z
+          return dx * dx + dz * dz < minimumModelSpacingSquared
+        })
+        if (!overlapsSelectedRock) modelCandidates.push(candidate)
+      }
+      for (const rock of modelCandidates) {
+        const modelScale = this.rockModelLayer.worldScale * (0.82 + rock.variation * 0.3)
+        this.dummy.position.set(rock.x, rock.y + 0.008, rock.z)
+        this.dummy.rotation.set(0, rock.rotationY, 0)
+        this.dummy.scale.setScalar(modelScale)
+        this.dummy.updateMatrix()
+        rockModelMatrices.push(this.dummy.matrix.clone())
+        modeledRockIds.add(rock.id)
+      }
+      this.rockModelLayer.setMatrices(rockModelMatrices, modelLimit)
+    }
+
+    const modeledGroundDetailIds = new Set<number>()
+    if (this.groundCoverModelLayer) {
+      const modelLimit = groundCoverModelInstanceLimit(natureQuality, this.groundCoverModelLayer.maximumInstances)
+      const minimumSpacingSquared = this.groundCoverModelLayer.minimumSpacing * this.groundCoverModelLayer.minimumSpacing
+      const modelCandidates: DetailPlacement[] = []
+      for (const candidate of [...groundDetailCandidates].sort((left, right) => left.priority - right.priority || left.id - right.id)) {
+        // Fern_02 is a forest-floor asset; grassland and snow keep their own
+        // lower-cost fallback detail instead of receiving an implausible fern.
+        if (candidate.color !== 0x3d7b46) continue
+        if (modelCandidates.length >= modelLimit) break
+        const overlaps = modelCandidates.some((selected) => {
+          const dx = candidate.x - selected.x
+          const dz = candidate.z - selected.z
+          return dx * dx + dz * dz < minimumSpacingSquared
+        })
+        if (!overlaps) modelCandidates.push(candidate)
+      }
+      const matrices: THREE.Matrix4[] = []
+      for (const detail of modelCandidates) {
+        this.dummy.position.set(detail.x, detail.y + 0.012, detail.z)
+        this.dummy.rotation.set(0, detail.rotation, 0)
+        this.dummy.scale.setScalar(this.groundCoverModelLayer.worldScale * detail.scale)
+        this.dummy.updateMatrix()
+        matrices.push(this.dummy.matrix.clone())
+        modeledGroundDetailIds.add(detail.id)
+      }
+      this.groundCoverModelLayer.setMatrices(matrices, modelLimit)
+    }
+
+    const modeledSandDetailIds = new Set<number>()
+    if (this.coastRockModelLayer) {
+      const modelLimit = sparseEnvironmentModelInstanceLimit(natureQuality, this.coastRockModelLayer.maximumInstances)
+      const minimumSpacingSquared = this.coastRockModelLayer.minimumSpacing * this.coastRockModelLayer.minimumSpacing
+      const modelCandidates: DetailPlacement[] = []
+      for (const candidate of [...sandDetailCandidates].sort((left, right) => left.priority - right.priority || left.id - right.id)) {
+        if (modelCandidates.length >= modelLimit) break
+        const overlaps = modelCandidates.some((selected) => {
+          const dx = candidate.x - selected.x
+          const dz = candidate.z - selected.z
+          return dx * dx + dz * dz < minimumSpacingSquared
+        })
+        if (!overlaps) modelCandidates.push(candidate)
+      }
+      const matrices: THREE.Matrix4[] = []
+      for (const detail of modelCandidates) {
+        this.dummy.position.set(detail.x, detail.y + 0.064, detail.z)
+        this.dummy.rotation.set(0, detail.rotation, 0)
+        this.dummy.scale.setScalar(this.coastRockModelLayer.worldScale * detail.scale)
+        this.dummy.updateMatrix()
+        matrices.push(this.dummy.matrix.clone())
+        modeledSandDetailIds.add(detail.id)
+      }
+      this.coastRockModelLayer.setMatrices(matrices, modelLimit)
+    }
+
+    let rockCount = 0
+    for (const rock of rockCandidates) {
+      if (modeledRockIds.has(rock.id) || rockCount >= this.rocks.instanceMatrix.count) continue
+      this.dummy.position.set(rock.x, rock.y + 0.08, rock.z)
+      this.dummy.rotation.set(rock.rotationX, rock.rotationY, 0)
+      this.dummy.scale.set(rock.scaleX, rock.scaleY, rock.scaleZ)
+      this.dummy.updateMatrix()
+      this.rocks.setMatrixAt(rockCount, this.dummy.matrix)
+      rockCount += 1
+    }
+
     let treeCount = 0
     for (const tree of treeCandidates) {
       if (modeledTreeIds.has(tree.id) || treeCount >= this.trees.instanceMatrix.count) continue
@@ -914,39 +1707,77 @@ export class WorldRenderer {
       treeCount += 1
     }
 
+    let detailCount = 0
+    for (const detail of groundDetailCandidates) {
+      if (modeledGroundDetailIds.has(detail.id) || detailCount >= this.groundDetails.instanceMatrix.count) continue
+      this.dummy.position.set(detail.x, detail.y + 0.11, detail.z)
+      this.dummy.rotation.set(0, detail.rotation, 0)
+      this.dummy.scale.setScalar(detail.scale)
+      this.dummy.updateMatrix()
+      this.groundDetails.setMatrixAt(detailCount, this.dummy.matrix)
+      this.groundDetails.setColorAt(detailCount, new THREE.Color(detail.color))
+      detailCount += 1
+    }
+
+    let sandDetailCount = 0
+    for (const detail of sandDetailCandidates) {
+      if (modeledSandDetailIds.has(detail.id) || sandDetailCount >= this.sandDetails.instanceMatrix.count) continue
+      this.dummy.position.set(detail.x, detail.y + 0.028, detail.z)
+      this.dummy.rotation.set(0, detail.rotation, 0)
+      this.dummy.scale.setScalar(detail.scale)
+      this.dummy.updateMatrix()
+      this.sandDetails.setMatrixAt(sandDetailCount, this.dummy.matrix)
+      this.sandDetails.setColorAt(sandDetailCount, new THREE.Color(detail.color))
+      sandDetailCount += 1
+    }
+
     this.trees.count = treeCount
     this.trunks.count = treeCount
     this.rocks.count = rockCount
     this.resources.count = resourceCount
     this.groundDetails.count = detailCount
+    this.sandDetails.count = sandDetailCount
     this.trees.instanceMatrix.needsUpdate = true
     this.trunks.instanceMatrix.needsUpdate = true
     this.rocks.instanceMatrix.needsUpdate = true
     this.resources.instanceMatrix.needsUpdate = true
     this.groundDetails.instanceMatrix.needsUpdate = true
+    this.sandDetails.instanceMatrix.needsUpdate = true
     if (this.trees.instanceColor) this.trees.instanceColor.needsUpdate = true
     if (this.groundDetails.instanceColor) this.groundDetails.instanceColor.needsUpdate = true
+    if (this.sandDetails.instanceColor) this.sandDetails.instanceColor.needsUpdate = true
     this.trees.computeBoundingSphere()
     this.trunks.computeBoundingSphere()
     this.rocks.computeBoundingSphere()
     this.resources.computeBoundingSphere()
     this.groundDetails.computeBoundingSphere()
+    this.sandDetails.computeBoundingSphere()
+    this.faunaLayer.setWorld(this.world, natureQuality)
   }
 
   private updateSettlementInstances(): void {
     let houseCount = 0
+    let roofCount = 0
+    let thatchRoofCount = 0
     let farmCount = 0
     let roadCount = 0
+    let workshopCount = 0
+    let forgeCount = 0
+    let townHallCount = 0
     let lanternCount = 0
-    let settlerCount = 0
+    const settlerPlacements: SettlerPlacement[] = []
     const seed = seedToUint32(this.world.config.seed)
-    const settings = qualitySettings(this.effectiveQuality)
+    const settings = qualitySettings(this.graphicsQuality('nature'))
 
     for (const village of this.simulation.villages) {
       const home = this.world.tiles[village.tileIndex]
       if (!home) continue
       const base = this.tilePosition(home)
       const localSeed = seed ^ seedToUint32(village.id)
+      const toolTier = villageToolTier(village.tools)
+      const hasFarming = toolTier >= 2
+      const hasMetalwork = toolTier >= 4
+      const hasTownHall = toolTier >= 6
 
       const visibleHomes = Math.ceil(village.homes * settings.settlementDensity)
       for (let index = 0; index < visibleHomes && houseCount < MAX_HOUSES; index += 1) {
@@ -967,11 +1798,17 @@ export class WorldRenderer {
         this.dummy.rotation.set(0, angle + Math.PI / 4, 0)
         this.dummy.scale.set(0.78 + houseVariation * 0.25, 0.82 + houseVariation * 0.3, 0.8 + (1 - houseVariation) * 0.23)
         this.dummy.updateMatrix()
-        this.roofs.setMatrixAt(houseCount, this.dummy.matrix)
+        if (hasMetalwork) {
+          this.roofs.setMatrixAt(roofCount, this.dummy.matrix)
+          roofCount += 1
+        } else {
+          this.thatchRoofs.setMatrixAt(thatchRoofCount, this.dummy.matrix)
+          thatchRoofCount += 1
+        }
         houseCount += 1
       }
 
-      if (village.era !== 'Mầm lửa') {
+      if (hasFarming) {
         const farmSlots = Math.min(8, Math.max(1, Math.floor((village.population + 5) / 8)))
         const visibleFarmSlots = Math.ceil(farmSlots * settings.settlementDensity)
         for (let index = 0; index < visibleFarmSlots && farmCount < MAX_FARMS; index += 1) {
@@ -987,20 +1824,61 @@ export class WorldRenderer {
         }
       }
 
-      const roadSegments = Math.min(6, Math.max(0, village.homes - 1))
-      const visibleRoadSegments = Math.ceil(roadSegments * settings.settlementDensity)
-      for (let index = 0; index < visibleRoadSegments && roadCount < MAX_ROADS; index += 1) {
-        const angle = hash2d(localSeed, index, 47) * Math.PI * 2
-        const radius = 0.28 + (index % 3) * 0.2
-        this.dummy.position.set(base.x + Math.cos(angle) * radius, base.y + 0.018, base.z + Math.sin(angle) * radius)
-        this.dummy.rotation.set(0, angle, 0)
-        this.dummy.scale.set(0.78 + (index % 2) * 0.18, 1, 0.72 + (index % 3) * 0.12)
-        this.dummy.updateMatrix()
-        this.roads.setMatrixAt(roadCount, this.dummy.matrix)
-        roadCount += 1
+      if (toolTier >= 1) {
+        const workshopsForVillage = Math.min(2, Math.max(1, Math.floor((village.population + 14) / 26)))
+        const visibleWorkshops = Math.ceil(workshopsForVillage * settings.settlementDensity)
+        for (let index = 0; index < visibleWorkshops && workshopCount < MAX_WORKSHOPS; index += 1) {
+          const angle = hash2d(localSeed, index, 59) * Math.PI * 2
+          const radius = 0.47 + index * 0.26
+          this.dummy.position.set(base.x + Math.cos(angle) * radius, base.y + 0.18, base.z + Math.sin(angle) * radius)
+          this.dummy.rotation.set(0, angle, 0)
+          this.dummy.scale.set(0.9 + index * 0.12, 0.9, 0.9 + (index % 2) * 0.12)
+          this.dummy.updateMatrix()
+          this.workshops.setMatrixAt(workshopCount, this.dummy.matrix)
+          workshopCount += 1
+        }
       }
 
-      if (village.era !== 'Mầm lửa' && village.population >= 12) {
+      if (hasMetalwork) {
+        const forgesForVillage = Math.min(2, Math.max(1, Math.floor((village.population + 22) / 38)))
+        const visibleForges = Math.ceil(forgesForVillage * settings.settlementDensity)
+        for (let index = 0; index < visibleForges && forgeCount < MAX_FORGES; index += 1) {
+          const angle = hash2d(localSeed, index, 67) * Math.PI * 2
+          const radius = 0.66 + index * 0.2
+          this.dummy.position.set(base.x + Math.cos(angle) * radius, base.y + 0.14, base.z + Math.sin(angle) * radius)
+          this.dummy.rotation.set(0, angle, 0)
+          this.dummy.scale.setScalar(0.9 + index * 0.12)
+          this.dummy.updateMatrix()
+          this.forges.setMatrixAt(forgeCount, this.dummy.matrix)
+          forgeCount += 1
+        }
+      }
+
+      if (hasTownHall && townHallCount < MAX_TOWN_HALLS) {
+        this.dummy.position.set(base.x, base.y + 0.28, base.z)
+        this.dummy.rotation.set(0, hash2d(localSeed, 71, 73) * Math.PI * 2, 0)
+        this.dummy.scale.setScalar(0.92 + Math.min(0.26, village.population / 240))
+        this.dummy.updateMatrix()
+        this.townHalls.setMatrixAt(townHallCount, this.dummy.matrix)
+        townHallCount += 1
+      }
+
+      if (toolTier >= 1) {
+        const roadSegments = Math.min(6, Math.max(0, village.homes - 1))
+        const visibleRoadSegments = Math.ceil(roadSegments * settings.settlementDensity)
+        for (let index = 0; index < visibleRoadSegments && roadCount < MAX_ROADS; index += 1) {
+          const angle = hash2d(localSeed, index, 47) * Math.PI * 2
+          const radius = 0.28 + (index % 3) * 0.2
+          this.dummy.position.set(base.x + Math.cos(angle) * radius, base.y + 0.018, base.z + Math.sin(angle) * radius)
+          this.dummy.rotation.set(0, angle, 0)
+          this.dummy.scale.set(0.78 + (index % 2) * 0.18, 1, 0.72 + (index % 3) * 0.12)
+          this.dummy.updateMatrix()
+          this.roads.setMatrixAt(roadCount, this.dummy.matrix)
+          roadCount += 1
+        }
+      }
+
+      if (hasMetalwork && village.population >= 12) {
         const lanternsForVillage = Math.min(4, Math.floor(village.population / 18) + 1)
         const visibleLanterns = Math.ceil(lanternsForVillage * settings.settlementDensity)
         for (let index = 0; index < visibleLanterns && lanternCount < MAX_LANTERNS; index += 1) {
@@ -1016,54 +1894,83 @@ export class WorldRenderer {
       }
 
       const visibleResidents = Math.min(village.population, settings.maxSettlers)
-      for (let index = 0; index < visibleResidents && settlerCount < MAX_SETTLERS; index += 1) {
-        const orbit = ((this.simulation.tick * 0.045 + hash2d(localSeed, index, 2)) % 1) * Math.PI * 2
-        const radius = 0.2 + (index % 6) * 0.095
-        this.dummy.position.set(base.x + Math.cos(orbit) * radius, base.y + 0.13, base.z + Math.sin(orbit) * radius)
-        this.dummy.rotation.set(0, orbit, 0)
-        this.dummy.scale.setScalar(0.9 + (index % 3) * 0.12)
-        this.dummy.updateMatrix()
-        this.settlers.setMatrixAt(settlerCount, this.dummy.matrix)
-        this.settlers.setColorAt(settlerCount, new THREE.Color(index % 2 === 0 ? 0xf4d6a4 : 0x8eb5d1))
-        settlerCount += 1
+      for (let index = 0; index < visibleResidents && settlerPlacements.length < MAX_SETTLERS; index += 1) {
+        const tool = village.tools[(index + Math.floor(hash2d(localSeed, index, 79) * village.tools.length)) % village.tools.length] ?? 'stone-handaxe'
+        settlerPlacements.push({
+          id: `${village.id}-settler-${index}`,
+          anchorTileX: home.x,
+          anchorTileZ: home.z,
+          phase: hash2d(localSeed, index, 2) * Math.PI * 2,
+          radius: 0.2 + (index % 6) * 0.095,
+          scale: 0.9 + (index % 3) * 0.12,
+          clothingColor: index % 2 === 0 ? 0x8eb5d1 : 0xb87858,
+          skinColor: index % 3 === 0 ? 0xc98d65 : 0xf4d6a4,
+          tool,
+        })
       }
     }
 
     this.houses.count = houseCount
-    this.roofs.count = houseCount
+    this.roofs.count = roofCount
+    this.thatchRoofs.count = thatchRoofCount
     this.farms.count = farmCount
     this.roads.count = roadCount
+    this.workshops.count = workshopCount
+    this.forges.count = forgeCount
+    this.townHalls.count = townHallCount
     this.lanterns.count = lanternCount
-    this.settlers.count = settlerCount
     this.houses.instanceMatrix.needsUpdate = true
     this.roofs.instanceMatrix.needsUpdate = true
+    this.thatchRoofs.instanceMatrix.needsUpdate = true
     this.farms.instanceMatrix.needsUpdate = true
     this.roads.instanceMatrix.needsUpdate = true
+    this.workshops.instanceMatrix.needsUpdate = true
+    this.forges.instanceMatrix.needsUpdate = true
+    this.townHalls.instanceMatrix.needsUpdate = true
     this.lanterns.instanceMatrix.needsUpdate = true
-    this.settlers.instanceMatrix.needsUpdate = true
-    if (this.settlers.instanceColor) this.settlers.instanceColor.needsUpdate = true
     this.houses.computeBoundingSphere()
     this.roofs.computeBoundingSphere()
+    this.thatchRoofs.computeBoundingSphere()
     this.farms.computeBoundingSphere()
     this.roads.computeBoundingSphere()
+    this.workshops.computeBoundingSphere()
+    this.forges.computeBoundingSphere()
+    this.townHalls.computeBoundingSphere()
     this.lanterns.computeBoundingSphere()
-    this.settlers.computeBoundingSphere()
+    this.settlerLayer.setSettlers(this.world, settlerPlacements)
+    this.refreshEvolutionArt()
   }
 
   private createClouds(): void {
     const random = createPrng(`${this.world.config.seed}-clouds`)
-    const cloudCount = qualitySettings(this.effectiveQuality).cloudCount
-    this.cloudGeometry = new THREE.DodecahedronGeometry(0.58, 1)
-    this.cloudMaterial = new THREE.MeshStandardMaterial({ color: 0xf4fbff, transparent: true, opacity: 0.26, flatShading: true, roughness: 0.92, depthWrite: false })
-    this.cloudMesh = new THREE.InstancedMesh(this.cloudGeometry, this.cloudMaterial, cloudCount * 3)
-    this.cloudMesh.count = cloudCount * 3
+    const effectsQuality = this.graphicsQuality('effects')
+    const cloudCount = qualitySettings(effectsQuality).cloudCount
+    const worldWidth = this.world.config.size * TILE_SCALE
+    this.cloudPuffsPerCloud = cloudPuffCount(effectsQuality)
+    this.cloudGeometry = new THREE.IcosahedronGeometry(0.72, effectsQuality === 'low' ? 1 : 2)
+    this.cloudMaterial = new THREE.MeshPhysicalMaterial({
+      color: CLEAR_CLOUD,
+      emissive: 0x7890a0,
+      emissiveIntensity: 0.08,
+      transparent: true,
+      opacity: 0.74,
+      roughness: 0.84,
+      metalness: 0,
+      clearcoat: 0.03,
+      clearcoatRoughness: 0.72,
+      depthWrite: false,
+      dithering: true,
+    })
+    this.cloudMesh = new THREE.InstancedMesh(this.cloudGeometry, this.cloudMaterial, cloudCount * this.cloudPuffsPerCloud)
+    this.cloudMesh.count = cloudCount * this.cloudPuffsPerCloud
     // The cloud mesh moves as a single batch, so culling a stale instance bound would pop it in and out of view.
     this.cloudMesh.frustumCulled = false
+    this.cloudMesh.visible = this.polyHavenSkyTexture === undefined
 
     for (let index = 0; index < cloudCount; index += 1) {
-      const baseX = random.range(-11, 11)
-      const baseZ = random.range(-9, 9)
-      this.clouds.push({ baseX, baseZ, altitude: random.range(4.8, 7.2), speed: random.range(0.06, 0.14), variation: random.next() })
+      const baseX = random.range(-worldWidth / 2 - 8, worldWidth / 2 + 8)
+      const baseZ = random.range(-worldWidth / 2 - 6, worldWidth / 2 + 6)
+      this.clouds.push({ baseX, baseZ, altitude: random.range(10.4, 15.4), speed: random.range(0.035, 0.09), variation: random.next() })
     }
 
     this.updateCloudMatrices(false)
@@ -1078,6 +1985,7 @@ export class WorldRenderer {
     this.cloudGeometry = undefined
     this.cloudMaterial = undefined
     this.cloudMesh = undefined
+    this.cloudPuffsPerCloud = 0
   }
 
   /** Packs every cloud puff into one instanced draw call while keeping seed-stable variation. */
@@ -1085,22 +1993,29 @@ export class WorldRenderer {
     const cloudMesh = this.cloudMesh
     if (!cloudMesh) return
     const worldWidth = this.world.config.size * TILE_SCALE
+    const travelWidth = worldWidth + 18
 
     this.clouds.forEach((cloud, cloudIndex) => {
       const x = animate
-        ? ((cloud.baseX + this.elapsed * cloud.speed * 2 + worldWidth / 2) % (worldWidth + 8)) - worldWidth / 2 - 4
+        ? ((cloud.baseX + this.elapsed * cloud.speed * 2 + travelWidth / 2) % travelWidth) - travelWidth / 2
         : cloud.baseX
-      const z = animate ? cloud.baseZ + Math.sin(this.elapsed * cloud.speed) * 0.24 : cloud.baseZ
+      const z = animate ? cloud.baseZ + Math.sin(this.elapsed * cloud.speed * 0.7) * 0.42 : cloud.baseZ
 
-      for (let puff = 0; puff < 3; puff += 1) {
-        const offset = (cloud.variation + puff * 0.31) % 1
-        const depthOffset = (cloud.variation + puff * 0.53) % 1
-        const heightOffset = (cloud.variation + puff * 0.17) % 1
-        this.dummy.position.set(x + (puff - 1) * 0.36, cloud.altitude + (offset - 0.5) * 0.26, z + (depthOffset - 0.5) * 0.16)
-        this.dummy.rotation.set(0, 0, 0)
-        this.dummy.scale.set(0.95 + offset * 0.5, 0.45 + heightOffset * 0.22, 0.72 + depthOffset * 0.3)
+      for (let puff = 0; puff < this.cloudPuffsPerCloud; puff += 1) {
+        const offset = (cloud.variation + puff * 0.37) % 1
+        const ringAngle = puff * 2.399963229728653 + cloud.variation * Math.PI * 2
+        const radius = puff === 0 ? 0.08 : 0.46 + offset * 0.78
+        const height = (puff % 3 - 1) * 0.16 + (puff >= this.cloudPuffsPerCloud * 0.55 ? 0.32 : 0)
+        const width = 1.14 + offset * 0.78
+        this.dummy.position.set(
+          x + Math.cos(ringAngle) * radius,
+          cloud.altitude + height,
+          z + Math.sin(ringAngle) * radius * 0.72,
+        )
+        this.dummy.rotation.set(0, ringAngle * 0.16, 0)
+        this.dummy.scale.set(width, 0.62 + offset * 0.4, width * (0.78 + (1 - offset) * 0.18))
         this.dummy.updateMatrix()
-        cloudMesh.setMatrixAt(cloudIndex * 3 + puff, this.dummy.matrix)
+        cloudMesh.setMatrixAt(cloudIndex * this.cloudPuffsPerCloud + puff, this.dummy.matrix)
       }
     })
 
@@ -1121,19 +2036,36 @@ export class WorldRenderer {
     const sky = this.skyColor.copy(NIGHT_SKY).lerp(DAY_SKY, daylight)
     if (stormStrength > 0) sky.lerp(STORM_SKY, 0.46 * stormStrength)
     const fog = this.scene.fog
-    this.scene.background = sky
-    if (fog) fog.color.copy(sky)
+    if (!this.polyHavenSkyTexture) this.scene.background = sky
     this.skyLight.intensity = (0.42 + daylight * 1.15) * (1 - stormStrength * 0.26)
     this.skyLight.color.setHSL(0.58, 0.5, 0.3 + daylight * 0.42)
     this.sun.intensity = (0.3 + daylight * 2.1) * (1 - stormStrength * 0.44)
     this.sun.color.setHSL(0.1, 0.65, 0.55 + daylight * 0.25)
     this.sun.position.set(Math.cos(phase * Math.PI * 2) * 13, 6 + daylight * 15, Math.sin(phase * Math.PI * 2) * 12)
-    this.waterMaterial.opacity = 0.52 + daylight * 0.24
-    this.cloudMaterial?.color.copy(stormStrength > 0 ? STORM_CLOUD : CLEAR_CLOUD)
-    this.water.position.y = getWaterLevel(this.world.config) + 0.016 + Math.sin(this.elapsed * 1.5) * 0.006
+    this.skyDome.material.uniforms.topColor!.value.copy(sky).lerp(SKY_ZENITH, 0.62 + daylight * 0.2)
+    this.skyHorizonColor.copy(sky).lerp(SKY_HORIZON, 0.58 + daylight * 0.18)
+    this.skyDome.material.uniforms.horizonColor!.value.copy(this.skyHorizonColor)
+    this.skyDome.material.uniforms.bottomColor!.value.copy(this.skyHorizonColor).lerp(SKY_BASE, 0.24)
+    if (fog) fog.color.copy(this.skyHorizonColor)
+    this.waterMaterial.color.setHSL(0.55, 0.74 - stormStrength * 0.16, 0.18 + daylight * 0.08)
+    this.waterMaterial.emissive.setHSL(0.56, 0.54, 0.018 + daylight * 0.026)
+    this.waterMaterial.specular.setHSL(0.56, 0.72, 0.54 + daylight * 0.18)
+    this.waterMaterial.shininess = 74 - stormStrength * 28
+    this.waterMaterial.normalScale.set(0.14 + stormStrength * 0.16, 0.11 + stormStrength * 0.12)
+    if (this.cloudMaterial) {
+      this.cloudMaterial.color.copy(stormStrength > 0 ? STORM_CLOUD : CLEAR_CLOUD)
+      this.cloudMaterial.emissive.setHSL(0.58, 0.24, 0.08 + daylight * 0.08)
+      this.cloudMaterial.emissiveIntensity = 0.06 + daylight * 0.08
+      this.cloudMaterial.opacity = 0.74 + daylight * 0.1 + stormStrength * 0.04
+    }
+    this.coastFoamMaterial.opacity = 0.24 + daylight * 0.08 + stormStrength * 0.12
+    this.waterRippleMaterial.opacity = 0.17 + daylight * 0.09 + stormStrength * 0.11
+    this.water.position.y = getWaterLevel(this.world.config) + 0.016
     if (!reducedMotion) {
       this.waterWaveFrame += 1
-      if (this.waterWaveFrame % qualitySettings(this.effectiveQuality).waterWaveInterval === 0) this.updateWaterSurface()
+      this.waterNormalMap.offset.set((this.elapsed * 0.008) % 1, (this.elapsed * 0.005) % 1)
+      if (this.waterWaveFrame % qualitySettings(this.graphicsQuality('water')).waterWaveInterval === 0) this.updateWaterSurface()
+      this.updateWaterRipples()
       this.updateCloudMatrices()
     }
 
@@ -1154,20 +2086,23 @@ export class WorldRenderer {
     attribute.needsUpdate = true
   }
 
-  /** A subtle, deterministic low-poly ripple gives the water a living surface without a texture download. */
+  /** Layered swells give the PBR surface a readable sea state while normal-map ripples retain close-up detail. */
   private updateWaterSurface(): void {
     const positions = this.water.geometry.getAttribute('position') as THREE.BufferAttribute
-    const amplitude = this.simulation.activeStorm ? 0.042 : 0.012
+    const stormStrength = this.simulation.activeStorm ? clamp(this.simulation.activeStorm.intensity / 2.2, 0, 0.78) : 0
+    const swellAmplitude = 0.008 + stormStrength * 0.032
 
     for (let index = 0; index < positions.count; index += 1) {
       const x = positions.getX(index)
       const z = positions.getZ(index)
-      const ripple = Math.sin(x * 2.4 + this.elapsed * 1.75) + Math.cos(z * 2.8 - this.elapsed * 1.25)
-      positions.setY(index, ripple * amplitude)
+      const broadSwell = Math.sin(x * 0.38 + z * 0.16 + this.elapsed * 0.92)
+        + Math.cos(z * 0.46 - x * 0.11 - this.elapsed * 0.68) * 0.64
+      const crossSwell = Math.sin((x + z) * 0.72 - this.elapsed * 1.24) * 0.28
+      positions.setY(index, broadSwell * swellAmplitude + crossSwell * swellAmplitude)
     }
 
     positions.needsUpdate = true
-    if (this.waterWaveFrame % qualitySettings(this.effectiveQuality).waterNormalInterval === 0) this.water.geometry.computeVertexNormals()
+    if (this.waterWaveFrame % qualitySettings(this.graphicsQuality('water')).waterNormalInterval === 0) this.water.geometry.computeVertexNormals()
   }
 
   private seedRain(): void {
@@ -1215,17 +2150,19 @@ export class WorldRenderer {
     if (width === 0 || height === 0) return
     this.camera.aspect = width / height
     this.camera.updateProjectionMatrix()
-    const settings = qualitySettings(this.effectiveQuality)
+    const settings = qualitySettings(this.graphicsQuality('scene'))
     const mobileCap = isMobileViewport() ? Math.min(settings.maxDpr, 1.5) : settings.maxDpr
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, mobileCap))
     this.renderer.setSize(width, height, false)
   }
 
   private refreshWaterGeometryForQuality(): void {
-    const nextSegments = waterSegmentsFor(this.effectiveQuality, this.world.config.size)
+    const nextSegments = oceanSegmentsFor(this.graphicsQuality('water'), this.world.config.size)
     if (nextSegments === this.waterSegments) return
 
-    const waterSize = Math.max(2, (this.world.config.size - 1) * TILE_SCALE)
+    const waterSize = waterPlaneSize(this.world.config.size)
+    const normalRepeat = waterNormalRepeat(waterSize)
+    this.waterNormalMap.repeat.set(normalRepeat, normalRepeat)
     const nextGeometry = new THREE.PlaneGeometry(waterSize, waterSize, nextSegments, nextSegments)
     nextGeometry.rotateX(-Math.PI / 2)
     const previousGeometry = this.water.geometry
@@ -1240,20 +2177,23 @@ export class WorldRenderer {
     this.applyQuality()
     this.resize()
     this.refreshWaterGeometryForQuality()
+    this.rebuildWaterRipples()
     this.refreshCloudQuality()
     this.updateStaticInstances()
     this.updateSettlementInstances()
   }
 
   private applyQuality(): void {
-    const settings = qualitySettings(this.effectiveQuality)
-    this.renderer.shadowMap.enabled = settings.shadows
-    this.sun.castShadow = settings.shadows
-    this.sun.shadow.mapSize.set(settings.shadowMapSize, settings.shadowMapSize)
+    const shadowSettings = qualitySettings(this.graphicsQuality('shadows'))
+    const effectSettings = qualitySettings(this.graphicsQuality('effects'))
+    const waterSettings = qualitySettings(this.graphicsQuality('water'))
+    this.renderer.shadowMap.enabled = shadowSettings.shadows
+    this.sun.castShadow = shadowSettings.shadows
+    this.sun.shadow.mapSize.set(shadowSettings.shadowMapSize, shadowSettings.shadowMapSize)
     this.renderer.shadowMap.needsUpdate = true
-    this.rainGeometry.setDrawRange(0, settings.rainDropCount * 2)
-    this.waterMaterial.roughness = settings.shadows ? 0.24 : 0.34
-    this.waterMaterial.metalness = settings.shadows ? 0.12 : 0.05
+    this.rainGeometry.setDrawRange(0, effectSettings.rainDropCount * 2)
+    this.waterMaterial.shininess = waterSettings.shadows ? 92 : 48
+    this.waterMaterial.normalScale.setScalar(waterSettings.shadows ? 0.28 : 0.14)
   }
 
   private refreshCloudQuality(): void {
@@ -1342,6 +2282,8 @@ export class WorldRenderer {
     this.statsElapsed += delta
     this.framesSinceStats += 1
     this.updateSky(motionDelta, reducedMotion)
+    this.faunaLayer.update(this.elapsed, reducedMotion)
+    this.settlerLayer.update(this.elapsed, reducedMotion)
     this.controls.update()
     this.renderer.render(this.scene, this.camera)
 
@@ -1361,12 +2303,23 @@ export class WorldRenderer {
         textures: info.memory.textures,
         assetLoadDurationMs: Math.round(this.assetPackManager.loadDurationMs),
         assetPack: this.assetPackManager.currentSelection?.selectedPack ?? 'procedural',
-        assetPackFallback: (this.assetPackManager.currentSelection?.usedFallback ?? true) || this.assetPackManager.loadUsedFallback || this.treeModelFallback,
+        assetPackFallback: (this.assetPackManager.currentSelection?.usedFallback ?? true)
+          || this.assetPackManager.loadUsedFallback
+          || this.treeModelFallback
+          || this.rockModelFallback
+          || this.groundCoverModelFallback
+          || this.coastRockModelFallback,
         assetPackReason: this.assetPackManager.loadUsedFallback
           ? 'The selected Poly Haven pack could not load; procedural materials are active.'
           : this.treeModelFallback
             ? 'Poly Haven materials are active; the tree model could not load, so procedural trees remain visible.'
-          : this.assetPackManager.currentSelection?.reason ?? 'No asset pack is active.',
+            : this.rockModelFallback
+              ? 'Poly Haven materials are active; the rock model could not load, so procedural rocks remain visible.'
+              : this.groundCoverModelFallback
+                ? 'Poly Haven materials are active; the ground-cover model could not load, so procedural grass remains visible.'
+                : this.coastRockModelFallback
+                  ? 'Poly Haven materials are active; the shoreline-rock model could not load, so procedural coastal detail remains visible.'
+              : this.assetPackManager.currentSelection?.reason ?? 'No asset pack is active.',
         assetLoadState: this.assetPackManager.loadProgress.state,
       })
       this.statsElapsed = 0

@@ -15,7 +15,21 @@ export function AetheriaRouter(): JSX.Element {
   }, [])
 
   if (route === 'play') {
-    return <Suspense fallback={<main className="play-route-loading" role="status" aria-live="polite"><strong>Đang mở Web Demo 1K…</strong><span>Three.js chỉ được tải sau khi bạn vào trang chơi thử.</span></main>}><GameApp /></Suspense>
+    return (
+      <Suspense
+        fallback={(
+          <main className="play-route-loading">
+            <h1 className="sr-only">Aetheria: World Shaper</h1>
+            <div role="status" aria-live="polite" aria-atomic="true">
+              <strong>Đang mở bản chơi thử Web 1K…</strong>
+              <span>Three.js chỉ được tải khi bạn mở màn chơi.</span>
+            </div>
+          </main>
+        )}
+      >
+        <GameApp />
+      </Suspense>
+    )
   }
 
   return <LandingPage />

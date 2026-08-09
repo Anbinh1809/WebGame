@@ -1,11 +1,13 @@
 import type { GameSession, GameState } from './session'
 import { createWorldObjectives } from '../simulation/objectives'
-import { EMPTY_GOD_TOOL_USES, MAX_SIMULATION_TICK } from '../simulation/types'
-import type { CouncilDecision, SimulationEvent, SimulationState, VillageSimulation, WorldObjective } from '../simulation/types'
+import { isVillageKnowledgeLedger } from '../simulation/knowledge'
+import { villageEraForTools } from '../simulation/progression'
+import { EMPTY_GOD_TOOL_USES, MAX_SIMULATION_TICK, VILLAGE_TOOL_IDS } from '../simulation/types'
+import type { CouncilDecision, SimulationEvent, SimulationState, VillageSimulation, VillageToolId, WorldObjective } from '../simulation/types'
 import { refreshTileBiome } from '../world/generator'
 import type { SoilKind, TerrainKind, Tile, ToolId, VillageSite, World, WorldConfig } from '../world/types'
 
-export const SAVE_SCHEMA_VERSION = 2
+export const SAVE_SCHEMA_VERSION = 4
 export const SAVE_STORAGE_KEY = 'aetheria-world-shaper.save.v1'
 /**
  * Saves are intentionally bounded before JSON.parse. This keeps a corrupt or
@@ -26,7 +28,7 @@ export type SaveDecodeResult =
 const CLIMATES = ['ôn hòa', 'ấm', 'lạnh'] as const
 const BIOMES = ['biển', 'bờ cát', 'đồng cỏ', 'rừng', 'đồi', 'núi', 'tuyết'] as const
 const SOILS = ['thường', 'màu mỡ', 'cằn cỗi'] as const
-const ERAS = ['Mầm lửa', 'Nhà gỗ', 'Thợ đá', 'Nông trang', 'Thành đá'] as const
+const ERAS = ['Thời Đồ Đá', 'Làng Gỗ', 'Nông Nghiệp', 'Thời Kim Khí', 'Thị Trấn'] as const
 const EVENT_TONES = ['calm', 'good', 'warning', 'danger'] as const
 const SIMULATION_SPEEDS = [0, 1, 2, 4, 8] as const
 
@@ -60,7 +62,7 @@ function isWorldConfig(value: unknown): value is WorldConfig {
     && value.seed.length > 0
     && value.seed.length <= 64
     && value.seed === value.seed.trim()
-    && isIntegerInRange(value.size, 18, 52)
+    && isIntegerInRange(value.size, 18, 64)
     && isOneOf(value.climate, CLIMATES)
     && isNumberInRange(value.water, 0.2, 0.82)
     && isNumberInRange(value.resources, 0.2, 1)
@@ -135,6 +137,9 @@ function isVillageSimulation(value: unknown, world: World): value is VillageSimu
     && isIntegerInRange(value.territory, 0, 100_000)
     && isNumberInRange(value.resilience, 0, 100)
     && isOneOf(value.era, ERAS)
+    && isVillageToolLedger(value.tools)
+    && isVillageKnowledgeLedger(value.knowledge, value.tools)
+    && value.era === villageEraForTools(value.tools)
     && typeof value.lastDecision === 'string'
     && value.lastDecision.length <= 512
 }
@@ -160,6 +165,14 @@ function isEvent(value: unknown, currentTick: number): value is SimulationEvent 
     && typeof value.detail === 'string'
     && value.detail.length <= 512
     && isOneOf(value.tone, EVENT_TONES)
+}
+
+/** Prevent imports from granting late-game bonuses by forging an out-of-order tool list. */
+function isVillageToolLedger(value: unknown): value is VillageToolId[] {
+  return Array.isArray(value)
+    && value.length > 0
+    && value.length <= VILLAGE_TOOL_IDS.length
+    && value.every((toolId, index) => toolId === VILLAGE_TOOL_IDS[index])
 }
 
 function isGodToolUses(value: unknown): value is Record<ToolId, number> {
@@ -248,11 +261,16 @@ export function serializeSave(game: GameState): string {
 }
 
 /**
- * v1 saved the same core session but predates resilience, objectives, and the
- * tool ledger. Migration fills only deterministic defaults, then the complete
- * v2 validator still treats the result as untrusted input.
+ * Migration only fills deterministic defaults. The final v4 validator still
+ * treats every imported field as untrusted input.
  */
 export function migrateSaveDocument(value: unknown): unknown {
+  const v2 = migrateV1SaveDocument(value)
+  const v3 = migrateV2SaveDocument(v2)
+  return migrateV3SaveDocument(v3)
+}
+
+function migrateV1SaveDocument(value: unknown): unknown {
   if (!isRecord(value) || value.schemaVersion !== 1 || !isRecord(value.game)) return value
   const game = value.game
   if (!isRecord(game.session) || !isRecord(game.session.world) || !isRecord(game.session.simulation)) return value
@@ -263,7 +281,7 @@ export function migrateSaveDocument(value: unknown): unknown {
 
   return {
     ...value,
-    schemaVersion: SAVE_SCHEMA_VERSION,
+    schemaVersion: 2,
     game: {
       ...game,
       session: {
@@ -273,6 +291,75 @@ export function migrateSaveDocument(value: unknown): unknown {
           villages: simulation.villages.map((village) => isRecord(village) ? { ...village, resilience: 42 } : village),
           objectives: createWorldObjectives(legacyWorld),
           godToolUses: { ...EMPTY_GOD_TOOL_USES },
+        },
+      },
+    },
+  }
+}
+
+function toolsForLegacyEra(era: unknown): VillageToolId[] | undefined {
+  const counts: Record<string, number> = {
+    'Mầm lửa': 1,
+    'Nhà gỗ': 2,
+    'Thợ đá': 3,
+    'Nông trang': 4,
+    'Thành đá': 7,
+    'Thời Đồ Đá': 1,
+    'Làng Gỗ': 2,
+    'Nông Nghiệp': 4,
+    'Thời Kim Khí': 6,
+    'Thị Trấn': 7,
+  }
+  const count = typeof era === 'string' ? counts[era] : undefined
+  return count === undefined ? undefined : [...VILLAGE_TOOL_IDS.slice(0, count)]
+}
+
+function migrateV2SaveDocument(value: unknown): unknown {
+  if (!isRecord(value) || value.schemaVersion !== 2 || !isRecord(value.game)) return value
+  const game = value.game
+  if (!isRecord(game.session) || !isRecord(game.session.simulation)) return value
+  const simulation = game.session.simulation
+  if (!Array.isArray(simulation.villages)) return value
+
+  return {
+    ...value,
+    schemaVersion: 3,
+    game: {
+      ...game,
+      session: {
+        ...game.session,
+        simulation: {
+          ...simulation,
+          villages: simulation.villages.map((village) => {
+            if (!isRecord(village)) return village
+            const tools = toolsForLegacyEra(village.era)
+            return tools ? { ...village, tools, era: villageEraForTools(tools) } : village
+          }),
+        },
+      },
+    },
+  }
+}
+
+function migrateV3SaveDocument(value: unknown): unknown {
+  if (!isRecord(value) || value.schemaVersion !== 3 || !isRecord(value.game)) return value
+  const game = value.game
+  if (!isRecord(game.session) || !isRecord(game.session.simulation)) return value
+  const simulation = game.session.simulation
+  if (!Array.isArray(simulation.villages)) return value
+
+  return {
+    ...value,
+    schemaVersion: SAVE_SCHEMA_VERSION,
+    game: {
+      ...game,
+      session: {
+        ...game.session,
+        simulation: {
+          ...simulation,
+          villages: simulation.villages.map((village) => (
+            isRecord(village) && !('knowledge' in village) ? { ...village, knowledge: [] } : village
+          )),
         },
       },
     },

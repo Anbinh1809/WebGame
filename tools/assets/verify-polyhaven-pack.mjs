@@ -2,13 +2,19 @@ import { createHash } from 'node:crypto'
 import { readFile, stat } from 'node:fs/promises'
 import { resolve } from 'node:path'
 
-const SUPPORTED_PACKS = new Set(['web-1k', 'desktop-2k', 'desktop-4k'])
+const SUPPORTED_PACKS = new Set(['web-1k', 'desktop-2k', 'desktop-4k', 'cinema-8k'])
 const WEB_INITIAL_BUDGET_BYTES = 25 * 1024 * 1024
+const MINIMUM_TEXTURE_EDGE = {
+  'web-1k': 1024,
+  'desktop-2k': 2048,
+  'desktop-4k': 4096,
+  'cinema-8k': 8192,
+}
 
 function parsePack(argumentsList) {
   const packIndex = argumentsList.indexOf('--pack')
   const pack = packIndex >= 0 ? argumentsList[packIndex + 1] : 'web-1k'
-  if (!SUPPORTED_PACKS.has(pack)) throw new Error(`Expected --pack web-1k, desktop-2k, or desktop-4k; received ${String(pack)}.`)
+  if (!SUPPORTED_PACKS.has(pack)) throw new Error(`Expected --pack web-1k, desktop-2k, desktop-4k, or cinema-8k; received ${String(pack)}.`)
   return pack
 }
 
@@ -49,6 +55,7 @@ async function main() {
   }
 
   let verifiedBytes = 0
+  let webInitialBytes = 0
   let verifiedFiles = 0
   for (const entry of report.entries) {
     for (const file of entry.files) {
@@ -57,16 +64,23 @@ async function main() {
       const checksum = sha256(buffer)
       if (checksum !== file.processedChecksum) throw new Error(`${entry.id}: hash mismatch for ${file.runtimePath}`)
       if (fileStat.size !== file.runtimeBytes) throw new Error(`${entry.id}: byte mismatch for ${file.runtimePath}`)
+      if (file.role !== 'environment') {
+        const minimumEdge = MINIMUM_TEXTURE_EDGE[pack]
+        if (!Number.isInteger(file.width) || !Number.isInteger(file.height) || file.width < minimumEdge || file.height < minimumEdge) {
+          throw new Error(`${entry.id}: ${file.runtimePath} is below the ${minimumEdge}px ${pack} texture requirement.`)
+        }
+      }
       verifiedBytes += fileStat.size
+      if (entry.runtimeBudget?.preload !== false) webInitialBytes += fileStat.size
       verifiedFiles += 1
     }
   }
 
   if (verifiedBytes !== report.runtimeBytes) throw new Error(`Report runtime byte mismatch: ${verifiedBytes} !== ${report.runtimeBytes}`)
-  if (pack === 'web-1k' && verifiedBytes > WEB_INITIAL_BUDGET_BYTES) {
-    throw new Error(`Web 1K pack exceeds ${WEB_INITIAL_BUDGET_BYTES} bytes: ${verifiedBytes}.`)
+  if (pack === 'web-1k' && webInitialBytes > WEB_INITIAL_BUDGET_BYTES) {
+    throw new Error(`Web 1K initial preload exceeds ${WEB_INITIAL_BUDGET_BYTES} bytes: ${webInitialBytes}.`)
   }
-  console.log(JSON.stringify({ pack, verifiedManifestEntries: runtimeManifest.length, verifiedFiles, verifiedBytes, webBudgetBytes: pack === 'web-1k' ? WEB_INITIAL_BUDGET_BYTES : undefined }, null, 2))
+  console.log(JSON.stringify({ pack, verifiedManifestEntries: runtimeManifest.length, verifiedFiles, verifiedBytes, webInitialBytes: pack === 'web-1k' ? webInitialBytes : undefined, webBudgetBytes: pack === 'web-1k' ? WEB_INITIAL_BUDGET_BYTES : undefined }, null, 2))
 }
 
 await main()

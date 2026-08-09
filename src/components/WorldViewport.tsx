@@ -4,9 +4,9 @@ import { WorldRenderer } from '../renderer/WorldRenderer'
 import type { HoveredTile, RenderStats } from '../renderer/WorldRenderer'
 import type { SimulationState } from '../simulation/types'
 import type { HeatmapMode, ToolId, World } from '../world/types'
-import type { QualityProfile } from '../renderer/quality'
+import type { GraphicsQualityOverrides, QualityProfile } from '../renderer/quality'
 import type { AssetPackQuality } from '../assets/types'
-import type { GameEdition } from '../renderer/AssetPackManager'
+import type { AssetPackEntitlements, GameEdition } from '../renderer/AssetPackManager'
 
 interface WorldViewportProps {
   world: World
@@ -15,7 +15,9 @@ interface WorldViewportProps {
   heatmap: HeatmapMode
   photoSignal: number
   quality: QualityProfile
+  graphicsOverrides: GraphicsQualityOverrides
   assetPackQuality: AssetPackQuality
+  assetPackEntitlements: AssetPackEntitlements
   edition: GameEdition
   onTileHover: (tile: HoveredTile | undefined) => void
   onTileActivate: (tileIndex: number) => void
@@ -31,7 +33,9 @@ export function WorldViewport({
   heatmap,
   photoSignal,
   quality,
+  graphicsOverrides,
   assetPackQuality,
+  assetPackEntitlements,
   edition,
   onTileHover,
   onTileActivate,
@@ -45,7 +49,9 @@ export function WorldViewport({
   const worldRef = useRef(world)
   const simulationRef = useRef(simulation)
   const qualityRef = useRef(quality)
+  const graphicsOverridesRef = useRef(graphicsOverrides)
   const assetPackRef = useRef(assetPackQuality)
+  const assetPackEntitlementsRef = useRef(assetPackEntitlements)
   const [error, setError] = useState<string | null>(null)
   const [attempt, setAttempt] = useState(0)
 
@@ -57,8 +63,10 @@ export function WorldViewport({
     worldRef.current = world
     simulationRef.current = simulation
     qualityRef.current = quality
+    graphicsOverridesRef.current = graphicsOverrides
     assetPackRef.current = assetPackQuality
-  }, [assetPackQuality, quality, simulation, world])
+    assetPackEntitlementsRef.current = assetPackEntitlements
+  }, [assetPackEntitlements, assetPackQuality, graphicsOverrides, quality, simulation, world])
 
   useEffect(() => {
     const host = hostRef.current
@@ -70,7 +78,7 @@ export function WorldViewport({
         onTileActivate: (tileIndex) => callbacksRef.current.onTileActivate(tileIndex),
         onStats: (stats) => callbacksRef.current.onStats(stats),
         onWebGlError: (message) => setError(message),
-       }, qualityRef.current, edition)
+       }, qualityRef.current, edition, graphicsOverridesRef.current, assetPackEntitlementsRef.current)
        renderer.setAssetPack(assetPackRef.current)
       rendererRef.current = renderer
 
@@ -106,8 +114,16 @@ export function WorldViewport({
   }, [quality])
 
   useEffect(() => {
+    rendererRef.current?.setGraphicsOverrides(graphicsOverrides)
+  }, [graphicsOverrides])
+
+  useEffect(() => {
     rendererRef.current?.setAssetPack(assetPackQuality)
   }, [assetPackQuality])
+
+  useEffect(() => {
+    rendererRef.current?.setAssetPackEntitlements(assetPackEntitlements)
+  }, [assetPackEntitlements])
 
   useEffect(() => {
     if (photoSignal === 0) return

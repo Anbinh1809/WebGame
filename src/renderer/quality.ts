@@ -1,5 +1,21 @@
-export type QualityProfile = 'auto' | 'low' | 'medium' | 'high'
+export type QualityProfile = 'auto' | 'low' | 'medium' | 'high' | 'ultra'
 export type EffectiveQuality = Exclude<QualityProfile, 'auto'>
+
+/** A component can inherit the global profile or keep an intentional local tier. */
+export type GraphicsQualityOverride = 'inherit' | EffectiveQuality
+
+export const GRAPHICS_QUALITY_COMPONENTS = ['scene', 'shadows', 'nature', 'water', 'effects'] as const
+export type GraphicsQualityComponent = (typeof GRAPHICS_QUALITY_COMPONENTS)[number]
+export type GraphicsQualityOverrides = Record<GraphicsQualityComponent, GraphicsQualityOverride>
+
+export const DEFAULT_GRAPHICS_QUALITY_OVERRIDES: GraphicsQualityOverrides = {
+  scene: 'inherit',
+  shadows: 'inherit',
+  nature: 'inherit',
+  water: 'inherit',
+  effects: 'inherit',
+}
+
 export const AUTO_QUALITY_CHANGE_COOLDOWN_MS = 3_000
 
 export interface QualitySettings {
@@ -26,28 +42,53 @@ export const QUALITY_LABELS: Record<QualityProfile, string> = {
   low: 'Thấp',
   medium: 'Trung bình',
   high: 'Cao',
+  ultra: 'Cực cao',
+}
+
+export const GRAPHICS_COMPONENT_LABELS: Record<GraphicsQualityComponent, string> = {
+  scene: 'Khung hình & độ sắc nét',
+  shadows: 'Bóng & ánh sáng',
+  nature: 'Cảnh quan & vật thể 3D',
+  water: 'Nước & địa hình động',
+  effects: 'Thời tiết & hiệu ứng',
+}
+
+export function createGraphicsQualityOverrides(
+  values: Partial<GraphicsQualityOverrides> = {},
+): GraphicsQualityOverrides {
+  return {
+    ...DEFAULT_GRAPHICS_QUALITY_OVERRIDES,
+    ...values,
+  }
+}
+
+export function resolveGraphicsQuality(
+  override: GraphicsQualityOverride,
+  globalQuality: EffectiveQuality,
+): EffectiveQuality {
+  return override === 'inherit' ? globalQuality : override
 }
 
 export function effectiveQualityFor(profile: QualityProfile, fps: number, current: EffectiveQuality = 'medium'): EffectiveQuality {
   if (profile !== 'auto') return profile
   if (fps < 38) return 'low'
   if (fps > 56 && current !== 'high') return current === 'low' ? 'medium' : 'high'
-  if (fps < 48 && current === 'high') return 'medium'
-  return current
+  if (fps < 48 && (current === 'high' || current === 'ultra')) return 'medium'
+  return current === 'ultra' ? 'high' : current
 }
 
 /**
  * Auto starts from Low and uses measured FPS to promote one step at a time.
- * This avoids a long first-frame hitch on a weak device before telemetry exists.
+ * Ultra is deliberately opt-in: it can allocate large shadow maps and scene density.
  */
 export function qualityForProfileChange(next: QualityProfile, previous: QualityProfile, current: EffectiveQuality): EffectiveQuality {
   if (next !== 'auto') return next
   return previous === 'auto' ? current : 'low'
 }
 
-/** High is capped on compact viewports to keep input and WebGL responsive. */
+/** Compact viewports remain usable by capping explicit High and Ultra at Medium. */
 export function capQualityForMobile(profile: EffectiveQuality, mobileViewport: boolean): EffectiveQuality {
-  return mobileViewport && profile === 'high' ? 'medium' : profile
+  return mobileViewport && (profile === 'high' || profile === 'ultra') ? 'medium' : profile
 }
 
 /** Avoid visual quality oscillation while still responding to sustained FPS loss. */
@@ -61,7 +102,7 @@ export function qualitySettings(profile: EffectiveQuality): QualitySettings {
       maxDpr: 0.8,
       shadowMapSize: 512,
       shadows: false,
-      cloudCount: 2,
+      cloudCount: 3,
       rainDropCount: 80,
       vegetationDensity: 0.48,
       rockDensity: 0.55,
@@ -77,12 +118,34 @@ export function qualitySettings(profile: EffectiveQuality): QualitySettings {
     }
   }
 
+  if (profile === 'ultra') {
+    return {
+      // A fixed cap protects high-DPR desktop panels from quadratic buffer growth.
+      maxDpr: 2,
+      shadowMapSize: 4096,
+      shadows: true,
+      cloudCount: 12,
+      rainDropCount: 640,
+      vegetationDensity: 1.25,
+      rockDensity: 1.25,
+      resourceDensity: 1.2,
+      groundDetailDensity: 1.35,
+      settlementDensity: 1.15,
+      maxSettlers: 96,
+      waterSegmentScale: 1.3,
+      minimumWaterSegments: 24,
+      maximumWaterSegments: 72,
+      waterWaveInterval: 1,
+      waterNormalInterval: 2,
+    }
+  }
+
   if (profile === 'high') {
     return {
       maxDpr: 2,
       shadowMapSize: 2048,
       shadows: true,
-      cloudCount: 8,
+      cloudCount: 10,
       rainDropCount: 360,
       vegetationDensity: 1,
       rockDensity: 1,
@@ -102,7 +165,7 @@ export function qualitySettings(profile: EffectiveQuality): QualitySettings {
     maxDpr: 1.25,
     shadowMapSize: 1024,
     shadows: true,
-    cloudCount: 4,
+    cloudCount: 5,
     rainDropCount: 180,
     vegetationDensity: 0.78,
     rockDensity: 0.76,

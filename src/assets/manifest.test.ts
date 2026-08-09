@@ -41,9 +41,17 @@ describe('asset manifest registry', () => {
     expect(validateAssetManifest(ASSET_MANIFEST)).toEqual({ valid: true, errors: [] })
     expect(initialAssetPayloadBytes(ASSET_MANIFEST, 'web-1k')).toBeLessThanOrEqual(25 * 1024 * 1024)
     expect(initialAssetPayloadBytes(ASSET_MANIFEST, 'web-1k')).toBeGreaterThan(0)
-    expect(initialAssetPayloadBytes(ASSET_MANIFEST, 'web-1k')).toBe(19_091_922)
+    expect(initialAssetPayloadBytes(ASSET_MANIFEST, 'web-1k')).toBe(12_044_474)
     expect(validateAssetManifest([validAsset]).valid).toBe(true)
     expect(validateAssetManifest([{ ...validAsset, license: 'unknown' } as unknown as AssetManifestEntry]).valid).toBe(false)
+  })
+
+  it('keeps the detailed Poly Haven cloud sky local and outside the Web bootstrap budget', () => {
+    const cloudSky = ASSET_MANIFEST.find((entry) => entry.polyHavenSlug === 'cloud_layers')
+    expect(cloudSky?.runtime.kind).toBe('environment')
+    expect(cloudSky?.runtime.kind === 'environment' && cloudSky.runtime.environmentRole).toBe('sky')
+    expect(cloudSky?.runtime.files[0]?.path).toBe('/assets/polyhaven/web-1k/cloud_layers/environment.hdr')
+    expect(cloudSky?.runtimeBudget.preload).toBe(false)
   })
 
   it('selects variants deterministically and budgets only preload assets', () => {

@@ -90,19 +90,19 @@
     }
   ],
   "sourceBytes": 214609299,
-  "runtimeBytes": 11392664,
+  "runtimeBytes": 9248916,
   "variants": [
     {
-      "id": "forest-lod1",
-      "simplifyRatio": 0.01,
-      "simplifyError": 0.002,
+      "id": "forest-lod2",
+      "simplifyRatio": 0.001,
+      "simplifyError": 0.003,
       "textureSize": 1024,
       "intendedUse": "instanced wide-canopy Web forest tree",
       "maxInstances": 8,
-      "path": "/assets/polyhaven/web-1k/models/jacaranda_tree/jacaranda_tree_forest-lod1.glb",
-      "processedPath": "public/assets/polyhaven/web-1k/models/jacaranda_tree/jacaranda_tree_forest-lod1.glb",
-      "processedChecksum": "sha256:20ca43714226b18f98622d99cabf0c4e45d7a75884f7bfad83baf09bcfac3cfd",
-      "processedBytes": 11392664
+      "path": "/assets/polyhaven/web-1k/models/jacaranda_tree/jacaranda_tree_forest-lod2.glb",
+      "processedPath": "public/assets/polyhaven/web-1k/models/jacaranda_tree/jacaranda_tree_forest-lod2.glb",
+      "processedChecksum": "sha256:83780ddb78cb408f729cb570cf64d69e0f4eae71e66249057bc8bd72586f3bfc",
+      "processedBytes": 9248916
     }
   ]
 }

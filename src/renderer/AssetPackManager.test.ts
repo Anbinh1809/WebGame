@@ -27,6 +27,16 @@ describe('asset pack selection', () => {
     }
     expect(resolveAssetPack(request)).toMatchObject({ selectedPack: 'desktop-4k', usedFallback: true })
     expect(resolveAssetPack({ ...request, entitlements: { desktopGame: true, cinema8k: true } })).toMatchObject({ selectedPack: 'cinema-8k', usedFallback: false })
+    expect(resolveAssetPack({
+      ...request,
+      capabilities: { maxTextureSize: 8192 },
+      entitlements: { desktopGame: true, cinema8k: true },
+    })).toMatchObject({ selectedPack: 'cinema-8k', usedFallback: false })
+    expect(resolveAssetPack({
+      ...request,
+      capabilities: { maxTextureSize: 8192, estimatedVramMiB: 8_192 },
+      entitlements: { desktopGame: true, cinema8k: true },
+    })).toMatchObject({ selectedPack: 'desktop-4k', usedFallback: true })
   })
 
   it('keeps a desktop player on their requested 1K pack and falls back from missing 4K to 2K then 1K', () => {

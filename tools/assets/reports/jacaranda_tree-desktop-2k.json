@@ -98,7 +98,7 @@
       "simplifyError": 0.002,
       "textureSize": 2048,
       "intendedUse": "instanced wide-canopy desktop forest tree",
-      "maxInstances": 10,
+      "maxInstances": 4,
       "path": "models/jacaranda_tree/jacaranda_tree_forest-lod1.glb",
       "processedPath": "desktop-packs/polyhaven/desktop-2k/models/jacaranda_tree/jacaranda_tree_forest-lod1.glb",
       "processedChecksum": "sha256:d7923d02255112d82cbc5e9f1ea31c9e448ec611dc78a11668620357d02f121a",

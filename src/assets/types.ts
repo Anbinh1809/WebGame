@@ -15,8 +15,12 @@ export type AssetMaterialSurface =
   | 'trunk'
   | 'house'
   | 'roof'
+  | 'thatchRoof'
   | 'farm'
   | 'road'
+  | 'workshopWood'
+  | 'stonework'
+  | 'metalwork'
   | 'environment'
 
 export type AssetRuntimeFileRole = 'albedo' | 'normal' | 'roughness' | 'environment' | 'model'
@@ -30,6 +34,8 @@ export interface AssetRuntimeFile {
 export interface AssetMaterialRuntimeDefinition {
   kind: 'material' | 'environment'
   surface: AssetMaterialSurface
+  /** Environment files are split into lighting and the visible sky background. */
+  environmentRole?: 'lighting' | 'sky'
   files: readonly AssetRuntimeFile[]
   repeat?: readonly [number, number]
 }
@@ -37,9 +43,9 @@ export interface AssetMaterialRuntimeDefinition {
 /** A mesh asset is curated separately from tileable PBR materials. */
 export interface AssetModelRuntimeDefinition {
   kind: 'model'
-  surface: 'foliage'
-  modelType: 'tree'
-  modelVariant: 'forest' | 'hero'
+  surface: 'foliage' | 'terrainRock' | 'terrainSand'
+  modelType: 'tree' | 'rock' | 'groundCover' | 'coastRock'
+  modelVariant: 'forest' | 'hero' | 'formation' | 'ground' | 'coast'
   /** World-unit scale chosen during offline asset curation, never inferred from texture resolution. */
   worldScale: number
   /** Keeps deterministic instances from overlapping when an asset has a broad canopy. */

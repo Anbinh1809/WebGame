@@ -1,0 +1,66 @@
+{
+  "schemaVersion": 1,
+  "asset": {
+    "id": "boulder-01",
+    "slug": "boulder_01",
+    "license": "CC0-1.0",
+    "attribution": "Poly Haven — boulder_01 (CC0 1.0)",
+    "sourceUrl": "https://polyhaven.com/a/boulder_01"
+  },
+  "pack": "web-1k",
+  "textureSourceResolution": "1k",
+  "sourceCache": ".asset-cache/polyhaven-models/boulder_01/1k",
+  "sourceFiles": [
+    {
+      "path": "boulder_01_1k.gltf",
+      "sourceUrl": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/1k/boulder_01/boulder_01_1k.gltf",
+      "sourceMd5": "26e2eef4a1f68c9557c65cd375b21d6c",
+      "sourceChecksum": "sha256:51487934db898b4c24072780a451e34eca5c02e3ada24a62bbc600bbc4019e92",
+      "sourceBytes": 2773
+    },
+    {
+      "path": "textures/boulder_01_arm_1k.jpg",
+      "sourceUrl": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/boulder_01/boulder_01_arm_1k.jpg",
+      "sourceMd5": "d632159982cc3121ed3d69b89a122146",
+      "sourceChecksum": "sha256:c57187c5746b6be913fa53846cb44ff78743e7ca5000f131c9627b99563c2b87",
+      "sourceBytes": 659386
+    },
+    {
+      "path": "textures/boulder_01_diff_1k.jpg",
+      "sourceUrl": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/boulder_01/boulder_01_diff_1k.jpg",
+      "sourceMd5": "25f8a843f13369d56d37f49db05ea8c3",
+      "sourceChecksum": "sha256:c38f0e918f6dc16b8d386ba3cdd89805c78320c119a1ceec85856f82b09a65b8",
+      "sourceBytes": 987467
+    },
+    {
+      "path": "boulder_01.bin",
+      "sourceUrl": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/8k/boulder_01/boulder_01.bin",
+      "sourceMd5": "27a19fa031d8b4c3a09261f19c444dc5",
+      "sourceChecksum": "sha256:7f5b06503d62bd95bfe9c6b8a354a5cc8ff04a4d271a8cf87a3e3125db4232d7",
+      "sourceBytes": 2938808
+    },
+    {
+      "path": "textures/boulder_01_nor_gl_1k.jpg",
+      "sourceUrl": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/boulder_01/boulder_01_nor_gl_1k.jpg",
+      "sourceMd5": "0c4da644d901144b53e4fe2446f3c389",
+      "sourceChecksum": "sha256:0810cf6e89d89bb6eb065b4d2e2855288f5dcbd2c15c6e40ab90d462021b50aa",
+      "sourceBytes": 1183552
+    }
+  ],
+  "sourceBytes": 5771986,
+  "runtimeBytes": 3492516,
+  "variants": [
+    {
+      "id": "formation-lod1",
+      "simplifyRatio": 0.16,
+      "simplifyError": 0.003,
+      "textureSize": 1024,
+      "intendedUse": "instanced hillside boulder",
+      "maxInstances": 10,
+      "path": "/assets/polyhaven/web-1k/models/boulder_01/boulder_01_formation-lod1.glb",
+      "processedPath": "public/assets/polyhaven/web-1k/models/boulder_01/boulder_01_formation-lod1.glb",
+      "processedChecksum": "sha256:27040425d2b95d6504fb5009f0da6b1689a1d9333b6c9efb2d0d70a5141170bd",
+      "processedBytes": 3492516
+    }
+  ]
+}

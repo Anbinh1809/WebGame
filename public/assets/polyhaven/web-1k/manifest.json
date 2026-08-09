@@ -390,7 +390,7 @@
     "runtimeBudget": {
       "maxInstances": 240,
       "residentMiB": 6,
-      "preload": true,
+      "preload": false,
       "intendedUse": "instanced tree foliage"
     },
     "runtime": {
@@ -770,6 +770,286 @@
     }
   },
   {
+    "id": "era-thatch-roof-web-1k",
+    "biome": "stone-age",
+    "useCase": "primitive hut roofs after the first crafted axe",
+    "deterministicVariants": [
+      "thatch_roof_angled"
+    ],
+    "provider": "polyhaven",
+    "polyHavenSlug": "thatch_roof_angled",
+    "sourceUrl": "https://polyhaven.com/a/thatch_roof_angled",
+    "license": "CC0-1.0",
+    "attribution": "Poly Haven — thatch_roof_angled (CC0 1.0)",
+    "sourceChecksum": "sha256:33b7afd4985d8e03da624daa5f28266d0fe8952e1f3161321950d3b5c388db2a",
+    "processedChecksum": "sha256:08bcb0c410b37f73e23937a4d5ee1aa056bf8b50ce99e7fb0ded5aa4c49ef3fc",
+    "pack": "web-1k",
+    "fileSizes": {
+      "sourceBytes": 2727215,
+      "processedBytes": 1062238,
+      "runtimeBytes": 1062238
+    },
+    "lods": [
+      {
+        "id": "lod0",
+        "triangles": 0,
+        "available": true
+      },
+      {
+        "id": "lod1",
+        "triangles": 0,
+        "available": true
+      },
+      {
+        "id": "lod2",
+        "triangles": 0,
+        "available": true
+      }
+    ],
+    "fallback": "procedural",
+    "runtimeBudget": {
+      "maxInstances": 48,
+      "residentMiB": 5,
+      "preload": false,
+      "intendedUse": "primitive hut roofs after the first crafted axe"
+    },
+    "runtime": {
+      "kind": "material",
+      "surface": "thatchRoof",
+      "repeat": [
+        2,
+        2
+      ],
+      "files": [
+        {
+          "role": "albedo",
+          "path": "/assets/polyhaven/web-1k/thatch_roof_angled/albedo.webp",
+          "colorSpace": "srgb"
+        },
+        {
+          "role": "normal",
+          "path": "/assets/polyhaven/web-1k/thatch_roof_angled/normal.webp",
+          "colorSpace": "linear"
+        },
+        {
+          "role": "roughness",
+          "path": "/assets/polyhaven/web-1k/thatch_roof_angled/roughness.webp",
+          "colorSpace": "linear"
+        }
+      ]
+    }
+  },
+  {
+    "id": "era-workshop-wood-web-1k",
+    "biome": "wood-age",
+    "useCase": "instanced wood workshops after the first crafted axe",
+    "deterministicVariants": [
+      "wooden_rough_planks"
+    ],
+    "provider": "polyhaven",
+    "polyHavenSlug": "wooden_rough_planks",
+    "sourceUrl": "https://polyhaven.com/a/wooden_rough_planks",
+    "license": "CC0-1.0",
+    "attribution": "Poly Haven — wooden_rough_planks (CC0 1.0)",
+    "sourceChecksum": "sha256:ef5bcb8c3188e7a401d4343d129e43b360584880b32f0ab9b95805762e758ee9",
+    "processedChecksum": "sha256:190d6fcab1c960b7ce0cb93557d5ef22940d5fb07b9c245de94a24ce8e709529",
+    "pack": "web-1k",
+    "fileSizes": {
+      "sourceBytes": 1411441,
+      "processedBytes": 904196,
+      "runtimeBytes": 904196
+    },
+    "lods": [
+      {
+        "id": "lod0",
+        "triangles": 0,
+        "available": true
+      },
+      {
+        "id": "lod1",
+        "triangles": 0,
+        "available": true
+      },
+      {
+        "id": "lod2",
+        "triangles": 0,
+        "available": true
+      }
+    ],
+    "fallback": "procedural",
+    "runtimeBudget": {
+      "maxInstances": 24,
+      "residentMiB": 5,
+      "preload": false,
+      "intendedUse": "instanced wood workshops after the first crafted axe"
+    },
+    "runtime": {
+      "kind": "material",
+      "surface": "workshopWood",
+      "repeat": [
+        2,
+        2
+      ],
+      "files": [
+        {
+          "role": "albedo",
+          "path": "/assets/polyhaven/web-1k/wooden_rough_planks/albedo.webp",
+          "colorSpace": "srgb"
+        },
+        {
+          "role": "normal",
+          "path": "/assets/polyhaven/web-1k/wooden_rough_planks/normal.webp",
+          "colorSpace": "linear"
+        },
+        {
+          "role": "roughness",
+          "path": "/assets/polyhaven/web-1k/wooden_rough_planks/roughness.webp",
+          "colorSpace": "linear"
+        }
+      ]
+    }
+  },
+  {
+    "id": "era-metalwork-web-1k",
+    "biome": "metal-age",
+    "useCase": "instanced copper and iron forges after metallurgy",
+    "deterministicVariants": [
+      "metal_plate"
+    ],
+    "provider": "polyhaven",
+    "polyHavenSlug": "metal_plate",
+    "sourceUrl": "https://polyhaven.com/a/metal_plate",
+    "license": "CC0-1.0",
+    "attribution": "Poly Haven — metal_plate (CC0 1.0)",
+    "sourceChecksum": "sha256:8112695d6f874b1ec6650cbd3e6496b9742d551989b93b179f3d76da2514ceb5",
+    "processedChecksum": "sha256:3502dd8f7dd133310f578ebcacb90255ebdbf4e91f93c5523bfac58b662621d8",
+    "pack": "web-1k",
+    "fileSizes": {
+      "sourceBytes": 2237747,
+      "processedBytes": 769736,
+      "runtimeBytes": 769736
+    },
+    "lods": [
+      {
+        "id": "lod0",
+        "triangles": 0,
+        "available": true
+      },
+      {
+        "id": "lod1",
+        "triangles": 0,
+        "available": true
+      },
+      {
+        "id": "lod2",
+        "triangles": 0,
+        "available": true
+      }
+    ],
+    "fallback": "procedural",
+    "runtimeBudget": {
+      "maxInstances": 24,
+      "residentMiB": 6,
+      "preload": false,
+      "intendedUse": "instanced copper and iron forges after metallurgy"
+    },
+    "runtime": {
+      "kind": "material",
+      "surface": "metalwork",
+      "repeat": [
+        2,
+        2
+      ],
+      "files": [
+        {
+          "role": "albedo",
+          "path": "/assets/polyhaven/web-1k/metal_plate/albedo.webp",
+          "colorSpace": "srgb"
+        },
+        {
+          "role": "normal",
+          "path": "/assets/polyhaven/web-1k/metal_plate/normal.webp",
+          "colorSpace": "linear"
+        },
+        {
+          "role": "roughness",
+          "path": "/assets/polyhaven/web-1k/metal_plate/roughness.webp",
+          "colorSpace": "linear"
+        }
+      ]
+    }
+  },
+  {
+    "id": "era-stonework-web-1k",
+    "biome": "town",
+    "useCase": "instanced town halls after ironworking",
+    "deterministicVariants": [
+      "medieval_blocks_03"
+    ],
+    "provider": "polyhaven",
+    "polyHavenSlug": "medieval_blocks_03",
+    "sourceUrl": "https://polyhaven.com/a/medieval_blocks_03",
+    "license": "CC0-1.0",
+    "attribution": "Poly Haven — medieval_blocks_03 (CC0 1.0)",
+    "sourceChecksum": "sha256:492f9b5f01acd92f1603a277785df69722764bfc9523568cf199f40fabc7ff19",
+    "processedChecksum": "sha256:cc5be4abfcdb6588ea16fe4127c0486cb5076b444b1f275e30ca0b49c4c680e9",
+    "pack": "web-1k",
+    "fileSizes": {
+      "sourceBytes": 2767745,
+      "processedBytes": 1091000,
+      "runtimeBytes": 1091000
+    },
+    "lods": [
+      {
+        "id": "lod0",
+        "triangles": 0,
+        "available": true
+      },
+      {
+        "id": "lod1",
+        "triangles": 0,
+        "available": true
+      },
+      {
+        "id": "lod2",
+        "triangles": 0,
+        "available": true
+      }
+    ],
+    "fallback": "procedural",
+    "runtimeBudget": {
+      "maxInstances": 12,
+      "residentMiB": 7,
+      "preload": false,
+      "intendedUse": "instanced town halls after ironworking"
+    },
+    "runtime": {
+      "kind": "material",
+      "surface": "stonework",
+      "repeat": [
+        2,
+        2
+      ],
+      "files": [
+        {
+          "role": "albedo",
+          "path": "/assets/polyhaven/web-1k/medieval_blocks_03/albedo.webp",
+          "colorSpace": "srgb"
+        },
+        {
+          "role": "normal",
+          "path": "/assets/polyhaven/web-1k/medieval_blocks_03/normal.webp",
+          "colorSpace": "linear"
+        },
+        {
+          "role": "roughness",
+          "path": "/assets/polyhaven/web-1k/medieval_blocks_03/roughness.webp",
+          "colorSpace": "linear"
+        }
+      ]
+    }
+  },
+  {
     "id": "environment-kloppenheim-web-1k",
     "biome": "global",
     "useCase": "PMREM environment lighting",
@@ -816,10 +1096,68 @@
     "runtime": {
       "kind": "environment",
       "surface": "environment",
+      "environmentRole": "lighting",
       "files": [
         {
           "role": "environment",
           "path": "/assets/polyhaven/web-1k/kloppenheim_02/environment.hdr",
+          "colorSpace": "linear"
+        }
+      ]
+    }
+  },
+  {
+    "id": "environment-cloud-layers-web-1k",
+    "biome": "global",
+    "useCase": "detailed equirectangular cloud background after /play",
+    "deterministicVariants": [
+      "cloud_layers"
+    ],
+    "provider": "polyhaven",
+    "polyHavenSlug": "cloud_layers",
+    "sourceUrl": "https://polyhaven.com/a/cloud_layers",
+    "license": "CC0-1.0",
+    "attribution": "Poly Haven — cloud_layers (CC0 1.0)",
+    "sourceChecksum": "sha256:2e9ecdc551bd08e71e05b526ba4defe0664d315070027e72eda94b2ffb1a2655",
+    "processedChecksum": "sha256:2e9ecdc551bd08e71e05b526ba4defe0664d315070027e72eda94b2ffb1a2655",
+    "pack": "web-1k",
+    "fileSizes": {
+      "sourceBytes": 1744648,
+      "processedBytes": 1744648,
+      "runtimeBytes": 1744648
+    },
+    "lods": [
+      {
+        "id": "lod0",
+        "triangles": 0,
+        "available": true
+      },
+      {
+        "id": "lod1",
+        "triangles": 0,
+        "available": true
+      },
+      {
+        "id": "lod2",
+        "triangles": 0,
+        "available": true
+      }
+    ],
+    "fallback": "procedural",
+    "runtimeBudget": {
+      "maxInstances": 1,
+      "residentMiB": 18,
+      "preload": false,
+      "intendedUse": "detailed equirectangular cloud background after /play"
+    },
+    "runtime": {
+      "kind": "environment",
+      "surface": "environment",
+      "environmentRole": "sky",
+      "files": [
+        {
+          "role": "environment",
+          "path": "/assets/polyhaven/web-1k/cloud_layers/environment.hdr",
           "colorSpace": "linear"
         }
       ]

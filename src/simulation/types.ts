@@ -1,7 +1,39 @@
 import type { ToolId } from '../world/types'
 
 export type SimulationSpeed = 0 | 1 | 2 | 4 | 8
-export type VillageEra = 'Mầm lửa' | 'Nhà gỗ' | 'Thợ đá' | 'Nông trang' | 'Thành đá'
+export type VillageEra = 'Thời Đồ Đá' | 'Làng Gỗ' | 'Nông Nghiệp' | 'Thời Kim Khí' | 'Thị Trấn'
+export const VILLAGE_TOOL_IDS = [
+  'stone-handaxe',
+  'flint-axe',
+  'stone-hoe',
+  'wooden-plow',
+  'copper-hammer',
+  'bronze-spear',
+  'iron-anvil',
+] as const
+export type VillageToolId = (typeof VILLAGE_TOOL_IDS)[number]
+export const VILLAGE_KNOWLEDGE_IDS = [
+  'fire-stewardship',
+  'weaving-and-storage',
+  'timber-joinery',
+  'seed-selection',
+  'crop-rotation',
+  'irrigation-channel',
+  'ore-sorting',
+  'alloy-casting',
+  'masonry',
+  'record-keeping',
+] as const
+export type VillageKnowledgeId = (typeof VILLAGE_KNOWLEDGE_IDS)[number]
+export type VillageKnowledgeAssessmentStatus = 'accepted' | 'duplicate' | 'too-advanced' | 'missing-prerequisite' | 'unrecognized'
+
+/** A transparent result for a player-provided knowledge proposal. */
+export interface VillageKnowledgeAssessment {
+  status: VillageKnowledgeAssessmentStatus
+  title: string
+  detail: string
+  knowledgeId?: VillageKnowledgeId
+}
 export type EventTone = 'calm' | 'good' | 'warning' | 'danger'
 export type CouncilChoiceId = 'stockpile' | 'raise-ward'
 export type WorldObjectiveId = 'rooted-grove' | 'full-granary' | 'stormward'
@@ -24,6 +56,10 @@ export interface VillageSimulation {
   /** Capacity to absorb a disaster and recover without a soft-lock. */
   resilience: number
   era: VillageEra
+  /** Ordered craft ledger that controls both gameplay bonuses and visual growth. */
+  tools: VillageToolId[]
+  /** Player-taught, validated techniques; arbitrary text never becomes simulation state. */
+  knowledge: VillageKnowledgeId[]
   lastDecision: string
 }
 

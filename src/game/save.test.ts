@@ -7,6 +7,15 @@ import type { WorldConfig } from '../world/types'
 const config: WorldConfig = { seed: 'save-round-trip', size: 28, climate: 'ôn hòa', water: 0.54, resources: 0.62 }
 
 describe('local save schema', () => {
+  it('accepts saves from every supported world size, including the expanded 60 by 60 map', () => {
+    const largeWorld = createGameState({ ...config, seed: 'save-60-by-60', size: 60 })
+    const decoded = decodeSave(serializeSave(largeWorld))
+    expect(decoded.ok).toBe(true)
+    if (!decoded.ok) return
+    expect(decoded.game.session.world.config.size).toBe(60)
+    expect(decoded.game.session.world.tiles).toHaveLength(3_600)
+  })
+
   it('round-trips the current game session while dropping ephemeral undo snapshots', () => {
     const initial = createGameState(config)
     const terrainChange = applyTerrainTool(initial.session.world, 0, 'raise', 'Nâng đất')
@@ -72,7 +81,7 @@ describe('local save schema', () => {
     expect(decodeSave(JSON.stringify(withHistory)).ok).toBe(false)
   })
 
-  it('migrates v1 saves deterministically to the current objective and resilience schema', () => {
+  it('migrates v1 saves deterministically to the current objective, resilience, craft, and knowledge schema', () => {
     const legacy = JSON.parse(serializeSave(createGameState(config))) as {
       schemaVersion: number
       game: {
@@ -87,7 +96,10 @@ describe('local save schema', () => {
       }
     }
     legacy.schemaVersion = 1
-    for (const village of legacy.game.session.simulation.villages) delete village.resilience
+    for (const village of legacy.game.session.simulation.villages) {
+      delete village.resilience
+      delete village.knowledge
+    }
     delete legacy.game.session.simulation.objectives
     delete legacy.game.session.simulation.godToolUses
 
@@ -100,7 +112,7 @@ describe('local save schema', () => {
         }
       }
     }
-    expect(migratedDocument.schemaVersion).toBe(2)
+    expect(migratedDocument.schemaVersion).toBe(4)
     expect(migratedDocument.game.session.world).toEqual(legacy.game.session.world)
     expect(migratedDocument.game.session.simulation.villages[0]?.resilience).toBe(42)
     const migrated = decodeSave(JSON.stringify(legacy))
@@ -110,5 +122,47 @@ describe('local save schema', () => {
     expect(migrated.game.session.simulation.villages[0]!.resilience).toBe(42)
     expect(migrated.game.session.simulation.objectives).toHaveLength(3)
     expect(migrated.game.session.simulation.godToolUses.forest).toBe(0)
+    expect(migrated.game.session.simulation.villages[0]!.tools).toEqual(['stone-handaxe'])
+    expect(migrated.game.session.simulation.villages[0]!.knowledge).toEqual([])
+    expect(migrated.game.session.simulation.villages[0]!.era).toBe('Thời Đồ Đá')
+  })
+
+  it('migrates a v2 era into its ordered tool ledger without granting out-of-order tools', () => {
+    const legacy = JSON.parse(serializeSave(createGameState(config))) as {
+      schemaVersion: number
+      game: { session: { simulation: { villages: Array<Record<string, unknown>> } } }
+    }
+    legacy.schemaVersion = 2
+    const village = legacy.game.session.simulation.villages[0]!
+    village.era = 'Thợ đá'
+    delete village.tools
+
+    const migrated = decodeSave(JSON.stringify(legacy))
+    if (!migrated.ok) throw new Error(migrated.reason)
+    expect(migrated.game.session.simulation.villages[0]!.tools).toEqual(['stone-handaxe', 'flint-axe', 'stone-hoe'])
+    expect(migrated.game.session.simulation.villages[0]!.era).toBe('Nông Nghiệp')
+  })
+
+  it('migrates v3 saves with an empty knowledge ledger and rejects forged late-era knowledge', () => {
+    const legacy = JSON.parse(serializeSave(createGameState(config))) as {
+      schemaVersion: number
+      game: { session: { simulation: { villages: Array<Record<string, unknown>> } } }
+    }
+    legacy.schemaVersion = 3
+    delete legacy.game.session.simulation.villages[0]!.knowledge
+
+    const migratedDocument = migrateSaveDocument(legacy) as {
+      schemaVersion: number
+      game: { session: { simulation: { villages: Array<Record<string, unknown>> } } }
+    }
+    expect(migratedDocument.schemaVersion).toBe(4)
+    expect(migratedDocument.game.session.simulation.villages[0]!.knowledge).toEqual([])
+    expect(decodeSave(JSON.stringify(legacy)).ok).toBe(true)
+
+    const forged = JSON.parse(serializeSave(createGameState(config))) as {
+      game: { session: { simulation: { villages: Array<{ knowledge: unknown[] }> } } }
+    }
+    forged.game.session.simulation.villages[0]!.knowledge = ['masonry']
+    expect(decodeSave(JSON.stringify(forged)).ok).toBe(false)
   })
 })

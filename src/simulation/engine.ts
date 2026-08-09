@@ -1,7 +1,9 @@
 import { hash2d, seedToUint32 } from '../world/prng'
 import type { Tile, ToolId, VillageSite, World } from '../world/types'
+import { assessVillageKnowledge, villageKnowledgeDefinition, villageKnowledgeEffects } from './knowledge'
 import { nearestVillage, tileDistance } from './metrics'
 import { createWorldObjectives, refreshWorldObjectives } from './objectives'
+import { nextVillageTool, STARTING_VILLAGE_TOOLS, villageEraForTools, villageEraLabel, villageToolEffects } from './progression'
 import { EMPTY_GOD_TOOL_USES, MAX_SIMULATION_TICK } from './types'
 import type {
   CouncilChoiceId,
@@ -10,6 +12,7 @@ import type {
   SimulationState,
   StormState,
   VillageEra,
+  VillageKnowledgeAssessment,
   VillageSimulation,
 } from './types'
 
@@ -29,6 +32,14 @@ interface EventInput {
 export type SpawnSettlersResult =
   | { ok: true; simulation: SimulationState; villageSite: VillageSite; createdVillage: boolean }
   | { ok: false; simulation: SimulationState; reason: string }
+
+export type DevelopVillageToolResult =
+  | { ok: true; simulation: SimulationState; toolLabel: string; era: VillageEra }
+  | { ok: false; simulation: SimulationState; reason: string }
+
+export type SubmitVillageKnowledgeResult =
+  | { ok: true; simulation: SimulationState; knowledgeLabel: string; assessment: VillageKnowledgeAssessment }
+  | { ok: false; simulation: SimulationState; reason: string; assessment: VillageKnowledgeAssessment }
 
 function clamp(value: number, minimum: number, maximum: number): number {
   return Math.min(maximum, Math.max(minimum, value))
@@ -50,11 +61,7 @@ function appendEvent(state: SimulationState, input: EventInput): SimulationState
 }
 
 function eraFor(village: VillageSimulation): VillageEra {
-  if (village.population >= 60 && village.food >= village.population * 1.7 && village.happiness >= 67 && village.resilience >= 60) return 'Thành đá'
-  if (village.population >= 34 && village.food >= village.population * 1.55 && village.happiness >= 58 && village.resilience >= 48) return 'Nông trang'
-  if (village.research >= 30 && village.homes >= 6 && village.population >= 18) return 'Thợ đá'
-  if (village.homes >= 4) return 'Nhà gỗ'
-  return 'Mầm lửa'
+  return villageEraForTools(village.tools)
 }
 
 interface SettlementEcology {
@@ -116,6 +123,8 @@ function updateVillage(
   const ecology = settlementEcology(world, village.tileIndex)
   const seasonalModifier = 0.9 + Math.sin(tick / 9) * 0.16
   const workers = Math.max(2, Math.floor(village.population * 0.57))
+  const toolEffects = villageToolEffects(village.tools)
+  const knowledgeEffects = villageKnowledgeEffects(village.knowledge)
   const researchBonus = clamp(village.research / 320, 0, 0.18)
   const territoryBonus = clamp(village.territory / 90, 0, 0.12)
   const harvest = workers * (
@@ -126,9 +135,11 @@ function updateVillage(
     + ecology.forest * 0.035
     + researchBonus
     + territoryBonus
+    + toolEffects.harvest
+    + knowledgeEffects.harvest
   ) * seasonalModifier
-  const stormDefense = clamp(village.military / 65, 0, 0.42)
-  const resilienceTarget = clamp(24 + ecology.fertility * 22 + ecology.water * 18 + ecology.forest * 17 + village.military * 0.23, 0, 100)
+  const stormDefense = clamp(village.military / 65 + toolEffects.stormDefense + knowledgeEffects.stormDefense, 0, 0.62)
+  const resilienceTarget = clamp(24 + ecology.fertility * 22 + ecology.water * 18 + ecology.forest * 17 + village.military * 0.23 + toolEffects.resilience + knowledgeEffects.resilience, 0, 100)
   const resilience = clamp(
     village.resilience + (resilienceTarget - village.resilience) * 0.075 + (storm ? -storm.intensity * 0.45 : 0.2),
     0,
@@ -140,7 +151,7 @@ function updateVillage(
   let happiness = clamp(village.happiness + (food > village.population * 2 ? 0.45 : -0.8) - stormPenalty * 0.38, 0, 100)
   let population = clamp(village.population, 0, MAX_VILLAGE_VALUE)
   let homes = clamp(village.homes, 0, MAX_VILLAGE_VALUE)
-  let research = clamp(village.research + (food > population * 2 ? 0.16 : 0.05), 0, MAX_VILLAGE_VALUE)
+  let research = clamp(village.research + (food > population * 2 ? 0.16 : 0.05) + toolEffects.research + knowledgeEffects.research, 0, MAX_VILLAGE_VALUE)
   const military = clamp(village.military + (storm ? 0.02 : 0.06), 0, 100)
   let territory = clamp(village.territory, 0, MAX_VILLAGE_VALUE)
   let lastDecision = storm
@@ -216,7 +227,9 @@ function villageFromSite(site: VillageSite, index: number): VillageSimulation {
     military: 2,
     territory: 3,
     resilience: 42,
-    era: 'Mầm lửa',
+    era: 'Thời Đồ Đá',
+    tools: [...STARTING_VILLAGE_TOOLS],
+    knowledge: [],
     lastDecision: 'Chọn nơi dựng lửa đầu tiên',
   }
 }
@@ -372,6 +385,94 @@ export function triggerStorm(state: SimulationState): SimulationState {
     },
     { kind: 'global-storm', title: 'Mưa lớn toàn cõi', detail: `Mây đen phủ ${location}; mùa màng và hạnh phúc đang chịu thử thách.`, tone: 'danger' },
   )
+}
+
+/**
+ * Crafts exactly the next settlement tool. The action is explicit so players
+ * decide when to trade stored food and research for a new era.
+ */
+export function developVillageTool(state: SimulationState, villageId = state.villages[0]?.id): DevelopVillageToolResult {
+  const village = state.villages.find((candidate) => candidate.id === villageId)
+  if (!village) return { ok: false, simulation: state, reason: 'Chưa có cộng đồng nào để phát triển công cụ.' }
+
+  const tool = nextVillageTool(village.tools)
+  if (!tool) return { ok: false, simulation: state, reason: `${village.name} đã hoàn thành toàn bộ chuỗi công cụ.` }
+
+  const missingResearch = Math.max(0, Math.ceil(tool.researchCost - village.research))
+  const missingFood = Math.max(0, Math.ceil(tool.foodCost - village.food))
+  if (missingResearch > 0 || missingFood > 0) {
+    const requirements = [
+      missingResearch > 0 ? `thiếu ${missingResearch} nghiên cứu` : undefined,
+      missingFood > 0 ? `thiếu ${missingFood} lương thực` : undefined,
+    ].filter((value): value is string => Boolean(value))
+    return { ok: false, simulation: state, reason: `Chưa thể rèn ${tool.label}: ${requirements.join(', ')}.` }
+  }
+
+  const tools = [...village.tools, tool.id]
+  const era = eraFor({ ...village, tools })
+  const developedVillage: VillageSimulation = {
+    ...village,
+    tools,
+    food: clamp(village.food - tool.foodCost, 0, 999),
+    research: clamp(village.research - tool.researchCost, 0, MAX_VILLAGE_VALUE),
+    era,
+    lastDecision: `Rèn ${tool.label} để đưa cộng đồng tiến lên`,
+  }
+  const next = { ...state, villages: state.villages.map((candidate) => candidate.id === village.id ? developedVillage : candidate) }
+  const crafted = appendEvent(next, {
+    kind: `craft-${tool.id}`,
+    title: `Rèn ${tool.label}`,
+    detail: `${village.name} dùng ${tool.researchCost} nghiên cứu và ${tool.foodCost} lương thực. ${tool.benefit}`,
+    tone: 'good',
+  })
+  const simulation = village.era === era
+    ? crafted
+    : appendEvent(crafted, {
+        kind: `era-${tool.id}`,
+        title: `Bước vào ${villageEraLabel(era)}`,
+        detail: `${village.name} mở thêm kiến trúc và công cụ mới trong thế giới 3D.`,
+        tone: 'good',
+      })
+  return { ok: true, simulation, toolLabel: tool.label, era }
+}
+
+/**
+ * Accepts only a catalogue-backed technique after checking the active village's
+ * actual tool ledger and prerequisite knowledge. No free-form text affects the
+ * deterministic simulation.
+ */
+export function submitVillageKnowledge(state: SimulationState, proposal: string, villageId = state.villages[0]?.id): SubmitVillageKnowledgeResult {
+  const village = state.villages.find((candidate) => candidate.id === villageId)
+  if (!village) {
+    const assessment: VillageKnowledgeAssessment = {
+      status: 'unrecognized',
+      title: 'Chưa có cộng đồng để học hỏi',
+      detail: 'Hãy lập một cộng đồng trước khi truyền đạt tri thức.',
+    }
+    return { ok: false, simulation: state, reason: assessment.detail, assessment }
+  }
+
+  const assessment = assessVillageKnowledge(village, proposal)
+  if (assessment.status !== 'accepted' || !assessment.knowledgeId) {
+    return { ok: false, simulation: state, reason: `${assessment.title}. ${assessment.detail}`, assessment }
+  }
+
+  const knowledge = villageKnowledgeDefinition(assessment.knowledgeId)
+  const educatedVillage: VillageSimulation = {
+    ...village,
+    knowledge: [...village.knowledge, knowledge.id],
+    lastDecision: `Truyền đạt ${knowledge.label} cho cộng đồng`,
+  }
+  const simulation = appendEvent(
+    { ...state, villages: state.villages.map((candidate) => candidate.id === village.id ? educatedVillage : candidate) },
+    {
+      kind: `knowledge-${knowledge.id}`,
+      title: `Tri thức: ${knowledge.label}`,
+      detail: `${village.name} tiếp nhận ${knowledge.label}. ${knowledge.summary}`,
+      tone: 'good',
+    },
+  )
+  return { ok: true, simulation, knowledgeLabel: knowledge.label, assessment }
 }
 
 const GOD_TOOL_LABELS: Record<ToolId, string> = {

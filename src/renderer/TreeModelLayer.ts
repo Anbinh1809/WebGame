@@ -2,11 +2,11 @@ import * as THREE from 'three'
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js'
 import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js'
 import { assetsForPack } from '../assets/registry'
-import type { AssetManifestEntry, AssetPackQuality } from '../assets/types'
+import type { AssetManifestEntry, AssetModelRuntimeDefinition, AssetPackQuality } from '../assets/types'
 import type { DisposableResource } from './AssetPackManager'
 import type { EffectiveQuality } from './quality'
 
-interface InstancedTreePart {
+interface InstancedModelPart {
   mesh: THREE.InstancedMesh<THREE.BufferGeometry, THREE.Material | THREE.Material[]>
   localMatrix: THREE.Matrix4
 }
@@ -24,7 +24,7 @@ function collectMaterialTextures(material: THREE.Material, output: Set<THREE.Tex
   }
 }
 
-function cloneTreeMaterial(source: THREE.Material): THREE.Material {
+function cloneModelMaterial(source: THREE.Material): THREE.Material {
   const material = source.clone()
   if (material instanceof THREE.MeshStandardMaterial && /leaves/i.test(material.name)) {
     // Keep Poly Haven's authored BLEND treatment. The prior alpha-test shortcut
@@ -35,8 +35,8 @@ function cloneTreeMaterial(source: THREE.Material): THREE.Material {
   return material
 }
 
-function cloneTreeMaterials(source: THREE.Material | THREE.Material[]): THREE.Material | THREE.Material[] {
-  return Array.isArray(source) ? source.map(cloneTreeMaterial) : cloneTreeMaterial(source)
+function cloneModelMaterials(source: THREE.Material | THREE.Material[]): THREE.Material | THREE.Material[] {
+  return Array.isArray(source) ? source.map(cloneModelMaterial) : cloneModelMaterial(source)
 }
 
 function eachMaterial(material: THREE.Material | THREE.Material[], callback: (item: THREE.Material) => void): void {
@@ -49,7 +49,34 @@ function eachMaterial(material: THREE.Material | THREE.Material[], callback: (it
 
 /** A small, quality-aware cap keeps the real model from becoming a tile-count cost. */
 export function treeModelInstanceLimit(quality: EffectiveQuality, assetLimit: number): number {
-  const target = quality === 'low' ? 4 : quality === 'medium' ? 12 : 24
+  // Broad-canopy production meshes retain far more leaf geometry than the
+  // compact fallback. Their cap is deliberately a visual LOD, not a texture
+  // quality switch: one on Low, two on Medium, four on High.
+  if (assetLimit <= 4) {
+    const target = quality === 'low' ? 1 : quality === 'medium' ? 2 : 4
+    return Math.max(0, Math.min(assetLimit, target))
+  }
+  if (assetLimit <= 8) {
+    const target = quality === 'low' ? 1 : quality === 'medium' ? 4 : 8
+    return Math.max(0, Math.min(assetLimit, target))
+  }
+  const target = quality === 'low' ? 4 : quality === 'medium' ? 12 : quality === 'high' ? 24 : 36
+  return Math.max(0, Math.min(assetLimit, target))
+}
+
+/**
+ * Hero-scale environment models such as trees and shoreline rock formations
+ * are intentionally sparse. Their visual detail comes from the real model
+ * and texture pack, not from multiplying a dense mesh across every tile.
+ */
+export function sparseEnvironmentModelInstanceLimit(quality: EffectiveQuality, assetLimit: number): number {
+  const target = quality === 'low' ? 1 : quality === 'medium' ? 2 : quality === 'high' ? 3 : 4
+  return Math.max(0, Math.min(assetLimit, target))
+}
+
+/** Ferns are low-poly enough to make the forest floor feel populated without a tile-count cost. */
+export function groundCoverModelInstanceLimit(quality: EffectiveQuality, assetLimit: number): number {
+  const target = quality === 'low' ? 4 : quality === 'medium' ? 8 : quality === 'high' ? 12 : 16
   return Math.max(0, Math.min(assetLimit, target))
 }
 
@@ -58,30 +85,75 @@ export function canLoadTreeModel(textureSourceResolution: number): boolean {
   return textureSourceResolution >= 1024
 }
 
+function fallbackModelPacks(pack: AssetPackQuality): readonly AssetPackQuality[] {
+  if (pack === 'cinema-8k') return ['cinema-8k', 'desktop-4k', 'desktop-2k', 'web-1k']
+  return [pack]
+}
+
 export function treeModelAssetForPack(
   entries: readonly AssetManifestEntry[],
   pack: AssetPackQuality,
 ): AssetManifestEntry | undefined {
-  return assetsForPack(entries, pack).find((entry) => entry.runtime.kind === 'model' && entry.runtime.modelType === 'tree' && entry.runtime.modelVariant === 'forest')
+  for (const candidatePack of fallbackModelPacks(pack)) {
+    const models = assetsForPack(entries, candidatePack).filter((entry) => entry.runtime.kind === 'model' && entry.runtime.modelType === 'tree' && entry.runtime.modelVariant === 'forest')
+    const model = models.find((entry) => entry.polyHavenSlug === 'island_tree_01') ?? models[0]
+    if (model) return model
+  }
+  return undefined
+}
+
+export function rockModelAssetForPack(
+  entries: readonly AssetManifestEntry[],
+  pack: AssetPackQuality,
+): AssetManifestEntry | undefined {
+  for (const candidatePack of fallbackModelPacks(pack)) {
+    const models = assetsForPack(entries, candidatePack).filter((entry) => entry.runtime.kind === 'model' && entry.runtime.modelType === 'rock' && entry.runtime.modelVariant === 'formation')
+    const model = models.find((entry) => entry.polyHavenSlug === 'boulder_01') ?? models[0]
+    if (model) return model
+  }
+  return undefined
+}
+
+export function groundCoverModelAssetForPack(
+  entries: readonly AssetManifestEntry[],
+  pack: AssetPackQuality,
+): AssetManifestEntry | undefined {
+  for (const candidatePack of fallbackModelPacks(pack)) {
+    const model = assetsForPack(entries, candidatePack).find((entry) => entry.runtime.kind === 'model' && entry.runtime.modelType === 'groundCover' && entry.runtime.modelVariant === 'ground')
+    if (model) return model
+  }
+  return undefined
+}
+
+export function coastRockModelAssetForPack(
+  entries: readonly AssetManifestEntry[],
+  pack: AssetPackQuality,
+): AssetManifestEntry | undefined {
+  for (const candidatePack of fallbackModelPacks(pack)) {
+    const model = assetsForPack(entries, candidatePack).find((entry) => entry.runtime.kind === 'model' && entry.runtime.modelType === 'coastRock' && entry.runtime.modelVariant === 'coast')
+    if (model) return model
+  }
+  return undefined
 }
 
 /**
  * One shared geometry/material set is instanced for every selected tree. The
  * layer owns its GLTF GPU resources and is safe to detach during a pack swap.
  */
-export class InstancedTreeModelLayer implements DisposableResource {
+export class InstancedModelLayer implements DisposableResource {
   private readonly group = new THREE.Group()
   private readonly combinedMatrix = new THREE.Matrix4()
   private attachedScene: THREE.Scene | undefined
   private disposed = false
 
   public constructor(
-    private readonly parts: readonly InstancedTreePart[],
+    private readonly parts: readonly InstancedModelPart[],
     public readonly maximumInstances: number,
     public readonly worldScale: number,
     public readonly minimumSpacing: number,
+    name = 'polyhaven-instanced-model',
   ) {
-    this.group.name = 'polyhaven-tree-small-02-instanced'
+    this.group.name = name
     for (const part of parts) {
       part.mesh.castShadow = true
       part.mesh.receiveShadow = true
@@ -137,10 +209,10 @@ export class InstancedTreeModelLayer implements DisposableResource {
   }
 }
 
-/** Loads only the preprocessed Aetheria GLB; it never contacts Poly Haven at runtime. */
-export async function loadInstancedTreeModel(asset: AssetManifestEntry): Promise<InstancedTreeModelLayer> {
-  if (asset.runtime.kind !== 'model' || asset.runtime.modelType !== 'tree') {
-    throw new Error(`${asset.id} is not a tree model asset.`)
+/** Loads only a preprocessed Aetheria GLB; it never contacts Poly Haven at runtime. */
+async function loadInstancedModel(asset: AssetManifestEntry, expectedType: AssetModelRuntimeDefinition['modelType']): Promise<InstancedModelLayer> {
+  if (asset.runtime.kind !== 'model' || asset.runtime.modelType !== expectedType) {
+    throw new Error(`${asset.id} is not a ${expectedType} model asset.`)
   }
   const file = asset.runtime.files.find((candidate) => candidate.role === 'model')
   if (!file) throw new Error(`${asset.id} is missing its model runtime file.`)
@@ -150,7 +222,7 @@ export async function loadInstancedTreeModel(asset: AssetManifestEntry): Promise
   const gltf = await loader.loadAsync(file.path)
   gltf.scene.updateMatrixWorld(true)
 
-  const parts: InstancedTreePart[] = []
+  const parts: InstancedModelPart[] = []
   const sourceGeometries = new Set<THREE.BufferGeometry>()
   const sourceMaterials = new Set<THREE.Material>()
   gltf.scene.traverse((node) => {
@@ -158,7 +230,7 @@ export async function loadInstancedTreeModel(asset: AssetManifestEntry): Promise
     sourceGeometries.add(node.geometry)
     eachMaterial(node.material, (material) => sourceMaterials.add(material))
     const geometry = node.geometry.clone()
-    const material = cloneTreeMaterials(node.material)
+    const material = cloneModelMaterials(node.material)
     const mesh = new THREE.InstancedMesh(geometry, material, asset.runtimeBudget.maxInstances)
     mesh.name = `${asset.id}-${parts.length}`
     parts.push({ mesh, localMatrix: node.matrixWorld.clone() })
@@ -167,10 +239,27 @@ export async function loadInstancedTreeModel(asset: AssetManifestEntry): Promise
   for (const geometry of sourceGeometries) geometry.dispose()
   for (const material of sourceMaterials) material.dispose()
   if (parts.length === 0) throw new Error(`${asset.id} contains no renderable mesh.`)
-  return new InstancedTreeModelLayer(
+  return new InstancedModelLayer(
     parts,
     asset.runtimeBudget.maxInstances,
     asset.runtime.worldScale,
     asset.runtime.minimumSpacing,
+    `polyhaven-${asset.id}-instanced`,
   )
+}
+
+export function loadInstancedTreeModel(asset: AssetManifestEntry): Promise<InstancedModelLayer> {
+  return loadInstancedModel(asset, 'tree')
+}
+
+export function loadInstancedRockModel(asset: AssetManifestEntry): Promise<InstancedModelLayer> {
+  return loadInstancedModel(asset, 'rock')
+}
+
+export function loadInstancedGroundCoverModel(asset: AssetManifestEntry): Promise<InstancedModelLayer> {
+  return loadInstancedModel(asset, 'groundCover')
+}
+
+export function loadInstancedCoastRockModel(asset: AssetManifestEntry): Promise<InstancedModelLayer> {
+  return loadInstancedModel(asset, 'coastRock')
 }

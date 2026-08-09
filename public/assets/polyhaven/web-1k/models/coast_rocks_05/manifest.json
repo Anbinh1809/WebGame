@@ -1,0 +1,66 @@
+{
+  "schemaVersion": 1,
+  "asset": {
+    "id": "coast-rocks-05",
+    "slug": "coast_rocks_05",
+    "license": "CC0-1.0",
+    "attribution": "Poly Haven — coast_rocks_05 (CC0 1.0)",
+    "sourceUrl": "https://polyhaven.com/a/coast_rocks_05"
+  },
+  "pack": "web-1k",
+  "textureSourceResolution": "1k",
+  "sourceCache": ".asset-cache/polyhaven-models/coast_rocks_05/1k",
+  "sourceFiles": [
+    {
+      "path": "coast_rocks_05_1k.gltf",
+      "sourceUrl": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/1k/coast_rocks_05/coast_rocks_05_1k.gltf",
+      "sourceMd5": "4d4e9186fe053d2385913fd2bf7eddd9",
+      "sourceChecksum": "sha256:4b5e97d42b4d9e1999ee5961922adc6b5d81f4aad34219915def7975bb2a8eb7",
+      "sourceBytes": 2821
+    },
+    {
+      "path": "textures/coast_rocks_05_arm_1k.jpg",
+      "sourceUrl": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/coast_rocks_05/coast_rocks_05_arm_1k.jpg",
+      "sourceMd5": "e1254e9d26745f5d06e7a266a1231360",
+      "sourceChecksum": "sha256:26b851f13a6e00500440d964393bee8aa1865660777c05b9082bdb12c43a23b6",
+      "sourceBytes": 893696
+    },
+    {
+      "path": "coast_rocks_05.bin",
+      "sourceUrl": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/8k/coast_rocks_05/coast_rocks_05.bin",
+      "sourceMd5": "9d4e639dd13128e96335a5d9828b3f47",
+      "sourceChecksum": "sha256:c46b19d62dd5d42d5f03bc7508e22fdc00ec88fa197b4fdf8db8e40929ea13cc",
+      "sourceBytes": 22102224
+    },
+    {
+      "path": "textures/coast_rocks_05_nor_gl_1k.jpg",
+      "sourceUrl": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/coast_rocks_05/coast_rocks_05_nor_gl_1k.jpg",
+      "sourceMd5": "e5f4c65b6fafd54885044cb25a783265",
+      "sourceChecksum": "sha256:5d32e03ea42abc05dd913e7ead4e915d9d60f27c8942f75128a87f84e7baee9d",
+      "sourceBytes": 1327762
+    },
+    {
+      "path": "textures/coast_rocks_05_diff_1k.jpg",
+      "sourceUrl": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/coast_rocks_05/coast_rocks_05_diff_1k.jpg",
+      "sourceMd5": "f2b66bad46855efa031e21aa392f4349",
+      "sourceChecksum": "sha256:2ec4ec09422a14d55cc890ad902486cf76df8e663688fbc32f78a15684646ee1",
+      "sourceBytes": 954605
+    }
+  ],
+  "sourceBytes": 25281108,
+  "runtimeBytes": 3852388,
+  "variants": [
+    {
+      "id": "coast-lod1",
+      "simplifyRatio": 0.14,
+      "simplifyError": 0.003,
+      "textureSize": 1024,
+      "intendedUse": "instanced coastal rock detail",
+      "maxInstances": 12,
+      "path": "/assets/polyhaven/web-1k/models/coast_rocks_05/coast_rocks_05_coast-lod1.glb",
+      "processedPath": "public/assets/polyhaven/web-1k/models/coast_rocks_05/coast_rocks_05_coast-lod1.glb",
+      "processedChecksum": "sha256:c36272ea0fea3a6aa9572b28564ef6a9b5481be37ad6193d92c62f51cabec1d3",
+      "processedBytes": 3852388
+    }
+  ]
+}

@@ -29,15 +29,29 @@ export function validateAssetManifest(entries: readonly AssetManifestEntry[]): A
       errors.push(`${entry.id}: runtime budget không hợp lệ.`)
     }
     const runtimeFiles = entry.runtime.files
-    if (entry.runtime.kind === 'model' && (
-      entry.runtime.modelType !== 'tree'
-      || !entry.runtime.modelVariant
-      || entry.runtime.worldScale <= 0
-      || entry.runtime.minimumSpacing <= 0
-      || runtimeFiles.length !== 1
-      || runtimeFiles[0]?.role !== 'model'
-    )) {
-      errors.push(`${entry.id}: invalid tree model runtime.`)
+    if (entry.runtime.kind === 'model') {
+      const runtime = entry.runtime
+      const validTree = runtime.modelType === 'tree'
+        && runtime.surface === 'foliage'
+        && (runtime.modelVariant === 'forest' || runtime.modelVariant === 'hero')
+      const validRock = runtime.modelType === 'rock'
+        && runtime.surface === 'terrainRock'
+        && runtime.modelVariant === 'formation'
+      const validGroundCover = runtime.modelType === 'groundCover'
+        && runtime.surface === 'foliage'
+        && runtime.modelVariant === 'ground'
+      const validCoastRock = runtime.modelType === 'coastRock'
+        && runtime.surface === 'terrainSand'
+        && runtime.modelVariant === 'coast'
+      if (
+        (!validTree && !validRock && !validGroundCover && !validCoastRock)
+        || runtime.worldScale <= 0
+        || runtime.minimumSpacing <= 0
+        || runtimeFiles.length !== 1
+        || runtimeFiles[0]?.role !== 'model'
+      ) {
+        errors.push(`${entry.id}: invalid model runtime.`)
+      }
     }
     if (runtimeFiles.length === 0 || runtimeFiles.some((file) => !file.path.startsWith('/assets/polyhaven/') || !file.path.trim())) {
       errors.push(`${entry.id}: runtime files phải là asset Poly Haven đóng gói cục bộ.`)

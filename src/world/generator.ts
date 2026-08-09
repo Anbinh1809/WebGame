@@ -147,7 +147,7 @@ function chooseVillageSite(tiles: Tile[], config: WorldConfig, seed: number): Vi
 
 export function normalizeWorldConfig(config: WorldConfig): WorldConfig {
   const cleanSeed = config.seed.trim().slice(0, 64) || 'aetheria-bình-minh'
-  const cleanSize = Math.round(clamp(config.size, 18, 52))
+  const cleanSize = Math.round(clamp(config.size, 18, 64))
 
   return {
     ...config,

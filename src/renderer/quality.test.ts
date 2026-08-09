@@ -1,12 +1,23 @@
 import { describe, expect, it } from 'vitest'
-import { canApplyAutoQualityChange, capQualityForMobile, effectiveQualityFor, qualityForProfileChange, qualitySettings, waterSegmentsFor } from './quality'
+import {
+  canApplyAutoQualityChange,
+  capQualityForMobile,
+  createGraphicsQualityOverrides,
+  effectiveQualityFor,
+  qualityForProfileChange,
+  qualitySettings,
+  resolveGraphicsQuality,
+  waterSegmentsFor,
+} from './quality'
 
 describe('render quality profiles', () => {
   it('uses bounded DPR profiles and lowers auto quality under sustained low FPS', () => {
     expect(qualitySettings('low').maxDpr).toBe(0.8)
     expect(qualitySettings('medium').maxDpr).toBe(1.25)
     expect(qualitySettings('high').maxDpr).toBe(2)
+    expect(qualitySettings('ultra').shadowMapSize).toBe(4096)
     expect(qualitySettings('low').rainDropCount).toBeLessThan(qualitySettings('high').rainDropCount)
+    expect(qualitySettings('high').rainDropCount).toBeLessThan(qualitySettings('ultra').rainDropCount)
     expect(qualitySettings('low').groundDetailDensity).toBe(0)
     expect(qualitySettings('low').vegetationDensity).toBeLessThan(qualitySettings('medium').vegetationDensity)
     expect(effectiveQualityFor('auto', 32, 'high')).toBe('low')
@@ -15,6 +26,7 @@ describe('render quality profiles', () => {
 
   it('caps compact viewports and uses a cooldown before auto changes quality again', () => {
     expect(capQualityForMobile('high', true)).toBe('medium')
+    expect(capQualityForMobile('ultra', true)).toBe('medium')
     expect(capQualityForMobile('high', false)).toBe('high')
     expect(canApplyAutoQualityChange(2_999, 0)).toBe(false)
     expect(canApplyAutoQualityChange(3_000, 0)).toBe(true)
@@ -30,6 +42,14 @@ describe('render quality profiles', () => {
     expect(waterSegmentsFor('low', 36)).toBe(9)
     expect(waterSegmentsFor('medium', 36)).toBe(20)
     expect(waterSegmentsFor('high', 36)).toBe(36)
+    expect(waterSegmentsFor('ultra', 36)).toBe(47)
     expect(waterSegmentsFor('low', Number.NaN)).toBe(6)
+  })
+
+  it('lets individual graphics sections inherit or override the global quality', () => {
+    const overrides = createGraphicsQualityOverrides({ shadows: 'ultra', water: 'low' })
+    expect(resolveGraphicsQuality(overrides.scene, 'high')).toBe('high')
+    expect(resolveGraphicsQuality(overrides.shadows, 'low')).toBe('ultra')
+    expect(resolveGraphicsQuality(overrides.water, 'ultra')).toBe('low')
   })
 })

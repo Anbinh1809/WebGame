@@ -68,7 +68,12 @@ const PACK_RESOLUTION: Record<AssetPackQuality, 1024 | 2048 | 4096 | 8192> = {
 
 function isSupported(pack: AssetPackQuality, capabilities: AssetPackCapabilities): boolean {
   if (capabilities.maxTextureSize < PACK_RESOLUTION[pack]) return false
-  return pack !== 'cinema-8k' || (capabilities.estimatedVramMiB ?? 0) >= 12_288
+  // Browsers do not expose reliable dedicated-VRAM telemetry. A known low
+  // value blocks 8K; otherwise the explicit desktop choice may attempt a
+  // bounded load and fall back safely if the GPU rejects it.
+  return pack !== 'cinema-8k'
+    || capabilities.estimatedVramMiB === undefined
+    || capabilities.estimatedVramMiB >= 12_288
 }
 
 function desktopFallback(request: AssetPackRequest, originalRequestedPack = request.requestedPack): AssetPackSelection {
@@ -129,7 +134,15 @@ export function resolveAssetPack(request: AssetPackRequest): AssetPackSelection 
   }
 
   if (request.requestedPack === 'cinema-8k') {
-    if (!request.entitlements.cinema8k) return desktopFallback({ ...request, requestedPack: 'desktop-4k' }, request.requestedPack)
+    if (!request.entitlements.cinema8k) {
+      const fallback = desktopFallback({ ...request, requestedPack: 'desktop-4k' }, request.requestedPack)
+      return {
+        ...fallback,
+        reason: fallback.selectedPack === 'procedural'
+          ? 'Cinema 8K requires a verified purchase; no eligible local fallback is available.'
+          : `Cinema 8K requires a verified purchase; using ${fallback.selectedPack} instead.`,
+      }
+    }
     if (!request.availability['cinema-8k'] || !isSupported('cinema-8k', request.capabilities)) return desktopFallback({ ...request, requestedPack: 'desktop-4k' }, request.requestedPack)
     return {
       requestedPack: request.requestedPack,

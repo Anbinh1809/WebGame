@@ -30,7 +30,7 @@ export function ToolDock({ activeTool, onToolChange, onUndo, onRedo, canUndo, ca
           <span className="eyebrow">Quyền năng</span>
           <h2 id="tools-heading">Nắn thế giới</h2>
         </div>
-        <div className="history-actions" aria-label="Lịch sử thao tác">
+        <div className="history-actions" role="group" aria-label="Lịch sử thao tác">
           <button type="button" className="icon-button" onClick={onUndo} disabled={!canUndo} aria-label="Hoàn tác thao tác gần nhất">
             ↶
           </button>

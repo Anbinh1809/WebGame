@@ -4,9 +4,12 @@ import { FullscreenButton } from './FullscreenButton'
 import { GameDrawer } from './GameDrawer'
 
 describe('HUD accessibility components', () => {
-  it('renders a labelled drawer with a close control', () => {
+  it('renders a labelled modal drawer with a close control', () => {
     const markup = renderToStaticMarkup(<GameDrawer id="world-controls-drawer" label="Điều khiển thế giới" side="left" onClose={() => undefined}><button type="button">Nội dung</button></GameDrawer>)
-    expect(markup).toContain('aria-label="Điều khiển thế giới"')
+    expect(markup).toContain('role="dialog"')
+    expect(markup).toContain('aria-modal="true"')
+    expect(markup).toContain('aria-labelledby="world-controls-drawer-title"')
+    expect(markup).toContain('id="world-controls-drawer-title"')
     expect(markup).toContain('aria-label="Đóng Điều khiển thế giới"')
   })
 

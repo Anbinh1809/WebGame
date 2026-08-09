@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { advanceSimulation, createSimulation, isHabitableTile, MAX_ADVANCE_TICKS, recordGodToolUse, resolveCouncilDecision, spawnSettlersAt, toggleSimulationPause, triggerStorm } from './engine'
+import { advanceSimulation, createSimulation, developVillageTool, isHabitableTile, MAX_ADVANCE_TICKS, recordGodToolUse, resolveCouncilDecision, spawnSettlersAt, submitVillageKnowledge, toggleSimulationPause, triggerStorm } from './engine'
 import { MAX_SIMULATION_TICK } from './types'
 import { generateWorld } from '../world/generator'
 import type { WorldConfig } from '../world/types'
@@ -121,5 +121,51 @@ describe('simulation engine', () => {
     expect(resolved.pendingCouncil).toBeUndefined()
     expect(resolved.villages[0]!.resilience).toBeGreaterThan(storm.villages[0]!.resilience)
     expect(resolved.villages[0]!.food).toBeLessThan(storm.villages[0]!.food)
+  })
+
+  it('requires an ordered research and food investment before a village changes era', () => {
+    const world = generateWorld(config)
+    const initial = createSimulation(world)
+    const blocked = developVillageTool(initial)
+    expect(blocked.ok).toBe(false)
+
+    const prepared = {
+      ...initial,
+      villages: initial.villages.map((village) => ({ ...village, research: 999, food: 999 })),
+    }
+    const firstCraft = developVillageTool(prepared)
+    expect(firstCraft.ok).toBe(true)
+    if (!firstCraft.ok) return
+    expect(firstCraft.simulation.villages[0]!.tools).toEqual(['stone-handaxe', 'flint-axe'])
+    expect(firstCraft.simulation.villages[0]!.era).toBe('Làng Gỗ')
+    expect(firstCraft.simulation.events[0]?.title).toBe('Bước vào Làng gỗ')
+
+    let progressed = firstCraft.simulation
+    while (true) {
+      const next = developVillageTool(progressed)
+      if (!next.ok) break
+      progressed = next.simulation
+    }
+    expect(progressed.villages[0]!.tools).toHaveLength(7)
+    expect(progressed.villages[0]!.era).toBe('Thị Trấn')
+  })
+
+  it('only applies player-taught knowledge after a deterministic era and capability assessment', () => {
+    const world = generateWorld(config)
+    const initial = createSimulation(world)
+    const accepted = submitVillageKnowledge(initial, 'Giữ lửa và hong khô')
+    expect(accepted.ok).toBe(true)
+    if (!accepted.ok) return
+
+    expect(accepted.simulation.villages[0]!.knowledge).toEqual(['fire-stewardship'])
+    expect(accepted.simulation.events[0]?.title).toBe('Tri thức: Giữ lửa và hong khô')
+    const baseline = advanceSimulation(initial, world, 8)
+    const taught = advanceSimulation(accepted.simulation, world, 8)
+    expect(taught.villages[0]!.resilience).toBeGreaterThan(baseline.villages[0]!.resilience)
+
+    const tooEarly = submitVillageKnowledge(initial, 'Dẫn nước ruộng')
+    expect(tooEarly.ok).toBe(false)
+    if (!tooEarly.ok) expect(tooEarly.assessment.status).toBe('too-advanced')
+    expect(submitVillageKnowledge(initial, 'máy tính').ok).toBe(false)
   })
 })

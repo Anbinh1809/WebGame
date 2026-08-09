@@ -1,5 +1,7 @@
 import type { AssetManifestEntry, AssetMaterialSurface } from './types'
+import { WEB_ENVIRONMENT_MODEL_ASSET_MANIFEST } from './environmentModelManifest'
 import { WEB_MODEL_ASSET_MANIFEST } from './modelManifest'
+import { WEB_ROCK_MODEL_ASSET_MANIFEST } from './rockModelManifest'
 
 const TEXTURE_LODS = [
   { id: 'lod0', triangles: 0, available: true },
@@ -63,7 +65,7 @@ export const ASSET_MANIFEST: readonly AssetManifestEntry[] = [
   materialAsset({ id: 'terrain-grass', surface: 'terrainGrass', slug: 'aerial_grass_rock', biome: 'đồng cỏ', useCase: 'grassland and hill terrain material', repeat: [5, 5], sourceChecksum: 'sha256:4dce476c07ab33662677931be5cd89aa97c07a11811b2be348242410e54631b3', processedChecksum: 'sha256:9f61bd8b9cd47c0f0babf7d453379214f12aba28e825e5ac17b81c8c69c1a366', sourceBytes: 1_933_825, runtimeBytes: 996_438, maxInstances: 1, residentMiB: 7 }),
   materialAsset({ id: 'terrain-forest', surface: 'terrainForest', slug: 'forest_floor', biome: 'rừng', useCase: 'forest terrain material', repeat: [5, 5], sourceChecksum: 'sha256:75ac642e50407f617a5861e6825718906a81aadab0b7c4bbed00fe813f22f69b', processedChecksum: 'sha256:c526057d41a5f9d7e19bf98bab855c18d729c43d7d72189864ed738729da1fa7', sourceBytes: 3_446_310, runtimeBytes: 1_491_898, maxInstances: 1, residentMiB: 7 }),
   materialAsset({ id: 'terrain-rock', surface: 'terrainRock', slug: 'rocky_terrain_02', biome: 'núi', useCase: 'rocky terrain and instanced rocks', repeat: [4, 4], sourceChecksum: 'sha256:1f01f979b11afb74fb3cf378303199f52aa3562e0a29e563da37eb7d791a93ba', processedChecksum: 'sha256:410a028d43724a2dde19d73c9e931f988ac976ec3e1026d086cc407de5fb7c37', sourceBytes: 2_273_974, runtimeBytes: 794_484, maxInstances: 220, residentMiB: 7 }),
-  materialAsset({ id: 'terrain-sand', surface: 'terrainSand', slug: 'coast_sand_02', biome: 'bờ cát', useCase: 'coastal terrain material', repeat: [5, 5], sourceChecksum: 'sha256:b8860426e9a99e8ecc900bc679ed7a8304789c0877124972c11ef0ed31c5f5ad', processedChecksum: 'sha256:683436b2a3a9df49df0d13917882a52f94a926f7e4cac7a500725a507d3855e2', sourceBytes: 2_517_211, runtimeBytes: 952_816, maxInstances: 1, residentMiB: 7 }),
+  materialAsset({ id: 'terrain-sand', surface: 'terrainSand', slug: 'coast_sand_02', biome: 'bờ cát', useCase: 'coastal terrain material with close-up grain detail', repeat: [10, 10], sourceChecksum: 'sha256:b8860426e9a99e8ecc900bc679ed7a8304789c0877124972c11ef0ed31c5f5ad', processedChecksum: 'sha256:683436b2a3a9df49df0d13917882a52f94a926f7e4cac7a500725a507d3855e2', sourceBytes: 2_517_211, runtimeBytes: 952_816, maxInstances: 1, residentMiB: 7 }),
   materialAsset({ id: 'terrain-snow', surface: 'terrainSnow', slug: 'snow_02', biome: 'tuyết', useCase: 'snow terrain material', repeat: [5, 5], sourceChecksum: 'sha256:b4468ca12d04b3e741b6d079919c4f36566026b1b52e16514b4c3d7bc5f23b2f', processedChecksum: 'sha256:f79321279cd9cefbaef9f0d44ecc5738064767048419f40a41b66f2e0525fb18', sourceBytes: 1_553_444, runtimeBytes: 702_060, maxInstances: 1, residentMiB: 6 }),
   materialAsset({ id: 'tree-foliage', surface: 'foliage', slug: 'leafy_grass', biome: 'rừng', useCase: 'reserved ground-cover foliage material', repeat: [1, 2], sourceChecksum: 'sha256:e58e88dde01a477193ee7cc3fb401667486743f8c582f128d181f18857a00311', processedChecksum: 'sha256:fc709f2347dc8ec26fa4a22ad0cd0980e0323bd309b0846a4266dd5d6ea7bc93', sourceBytes: 3_172_828, runtimeBytes: 1_270_028, maxInstances: 240, residentMiB: 6, preload: false }),
   materialAsset({ id: 'tree-bark', surface: 'trunk', slug: 'bark_brown_02', biome: 'rừng', useCase: 'instanced tree trunks', repeat: [2, 3], sourceChecksum: 'sha256:22da29a30787fe800872b6fda050891e8f12ea33bc8f90f45b31df48e9393cb8', processedChecksum: 'sha256:7a0cdb0ce941f250648dd1e7d12e39e3bd7bf30eeff0099dfa6d18c338774836', sourceBytes: 2_013_161, runtimeBytes: 1_019_964, maxInstances: 240, residentMiB: 6 }),
@@ -71,6 +73,10 @@ export const ASSET_MANIFEST: readonly AssetManifestEntry[] = [
   materialAsset({ id: 'settlement-roof', surface: 'roof', slug: 'roof_slates_02', biome: 'settlement', useCase: 'procedural roofs', repeat: [2, 2], sourceChecksum: 'sha256:a68c16ebe24cd412a17aa33919c201c42bd153bab7e3f74e6ac29193746b1829', processedChecksum: 'sha256:79c29f13cd3ab02cd94c07c9574cac3322e296c33d9d6b97390926c58aac9511', sourceBytes: 1_585_908, runtimeBytes: 814_034, maxInstances: 48, residentMiB: 6 }),
   materialAsset({ id: 'farm-soil', surface: 'farm', slug: 'brown_mud_dry', biome: 'settlement', useCase: 'procedural farms', repeat: [2, 2], sourceChecksum: 'sha256:5d2abe74da432dffbcc46cb9629a477083e5b9b18653c55b555386128d74387b', processedChecksum: 'sha256:7bf097a9ea5dce8a58de582cec2e23b34c3d1cd247ef299943296bff184aff52', sourceBytes: 2_849_933, runtimeBytes: 1_478_624, maxInstances: 64, residentMiB: 5 }),
   materialAsset({ id: 'road-gravel', surface: 'road', slug: 'gravel_ground_01', biome: 'settlement', useCase: 'procedural roads', repeat: [2, 4], sourceChecksum: 'sha256:26779b49e344c591c5d9447c5bce621b0e295efcc9325a9f0a186816a44506f4', processedChecksum: 'sha256:cf7ab9897bdd8a85fae6223baf83608487211dec5801689a9eb815a49de29867', sourceBytes: 2_648_174, runtimeBytes: 1_351_678, maxInstances: 48, residentMiB: 6 }),
+  materialAsset({ id: 'era-thatch-roof', surface: 'thatchRoof', slug: 'thatch_roof_angled', biome: 'stone-age', useCase: 'primitive hut roofs after the first crafted axe', repeat: [2, 2], sourceChecksum: 'sha256:33b7afd4985d8e03da624daa5f28266d0fe8952e1f3161321950d3b5c388db2a', processedChecksum: 'sha256:08bcb0c410b37f73e23937a4d5ee1aa056bf8b50ce99e7fb0ded5aa4c49ef3fc', sourceBytes: 2_727_215, runtimeBytes: 1_062_238, maxInstances: 48, residentMiB: 5, preload: false }),
+  materialAsset({ id: 'era-workshop-wood', surface: 'workshopWood', slug: 'wooden_rough_planks', biome: 'wood-age', useCase: 'instanced wood workshops after the first crafted axe', repeat: [2, 2], sourceChecksum: 'sha256:ef5bcb8c3188e7a401d4343d129e43b360584880b32f0ab9b95805762e758ee9', processedChecksum: 'sha256:190d6fcab1c960b7ce0cb93557d5ef22940d5fb07b9c245de94a24ce8e709529', sourceBytes: 1_411_441, runtimeBytes: 904_196, maxInstances: 24, residentMiB: 5, preload: false }),
+  materialAsset({ id: 'era-metalwork', surface: 'metalwork', slug: 'metal_plate', biome: 'metal-age', useCase: 'instanced copper and iron forges after metallurgy', repeat: [2, 2], sourceChecksum: 'sha256:8112695d6f874b1ec6650cbd3e6496b9742d551989b93b179f3d76da2514ceb5', processedChecksum: 'sha256:3502dd8f7dd133310f578ebcacb90255ebdbf4e91f93c5523bfac58b662621d8', sourceBytes: 2_237_747, runtimeBytes: 769_736, maxInstances: 24, residentMiB: 6, preload: false }),
+  materialAsset({ id: 'era-stonework', surface: 'stonework', slug: 'medieval_blocks_03', biome: 'town', useCase: 'instanced town halls after ironworking', repeat: [2, 2], sourceChecksum: 'sha256:492f9b5f01acd92f1603a277785df69722764bfc9523568cf199f40fabc7ff19', processedChecksum: 'sha256:cc5be4abfcdb6588ea16fe4127c0486cb5076b444b1f275e30ca0b49c4c680e9', sourceBytes: 2_767_745, runtimeBytes: 1_091_000, maxInstances: 12, residentMiB: 7, preload: false }),
   {
     id: 'environment-kloppenheim-web-1k',
     biome: 'global',
@@ -88,9 +94,30 @@ export const ASSET_MANIFEST: readonly AssetManifestEntry[] = [
     lods: TEXTURE_LODS,
     fallback: 'procedural',
     runtimeBudget: { maxInstances: 1, residentMiB: 8, preload: true, intendedUse: 'PMREM environment lighting' },
-    runtime: { kind: 'environment', surface: 'environment', files: [{ role: 'environment', path: '/assets/polyhaven/web-1k/kloppenheim_02/environment.hdr', colorSpace: 'linear' }] },
+    runtime: { kind: 'environment', surface: 'environment', environmentRole: 'lighting', files: [{ role: 'environment', path: '/assets/polyhaven/web-1k/kloppenheim_02/environment.hdr', colorSpace: 'linear' }] },
   },
+  {
+    id: 'environment-cloud-layers-web-1k',
+    biome: 'global',
+    useCase: 'detailed equirectangular cloud background after /play',
+    deterministicVariants: ['cloud_layers'],
+    provider: 'polyhaven',
+    polyHavenSlug: 'cloud_layers',
+    sourceUrl: 'https://polyhaven.com/a/cloud_layers',
+    license: 'CC0-1.0',
+    attribution: 'Poly Haven — cloud_layers (CC0 1.0)',
+    sourceChecksum: 'sha256:2e9ecdc551bd08e71e05b526ba4defe0664d315070027e72eda94b2ffb1a2655',
+    processedChecksum: 'sha256:2e9ecdc551bd08e71e05b526ba4defe0664d315070027e72eda94b2ffb1a2655',
+    pack: 'web-1k',
+    fileSizes: { sourceBytes: 1_744_648, processedBytes: 1_744_648, runtimeBytes: 1_744_648 },
+    lods: TEXTURE_LODS,
+    fallback: 'procedural',
+    runtimeBudget: { maxInstances: 1, residentMiB: 18, preload: false, intendedUse: 'detailed equirectangular cloud background after /play' },
+    runtime: { kind: 'environment', surface: 'environment', environmentRole: 'sky', files: [{ role: 'environment', path: '/assets/polyhaven/web-1k/cloud_layers/environment.hdr', colorSpace: 'linear' }] },
+  },
+  ...WEB_ENVIRONMENT_MODEL_ASSET_MANIFEST,
   ...WEB_MODEL_ASSET_MANIFEST,
+  ...WEB_ROCK_MODEL_ASSET_MANIFEST,
 ]
 
 export const POLY_HAVEN_CREDIT = 'Các asset Poly Haven được dùng theo CC0/public-domain. Người chơi mua game, tích hợp kỹ thuật, pack đã tối ưu và nội dung Aetheria — không mua quyền sở hữu độc quyền đối với asset nguồn.'

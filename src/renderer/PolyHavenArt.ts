@@ -11,6 +11,19 @@ export type PolyHavenMaterialTargets = Partial<Record<MaterialSurface, readonly 
 export interface PolyHavenArtTargets {
   scene: THREE.Scene
   materials: PolyHavenMaterialTargets
+  /** The world owns its sky mesh; this callback swaps only its local texture. */
+  setSkyTexture?: (texture: THREE.Texture | undefined) => void
+}
+
+export interface PolyHavenArtLoadOptions {
+  /** Deferred material maps are loaded only when their gameplay visual becomes visible. */
+  includeDeferred?: boolean
+  /** Secondary material scopes must not replace the primary HDR environment. */
+  loadEnvironment?: boolean
+}
+
+export interface ClearPolyHavenArtOptions {
+  clearEnvironment?: boolean
 }
 
 interface LoadedMaterial {
@@ -47,6 +60,8 @@ export class PolyHavenArtBundle implements DisposableResource {
   public constructor(
     private readonly loadedMaterials: readonly LoadedMaterial[],
     private readonly environmentTarget: THREE.WebGLRenderTarget | undefined,
+    private readonly skyTexture: THREE.Texture | undefined,
+    private readonly appliesEnvironment = true,
   ) {}
 
   public apply(targets: PolyHavenArtTargets): void {
@@ -59,7 +74,10 @@ export class PolyHavenArtBundle implements DisposableResource {
         material.needsUpdate = true
       }
     }
-    targets.scene.environment = this.environmentTarget?.texture ?? null
+    if (this.appliesEnvironment) {
+      targets.scene.environment = this.environmentTarget?.texture ?? null
+      targets.setSkyTexture?.(this.skyTexture)
+    }
   }
 
   public dispose(): void {
@@ -71,14 +89,15 @@ export class PolyHavenArtBundle implements DisposableResource {
     }
     for (const texture of textures) texture.dispose()
     this.environmentTarget?.dispose()
+    this.skyTexture?.dispose()
   }
 }
 
 export function createProceduralArtFallback(): PolyHavenArtBundle {
-  return new PolyHavenArtBundle([], undefined)
+  return new PolyHavenArtBundle([], undefined, undefined)
 }
 
-export function clearPolyHavenArt(targets: PolyHavenArtTargets): void {
+export function clearPolyHavenArt(targets: PolyHavenArtTargets, options: ClearPolyHavenArtOptions = {}): void {
   const materials = new Set<THREE.MeshStandardMaterial>()
   for (const surfaceMaterials of Object.values(targets.materials)) {
     for (const material of surfaceMaterials ?? []) materials.add(material)
@@ -90,7 +109,10 @@ export function clearPolyHavenArt(targets: PolyHavenArtTargets): void {
     material.normalScale.setScalar(1)
     material.needsUpdate = true
   }
-  targets.scene.environment = null
+  if (options.clearEnvironment !== false) {
+    targets.scene.environment = null
+    targets.setSkyTexture?.(undefined)
+  }
 }
 
 /**
@@ -102,14 +124,18 @@ export async function loadPolyHavenArt(
   targets: PolyHavenArtTargets,
   entries: readonly AssetManifestEntry[],
   pack: AssetPackQuality,
+  options: PolyHavenArtLoadOptions = {},
 ): Promise<PolyHavenArtBundle> {
   const textureLoader = new THREE.TextureLoader()
   const maxAnisotropy = renderer.capabilities.getMaxAnisotropy()
   const loadedMaterials: LoadedMaterial[] = []
   let environmentTarget: THREE.WebGLRenderTarget | undefined
+  let skyTexture: THREE.Texture | undefined
 
   try {
-    for (const entry of assetsForPack(entries, pack)) {
+    const availableEntries = assetsForPack(entries, pack)
+      .filter((entry) => options.includeDeferred || entry.runtimeBudget.preload || (entry.runtime.kind === 'environment' && entry.runtime.environmentRole === 'sky'))
+    for (const entry of availableEntries) {
       if (entry.runtime.kind !== 'material') continue
       const surface = entry.runtime.surface
       if (surface === 'environment') continue
@@ -123,10 +149,14 @@ export async function loadPolyHavenArt(
       loadedMaterials.push({ materials: targetsForSurface, albedo, normal, roughness })
     }
 
-    const environment = assetsForPack(entries, pack).find((entry) => entry.runtime.kind === 'environment')
-    if (environment) {
+    const environments = options.loadEnvironment === false
+      ? []
+      : availableEntries.filter((entry) => entry.runtime.kind === 'environment')
+    const lightingEnvironment = environments.find((entry) => entry.runtime.kind === 'environment' && entry.runtime.environmentRole !== 'sky')
+    const visibleSky = environments.find((entry) => entry.runtime.kind === 'environment' && entry.runtime.environmentRole === 'sky')
+    if (lightingEnvironment) {
       const hdrLoader = new HDRLoader()
-      const hdrTexture = await hdrLoader.loadAsync(requiredFile(environment, 'environment').path)
+      const hdrTexture = await hdrLoader.loadAsync(requiredFile(lightingEnvironment, 'environment').path)
       const pmremGenerator = new THREE.PMREMGenerator(renderer)
       try {
         pmremGenerator.compileEquirectangularShader()
@@ -137,9 +167,16 @@ export async function loadPolyHavenArt(
       }
     }
 
-    return new PolyHavenArtBundle(loadedMaterials, environmentTarget)
+    if (visibleSky) {
+      const hdrLoader = new HDRLoader()
+      skyTexture = await hdrLoader.loadAsync(requiredFile(visibleSky, 'environment').path)
+      skyTexture.mapping = THREE.EquirectangularReflectionMapping
+      skyTexture.needsUpdate = true
+    }
+
+    return new PolyHavenArtBundle(loadedMaterials, environmentTarget, skyTexture, options.loadEnvironment !== false)
   } catch (error) {
-    new PolyHavenArtBundle(loadedMaterials, environmentTarget).dispose()
+    new PolyHavenArtBundle(loadedMaterials, environmentTarget, skyTexture, options.loadEnvironment !== false).dispose()
     throw error
   }
 }

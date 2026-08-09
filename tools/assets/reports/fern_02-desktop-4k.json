@@ -1,0 +1,66 @@
+{
+  "schemaVersion": 1,
+  "asset": {
+    "id": "fern-02",
+    "slug": "fern_02",
+    "license": "CC0-1.0",
+    "attribution": "Poly Haven — fern_02 (CC0 1.0)",
+    "sourceUrl": "https://polyhaven.com/a/fern_02"
+  },
+  "pack": "desktop-4k",
+  "textureSourceResolution": "4k",
+  "sourceCache": ".asset-cache/polyhaven-models/fern_02/4k",
+  "sourceFiles": [
+    {
+      "path": "fern_02_4k.gltf",
+      "sourceUrl": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/4k/fern_02/fern_02_4k.gltf",
+      "sourceMd5": "10425c45145273a2899b8cc585592d2e",
+      "sourceChecksum": "sha256:7d5d458d4be38edceff922586234fa906377db5257e66d7cdde34b37e79788f7",
+      "sourceBytes": 6899
+    },
+    {
+      "path": "textures/fern_02_diff_4k.jpg",
+      "sourceUrl": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/4k/fern_02/fern_02_diff_4k.jpg",
+      "sourceMd5": "07642c942fe65ae5b03b212398ba7004",
+      "sourceChecksum": "sha256:f924354b032fcde77830b0c33c4dff80b4b143f793e70126894788f199b61960",
+      "sourceBytes": 3025392
+    },
+    {
+      "path": "textures/fern_02_nor_gl_4k.jpg",
+      "sourceUrl": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/4k/fern_02/fern_02_nor_gl_4k.jpg",
+      "sourceMd5": "1a35f2135cd71a64a255406b11f988a2",
+      "sourceChecksum": "sha256:14125a030e3fab96f52343215a65167ea46bcabae4bdef3444ba8ae22cb05e41",
+      "sourceBytes": 5058951
+    },
+    {
+      "path": "fern_02.bin",
+      "sourceUrl": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/8k/fern_02/fern_02.bin",
+      "sourceMd5": "c061e9255f7d36ae9ce0e92ef3e100b2",
+      "sourceChecksum": "sha256:fe1abb762bcbbc7ad9e86925c8080437a62add257d9280e9142fdc85c226e64c",
+      "sourceBytes": 176176
+    },
+    {
+      "path": "textures/fern_02_arm_4k.jpg",
+      "sourceUrl": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/4k/fern_02/fern_02_arm_4k.jpg",
+      "sourceMd5": "37426a24b433a05fe3958acc34232ede",
+      "sourceChecksum": "sha256:0ccfb4d98966c0e69769e9ddd5be872e34bb1d2f8aece3aff6d42fd3e61f8f1c",
+      "sourceBytes": 2569142
+    }
+  ],
+  "sourceBytes": 10836560,
+  "runtimeBytes": 10711704,
+  "variants": [
+    {
+      "id": "ground-lod1",
+      "simplifyRatio": 0.24,
+      "simplifyError": 0.002,
+      "textureSize": 4096,
+      "intendedUse": "instanced ultra forest floor fern",
+      "maxInstances": 52,
+      "path": "models/fern_02/fern_02_ground-lod1.glb",
+      "processedPath": "desktop-packs/polyhaven/desktop-4k/models/fern_02/fern_02_ground-lod1.glb",
+      "processedChecksum": "sha256:1d6b98beb0fdc027175b7841d8a9c7da61727e759e99956457f4ad7b8bbc28f5",
+      "processedBytes": 10711704
+    }
+  ]
+}

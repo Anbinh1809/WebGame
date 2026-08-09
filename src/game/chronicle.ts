@@ -1,4 +1,5 @@
 import { seedToUint32 } from '../world/prng'
+import { villageEraLabel } from '../simulation/progression'
 import type { SimulationState, WorldObjectiveId } from '../simulation/types'
 import type { TerrainKind, ToolId, World } from '../world/types'
 
@@ -90,7 +91,7 @@ export function createChronicleDigest(world: World, simulation: SimulationState)
     version: 1,
     seed: cleanText(world.config.seed, 64),
     tick: simulation.tick,
-    era: cleanText(simulation.villages[0]?.era ?? 'Mầm lửa', 48),
+    era: cleanText(villageEraLabel(simulation.villages[0]?.era ?? 'Thời Đồ Đá'), 48),
     biome: primary?.biome ?? 'đồng cỏ',
     population,
     food,

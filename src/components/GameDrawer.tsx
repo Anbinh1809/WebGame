@@ -15,7 +15,13 @@ function focusableElements(container: HTMLElement): HTMLElement[] {
 }
 
 export function GameDrawer({ id, label, side, onClose, children }: GameDrawerProps): JSX.Element {
-  const drawerRef = useRef<HTMLElement>(null)
+  const drawerRef = useRef<HTMLDivElement>(null)
+  const onCloseRef = useRef(onClose)
+  const titleId = `${id}-title`
+
+  useEffect(() => {
+    onCloseRef.current = onClose
+  }, [onClose])
 
   useEffect(() => {
     const drawer = drawerRef.current
@@ -27,7 +33,7 @@ export function GameDrawer({ id, label, side, onClose, children }: GameDrawerPro
       if (event.key === 'Escape') {
         event.preventDefault()
         event.stopPropagation()
-        onClose()
+        onCloseRef.current()
         return
       }
       if (event.key !== 'Tab') return
@@ -47,15 +53,15 @@ export function GameDrawer({ id, label, side, onClose, children }: GameDrawerPro
 
     drawer.addEventListener('keydown', handleKeyDown)
     return () => drawer.removeEventListener('keydown', handleKeyDown)
-  }, [onClose])
+  }, [])
 
   return (
-    <aside ref={drawerRef} id={id} className={`game-drawer game-drawer-${side}`} aria-label={label} tabIndex={-1}>
+    <div ref={drawerRef} id={id} className={`game-drawer game-drawer-${side}`} role="dialog" aria-modal="true" aria-labelledby={titleId} tabIndex={-1}>
       <div className="drawer-topline">
-        <span>{label}</span>
+        <h2 id={titleId}>{label}</h2>
         <button type="button" className="icon-button" onClick={onClose} aria-label={`Đóng ${label}`}>×</button>
       </div>
       {children}
-    </aside>
+    </div>
   )
 }
