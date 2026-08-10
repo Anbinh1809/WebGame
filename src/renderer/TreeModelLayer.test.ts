@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { ASSET_MANIFEST } from '../assets/manifest'
 import { desktopEnvironmentModelEntries, WEB_ENVIRONMENT_MODEL_ASSET_MANIFEST } from '../assets/environmentModelManifest'
+import { desktopSettlementModelEntries, WEB_SETTLEMENT_MODEL_ASSET_MANIFEST } from '../assets/settlementModelManifest'
 import { desktopTreeModelEntries } from '../assets/modelManifest'
 import { desktopRockModelEntries } from '../assets/rockModelManifest'
 import { validateAssetManifest } from '../assets/registry'
@@ -10,6 +11,9 @@ import {
   groundCoverModelAssetForPack,
   groundCoverModelInstanceLimit,
   rockModelAssetForPack,
+  settlementLanternModelAssetForPack,
+  settlementPropModelInstanceLimit,
+  settlementStockpileModelAssetForPack,
   sparseEnvironmentModelInstanceLimit,
   treeModelAssetForPack,
   treeModelInstanceLimit,
@@ -51,6 +55,10 @@ describe('instanced Poly Haven tree selection', () => {
     expect(groundCoverModelInstanceLimit('medium', 72)).toBe(8)
     expect(groundCoverModelInstanceLimit('high', 72)).toBe(12)
     expect(groundCoverModelInstanceLimit('ultra', 72)).toBe(16)
+    expect(settlementPropModelInstanceLimit('low', 40)).toBe(1)
+    expect(settlementPropModelInstanceLimit('medium', 40)).toBe(2)
+    expect(settlementPropModelInstanceLimit('high', 40)).toBe(3)
+    expect(settlementPropModelInstanceLimit('ultra', 40)).toBe(4)
   })
 
   it('keeps desktop model paths outside the Web manifest and selects the wide forest variant over the photo hero', () => {
@@ -87,5 +95,21 @@ describe('instanced Poly Haven tree selection', () => {
     expect(groundCoverModelAssetForPack(desktopModels, 'cinema-8k')?.runtime.files[0]?.path).toBe('/assets/polyhaven/cinema-8k/models/fern_02/fern_02_ground-lod1.glb')
     expect(coastRockModelAssetForPack(desktopModels, 'cinema-8k')?.runtime.files[0]?.path).toBe('/assets/polyhaven/cinema-8k/models/coast_rocks_05/coast_rocks_05_coast-lod1.glb')
     expect(validateAssetManifest([...WEB_ENVIRONMENT_MODEL_ASSET_MANIFEST, ...desktopModels])).toEqual({ valid: true, errors: [] })
+  })
+
+  it('replaces village lanterns and workshop stockpiles with deferred local models in every pack', () => {
+    const lantern = settlementLanternModelAssetForPack(ASSET_MANIFEST, 'web-1k')
+    const stockpile = settlementStockpileModelAssetForPack(ASSET_MANIFEST, 'web-1k')
+    const desktopModels = desktopSettlementModelEntries('/assets/polyhaven')
+
+    expect(lantern?.polyHavenSlug).toBe('wooden_lantern_01')
+    expect(lantern?.runtime.kind === 'model' && lantern.runtime.modelType).toBe('settlementProp')
+    expect(lantern?.runtime.files[0]?.path).toBe('/assets/polyhaven/web-1k/models/wooden_lantern_01/wooden_lantern_01_lantern-lod1.glb')
+    expect(lantern?.runtimeBudget.preload).toBe(false)
+    expect(stockpile?.polyHavenSlug).toBe('wooden_barrels_01')
+    expect(stockpile?.runtime.files[0]?.path).toBe('/assets/polyhaven/web-1k/models/wooden_barrels_01/wooden_barrels_01_stockpile-lod1.glb')
+    expect(settlementLanternModelAssetForPack(desktopModels, 'desktop-4k')?.runtime.files[0]?.path).toBe('/assets/polyhaven/desktop-4k/models/wooden_lantern_01/wooden_lantern_01_lantern-lod1.glb')
+    expect(settlementStockpileModelAssetForPack(desktopModels, 'cinema-8k')?.runtime.files[0]?.path).toBe('/assets/polyhaven/cinema-8k/models/wooden_barrels_01/wooden_barrels_01_stockpile-lod1.glb')
+    expect(validateAssetManifest([...WEB_SETTLEMENT_MODEL_ASSET_MANIFEST, ...desktopModels])).toEqual({ valid: true, errors: [] })
   })
 })

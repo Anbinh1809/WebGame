@@ -21,6 +21,8 @@
     "assets:verify": "node tools/assets/verify-polyhaven-pack.mjs",
     "assets:verify:tree": "node tools/assets/verify-polyhaven-tree-model.mjs",
     "assets:verify:environment": "node tools/assets/verify-polyhaven-tree-model.mjs --asset environment",
+    "assets:verify:settlement": "node tools/assets/verify-polyhaven-tree-model.mjs --asset settlement",
+    "assets:verify:coast-structure": "node tools/assets/verify-polyhaven-tree-model.mjs --asset coast-structure",
     "assets:verify:jacaranda": "node tools/assets/verify-polyhaven-tree-model.mjs --asset jacaranda_tree",
     "assets:verify:rock-face": "node tools/assets/verify-polyhaven-tree-model.mjs --asset rock_face_01",
     "assets:verify:cinema-8k": "node tools/assets/verify-polyhaven-pack.mjs --pack cinema-8k",
@@ -36,9 +38,18 @@
     "assets:environment:web-1k": "node tools/assets/polyhaven-tree-model.mjs --asset island_tree_01 --pack web-1k && node tools/assets/polyhaven-tree-model.mjs --asset fern_02 --pack web-1k && node tools/assets/polyhaven-tree-model.mjs --asset coast_rocks_05 --pack web-1k && node tools/assets/polyhaven-tree-model.mjs --asset boulder_01 --pack web-1k",
     "assets:environment:desktop-2k": "node tools/assets/polyhaven-tree-model.mjs --asset island_tree_01 --pack desktop-2k && node tools/assets/polyhaven-tree-model.mjs --asset fern_02 --pack desktop-2k && node tools/assets/polyhaven-tree-model.mjs --asset coast_rocks_05 --pack desktop-2k && node tools/assets/polyhaven-tree-model.mjs --asset boulder_01 --pack desktop-2k",
     "assets:environment:desktop-4k": "node tools/assets/polyhaven-tree-model.mjs --asset island_tree_01 --pack desktop-4k && node tools/assets/polyhaven-tree-model.mjs --asset fern_02 --pack desktop-4k && node tools/assets/polyhaven-tree-model.mjs --asset coast_rocks_05 --pack desktop-4k && node tools/assets/polyhaven-tree-model.mjs --asset boulder_01 --pack desktop-4k",
-    "assets:environment:cinema-8k": "node tools/assets/polyhaven-tree-model.mjs --asset island_tree_01 --pack cinema-8k && node tools/assets/polyhaven-tree-model.mjs --asset fern_02 --pack cinema-8k && node tools/assets/polyhaven-tree-model.mjs --asset coast_rocks_05 --pack cinema-8k && node tools/assets/polyhaven-tree-model.mjs --asset boulder_01 --pack cinema-8k"
+    "assets:environment:cinema-8k": "node tools/assets/polyhaven-tree-model.mjs --asset island_tree_01 --pack cinema-8k && node tools/assets/polyhaven-tree-model.mjs --asset fern_02 --pack cinema-8k && node tools/assets/polyhaven-tree-model.mjs --asset coast_rocks_05 --pack cinema-8k && node tools/assets/polyhaven-tree-model.mjs --asset boulder_01 --pack cinema-8k",
+    "assets:settlement:web-1k": "node tools/assets/polyhaven-tree-model.mjs --asset wooden_lantern_01 --pack web-1k && node tools/assets/polyhaven-tree-model.mjs --asset wooden_barrels_01 --pack web-1k",
+    "assets:settlement:desktop-2k": "node tools/assets/polyhaven-tree-model.mjs --asset wooden_lantern_01 --pack desktop-2k && node tools/assets/polyhaven-tree-model.mjs --asset wooden_barrels_01 --pack desktop-2k",
+    "assets:settlement:desktop-4k": "node tools/assets/polyhaven-tree-model.mjs --asset wooden_lantern_01 --pack desktop-4k && node tools/assets/polyhaven-tree-model.mjs --asset wooden_barrels_01 --pack desktop-4k",
+    "assets:settlement:cinema-8k": "node tools/assets/polyhaven-tree-model.mjs --asset wooden_lantern_01 --pack cinema-8k && node tools/assets/polyhaven-tree-model.mjs --asset wooden_barrels_01 --pack cinema-8k",
+    "assets:coast-structure:web-1k": "node tools/assets/polyhaven-tree-model.mjs --asset modular_wooden_pier --pack web-1k",
+    "assets:coast-structure:desktop-2k": "node tools/assets/polyhaven-tree-model.mjs --asset modular_wooden_pier --pack desktop-2k",
+    "assets:coast-structure:desktop-4k": "node tools/assets/polyhaven-tree-model.mjs --asset modular_wooden_pier --pack desktop-4k",
+    "assets:coast-structure:cinema-8k": "node tools/assets/polyhaven-tree-model.mjs --asset modular_wooden_pier --pack cinema-8k"
   },
   "dependencies": {
+    "@fontsource/be-vietnam-pro": "^5.3.0",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
     "three": "^0.185.1"

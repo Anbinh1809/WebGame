@@ -221,6 +221,106 @@ const BOULDER_PACKS = {
   },
 }
 
+/**
+ * Village props use the same fully-local glTF pipeline as the landscape.
+ * Poly Haven has no character rigs or complete village buildings, but these
+ * two CC0 models replace the tiny primitive lantern and generic stockpile
+ * decoration with authored 3D meshes at every supported source resolution.
+ */
+const WOODEN_LANTERN_ASSET = {
+  id: 'wooden-lantern-01',
+  slug: 'wooden_lantern_01',
+  license: 'CC0-1.0',
+  attribution: 'Poly Haven — wooden_lantern_01 (CC0 1.0)',
+  sourceUrl: 'https://polyhaven.com/a/wooden_lantern_01',
+}
+
+const WOODEN_LANTERN_PACKS = {
+  'web-1k': {
+    resolution: '1k',
+    root: ['public', 'assets', 'polyhaven', 'web-1k', 'models', WOODEN_LANTERN_ASSET.slug],
+    variants: [{ id: 'lantern-lod1', simplifyRatio: 0.28, simplifyError: 0.0025, textureSize: 1024, intendedUse: 'instanced village lantern', maxInstances: 16 }],
+  },
+  'desktop-2k': {
+    resolution: '2k',
+    root: ['desktop-packs', 'polyhaven', 'desktop-2k', 'models', WOODEN_LANTERN_ASSET.slug],
+    variants: [{ id: 'lantern-lod1', simplifyRatio: 0.34, simplifyError: 0.002, textureSize: 2048, intendedUse: 'instanced desktop village lantern', maxInstances: 24 }],
+  },
+  'desktop-4k': {
+    resolution: '4k',
+    root: ['desktop-packs', 'polyhaven', 'desktop-4k', 'models', WOODEN_LANTERN_ASSET.slug],
+    variants: [{ id: 'lantern-lod1', simplifyRatio: 0.4, simplifyError: 0.0015, textureSize: 4096, intendedUse: 'instanced ultra village lantern', maxInstances: 32 }],
+  },
+  'cinema-8k': {
+    resolution: '8k',
+    root: ['desktop-packs', 'polyhaven', 'cinema-8k', 'models', WOODEN_LANTERN_ASSET.slug],
+    variants: [{ id: 'lantern-lod1', simplifyRatio: 0.46, simplifyError: 0.0012, textureSize: 8192, intendedUse: 'instanced cinema village lantern', maxInstances: 40 }],
+  },
+}
+
+const WOODEN_BARRELS_ASSET = {
+  id: 'wooden-barrels-01',
+  slug: 'wooden_barrels_01',
+  license: 'CC0-1.0',
+  attribution: 'Poly Haven — wooden_barrels_01 (CC0 1.0)',
+  sourceUrl: 'https://polyhaven.com/a/wooden_barrels_01',
+}
+
+const WOODEN_BARRELS_PACKS = {
+  'web-1k': {
+    resolution: '1k',
+    root: ['public', 'assets', 'polyhaven', 'web-1k', 'models', WOODEN_BARRELS_ASSET.slug],
+    variants: [{ id: 'stockpile-lod1', simplifyRatio: 0.2, simplifyError: 0.0025, textureSize: 1024, intendedUse: 'instanced village stockpile', maxInstances: 16 }],
+  },
+  'desktop-2k': {
+    resolution: '2k',
+    root: ['desktop-packs', 'polyhaven', 'desktop-2k', 'models', WOODEN_BARRELS_ASSET.slug],
+    variants: [{ id: 'stockpile-lod1', simplifyRatio: 0.26, simplifyError: 0.002, textureSize: 2048, intendedUse: 'instanced desktop village stockpile', maxInstances: 24 }],
+  },
+  'desktop-4k': {
+    resolution: '4k',
+    root: ['desktop-packs', 'polyhaven', 'desktop-4k', 'models', WOODEN_BARRELS_ASSET.slug],
+    variants: [{ id: 'stockpile-lod1', simplifyRatio: 0.32, simplifyError: 0.0015, textureSize: 4096, intendedUse: 'instanced ultra village stockpile', maxInstances: 32 }],
+  },
+  'cinema-8k': {
+    resolution: '8k',
+    root: ['desktop-packs', 'polyhaven', 'cinema-8k', 'models', WOODEN_BARRELS_ASSET.slug],
+    variants: [{ id: 'stockpile-lod1', simplifyRatio: 0.38, simplifyError: 0.0012, textureSize: 8192, intendedUse: 'instanced cinema village stockpile', maxInstances: 40 }],
+  },
+}
+
+/** A sparse coast structure gives the procedural waterline an authored 3D landmark. */
+const MODULAR_WOODEN_PIER_ASSET = {
+  id: 'modular-wooden-pier',
+  slug: 'modular_wooden_pier',
+  license: 'CC0-1.0',
+  attribution: 'Poly Haven — modular_wooden_pier (CC0 1.0)',
+  sourceUrl: 'https://polyhaven.com/a/modular_wooden_pier',
+}
+
+const MODULAR_WOODEN_PIER_PACKS = {
+  'web-1k': {
+    resolution: '1k',
+    root: ['public', 'assets', 'polyhaven', 'web-1k', 'models', MODULAR_WOODEN_PIER_ASSET.slug],
+    variants: [{ id: 'coast-dock-lod1', simplifyRatio: 0.04, simplifyError: 0.0025, textureSize: 1024, intendedUse: 'sparse coastal dock landmark', maxInstances: 6 }],
+  },
+  'desktop-2k': {
+    resolution: '2k',
+    root: ['desktop-packs', 'polyhaven', 'desktop-2k', 'models', MODULAR_WOODEN_PIER_ASSET.slug],
+    variants: [{ id: 'coast-dock-lod1', simplifyRatio: 0.05, simplifyError: 0.002, textureSize: 2048, intendedUse: 'sparse desktop coastal dock landmark', maxInstances: 8 }],
+  },
+  'desktop-4k': {
+    resolution: '4k',
+    root: ['desktop-packs', 'polyhaven', 'desktop-4k', 'models', MODULAR_WOODEN_PIER_ASSET.slug],
+    variants: [{ id: 'coast-dock-lod1', simplifyRatio: 0.06, simplifyError: 0.0015, textureSize: 4096, intendedUse: 'sparse ultra coastal dock landmark', maxInstances: 12 }],
+  },
+  'cinema-8k': {
+    resolution: '8k',
+    root: ['desktop-packs', 'polyhaven', 'cinema-8k', 'models', MODULAR_WOODEN_PIER_ASSET.slug],
+    variants: [{ id: 'coast-dock-lod1', simplifyRatio: 0.07, simplifyError: 0.0012, textureSize: 8192, intendedUse: 'sparse cinema coastal dock landmark', maxInstances: 16 }],
+  },
+}
+
 const CURATED_ASSETS = new Map([
   [ASSET.slug, { asset: ASSET, packs: PACKS }],
   [JACARANDA_ASSET.slug, { asset: JACARANDA_ASSET, packs: JACARANDA_PACKS }],
@@ -229,6 +329,9 @@ const CURATED_ASSETS = new Map([
   [FERN_ASSET.slug, { asset: FERN_ASSET, packs: FERN_PACKS }],
   [COAST_ROCKS_ASSET.slug, { asset: COAST_ROCKS_ASSET, packs: COAST_ROCKS_PACKS }],
   [BOULDER_ASSET.slug, { asset: BOULDER_ASSET, packs: BOULDER_PACKS }],
+  [WOODEN_LANTERN_ASSET.slug, { asset: WOODEN_LANTERN_ASSET, packs: WOODEN_LANTERN_PACKS }],
+  [WOODEN_BARRELS_ASSET.slug, { asset: WOODEN_BARRELS_ASSET, packs: WOODEN_BARRELS_PACKS }],
+  [MODULAR_WOODEN_PIER_ASSET.slug, { asset: MODULAR_WOODEN_PIER_ASSET, packs: MODULAR_WOODEN_PIER_PACKS }],
 ])
 
 function checksum(buffer) {

@@ -6,6 +6,7 @@ import {
   effectiveQualityFor,
   qualityForProfileChange,
   qualitySettings,
+  renderFrameIntervalMs,
   resolveGraphicsQuality,
   waterSegmentsFor,
 } from './quality'
@@ -36,6 +37,15 @@ describe('render quality profiles', () => {
     expect(qualityForProfileChange('auto', 'auto', 'low')).toBe('low')
     expect(qualityForProfileChange('auto', 'high', 'high')).toBe('low')
     expect(qualityForProfileChange('high', 'auto', 'low')).toBe('high')
+  })
+
+  it('gives expensive render work its own cadence', () => {
+    expect(renderFrameIntervalMs('auto', 'high')).toBeCloseTo(1000 / 60)
+    expect(renderFrameIntervalMs('high', 'medium')).toBeCloseTo(1000 / 45)
+    expect(renderFrameIntervalMs('ultra', 'ultra')).toBeCloseTo(1000 / 48)
+    expect(qualitySettings('medium').motionUpdateIntervalMs).toBeGreaterThan(qualitySettings('high').motionUpdateIntervalMs)
+    expect(qualitySettings('medium').shadowUpdateIntervalMs).toBeGreaterThan(qualitySettings('high').shadowUpdateIntervalMs)
+    expect(qualitySettings('high').shadowUpdateIntervalMs).toBeGreaterThan(qualitySettings('ultra').shadowUpdateIntervalMs)
   })
 
   it('reduces water mesh detail deterministically for low quality', () => {

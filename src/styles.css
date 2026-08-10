@@ -298,3 +298,96 @@ input.sr-only { width: 1px; min-width: 1px; height: 1px; min-height: 1px; paddin
 @media (max-width: 430px) and (orientation: portrait) { .hud-brand p { display: none; }.hud-status span:nth-child(2) { display: none; }.hud-brand { max-width: calc(100vw - 121px); }.world-stage { min-height: 100dvh; } }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { scroll-behavior: auto !important; transition-duration: 0.01ms !important; animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; } }
 @media (forced-colors: active) { .hud-brand, .game-drawer, .tool-dock, .panel-surface, .drawer-toggle, .marketing-feature-grid article, .marketing-offer-card, .marketing-table-wrap { border: 1px solid CanvasText; background: Canvas; color: CanvasText; }.primary-button, .secondary-button, .tool-button, .marketing-primary, .marketing-secondary { border: 1px solid CanvasText; } }
+
+
+/* Vietnamese-first typography and a higher-contrast game HUD refresh. */
+:root {
+  font-family: "Be Vietnam Pro", Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-kerning: normal;
+  line-height: 1.45;
+  --ink: #fff8e3;
+  --muted: #c2d4cc;
+  --panel: rgba(6, 24, 29, 0.92);
+  --panel-strong: rgba(5, 19, 24, 0.97);
+  --line: rgba(218, 239, 222, 0.28);
+  --radius: 16px;
+}
+
+body { letter-spacing: 0.005em; }
+button, input, select, textarea { font-family: inherit; }
+
+.hud-brand,
+.game-drawer,
+.tool-dock,
+.performance-badge,
+.quality-select,
+.asset-pack-badge,
+.player-profile-chip,
+.drawer-toggle,
+.map-instructions,
+.seed-readout {
+  border-color: rgba(224, 243, 226, 0.31);
+  box-shadow: 0 18px 48px rgba(0, 6, 10, 0.3);
+}
+
+.hud-brand {
+  gap: 12px;
+  padding: 11px 14px;
+  background: linear-gradient(135deg, rgba(13, 48, 54, 0.94), rgba(4, 20, 26, 0.75));
+}
+.brand-mark { font-family: "Be Vietnam Pro", ui-sans-serif, sans-serif; font-weight: 700; }
+.hud-brand h1,
+.panel-heading h2,
+.stat-grid strong,
+.fauna-roster h3,
+.progression-panel h3,
+.knowledge-panel h3,
+.objective-board h3,
+.council-decision h3,
+.chronicle-result p,
+.map-instructions strong,
+.webgl-fallback strong,
+.world-loading strong {
+  font-family: "Be Vietnam Pro", ui-sans-serif, sans-serif;
+  font-weight: 650;
+  letter-spacing: -0.012em;
+}
+.hud-brand p, .eyebrow { font-size: 0.68rem; letter-spacing: 0.14em; }
+.hud-brand h1 { font-size: 1.16rem; }
+.hud-status { gap: 6px 9px; font-size: 0.72rem; }
+
+.performance-badge, .quality-select, .asset-pack-badge, .player-profile-chip {
+  min-height: 36px;
+  padding: 7px 10px;
+  color: #f3fcf6;
+  background: rgba(5, 25, 31, 0.82);
+  font-size: 0.7rem;
+}
+.asset-pack-badge { color: #e5f2c7; }
+.drawer-toggle { min-height: 37px; padding: 8px 11px; font-size: 0.76rem; }
+.game-drawer { width: min(382px, calc(100vw - 24px)); padding: 14px; background: linear-gradient(145deg, rgba(16, 50, 55, 0.98), rgba(4, 19, 25, 0.98)); }
+.panel-surface { border-color: rgba(215, 237, 218, 0.24); background: rgba(2, 17, 22, 0.5); }
+.panel-heading h2 { font-size: 1.14rem; }
+.field-label, .range-field { font-size: 0.78rem; }
+input:not([type="range"]), select { min-height: 36px; padding: 7px 9px; }
+.primary-button, .secondary-button, .pause-button { min-height: 36px; font-size: 0.76rem; }
+.graphics-settings-intro, .graphics-settings-note,
+.player-account-copy, .player-account-privacy, .player-account-feedback,
+.decision-line, .lens-panel p, .muted-copy { font-size: 0.74rem; }
+.map-instructions { border-radius: 0 10px 10px 0; background: linear-gradient(90deg, rgba(4, 22, 27, 0.9), rgba(4, 22, 27, 0.32)); }
+.map-instructions span { font-size: 0.73rem; }
+
+@media (max-width: 760px) {
+  .hud-brand { gap: 8px; padding: 8px 10px; }
+  .hud-brand h1 { font-size: 0.96rem; }
+  .hud-status { font-size: 0.64rem; }
+  .quality-select { min-height: 34px; font-size: 0.64rem; }
+  .game-drawer { width: min(382px, calc(100vw - 20px)); padding: 12px; }
+  .panel-heading h2 { font-size: 1.05rem; }
+  .field-label, .range-field { font-size: 0.76rem; }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .hud-brand, .tool-dock { transition: box-shadow 180ms ease, border-color 180ms ease; }
+  .hud-brand:hover, .tool-dock:hover { border-color: rgba(255, 224, 145, 0.5); box-shadow: 0 20px 56px rgba(0, 6, 10, 0.4); }
+}

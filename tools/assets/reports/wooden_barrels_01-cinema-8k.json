@@ -1,0 +1,108 @@
+{
+  "schemaVersion": 1,
+  "asset": {
+    "id": "wooden-barrels-01",
+    "slug": "wooden_barrels_01",
+    "license": "CC0-1.0",
+    "attribution": "Poly Haven â€” wooden_barrels_01 (CC0 1.0)",
+    "sourceUrl": "https://polyhaven.com/a/wooden_barrels_01"
+  },
+  "pack": "cinema-8k",
+  "textureSourceResolution": "8k",
+  "sourceCache": ".asset-cache/polyhaven-models/wooden_barrels_01/8k",
+  "sourceFiles": [
+    {
+      "path": "wooden_barrels_01_8k.gltf",
+      "sourceUrl": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/8k/wooden_barrels_01/wooden_barrels_01_8k.gltf",
+      "sourceMd5": "3d3bdb0d883ca5ae52c268a81b31655c",
+      "sourceChecksum": "sha256:d07bdb6f461be17f3cac4968e7e1fa334344307e902255e0e6b4de9d9c5ef1c9",
+      "sourceBytes": 31017
+    },
+    {
+      "path": "textures/wooden_barrels_01_pieces_nor_gl_8k.jpg",
+      "sourceUrl": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/8k/wooden_barrels_01/wooden_barrels_01_pieces_nor_gl_8k.jpg",
+      "sourceMd5": "8ea5cf6c65ea38e9d243122039cc46eb",
+      "sourceChecksum": "sha256:9806a28ce2fe1ed00f3fcbf3617021706917cb4836b03527e7e78ee1d41652c1",
+      "sourceBytes": 33106320
+    },
+    {
+      "path": "textures/wooden_barrels_01_barrel01_diff_8k.jpg",
+      "sourceUrl": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/8k/wooden_barrels_01/wooden_barrels_01_barrel01_diff_8k.jpg",
+      "sourceMd5": "717105f0b0ea9f3d2d72134934d7c871",
+      "sourceChecksum": "sha256:8871da90125365db2adea13a4ca946cf127e1d86beb0b8167fc8e7506f5efb3c",
+      "sourceBytes": 31202336
+    },
+    {
+      "path": "textures/wooden_barrels_01_barrel01_nor_gl_8k.jpg",
+      "sourceUrl": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/8k/wooden_barrels_01/wooden_barrels_01_barrel01_nor_gl_8k.jpg",
+      "sourceMd5": "b62025f8fbc5b6b6b39fdd9d69a9765f",
+      "sourceChecksum": "sha256:b8945c9a8a01bd4ceb638abaae3f814f5f5cc31ae9a76f4a76591b5f90701353",
+      "sourceBytes": 31308687
+    },
+    {
+      "path": "textures/wooden_barrels_01_pieces_arm_8k.jpg",
+      "sourceUrl": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/8k/wooden_barrels_01/wooden_barrels_01_pieces_arm_8k.jpg",
+      "sourceMd5": "8619c028ae8c19d0eeb077f0ed170461",
+      "sourceChecksum": "sha256:a6e0e38d84c8b43fee08540fa80b317a88a1c2b728c3143251c034e6ed8f8110",
+      "sourceBytes": 41173474
+    },
+    {
+      "path": "wooden_barrels_01.bin",
+      "sourceUrl": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/8k/wooden_barrels_01/wooden_barrels_01.bin",
+      "sourceMd5": "6c1dbd45bc5f0b1e726a7343fae0fbdb",
+      "sourceChecksum": "sha256:7de8294b07ecb6bd57ea3542760fa45bbefc296a47dd044723eb599ffc56084f",
+      "sourceBytes": 1243556
+    },
+    {
+      "path": "textures/wooden_barrels_01_barrel02_arm_8k.jpg",
+      "sourceUrl": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/8k/wooden_barrels_01/wooden_barrels_01_barrel02_arm_8k.jpg",
+      "sourceMd5": "11a4d82a33887cb8403f090b55a44bf0",
+      "sourceChecksum": "sha256:02b29cc9521eb54cecf2ef4c2a9376b891cfa0fcd42351902a9bc4d862495d11",
+      "sourceBytes": 38239302
+    },
+    {
+      "path": "textures/wooden_barrels_01_barrel02_diff_8k.jpg",
+      "sourceUrl": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/8k/wooden_barrels_01/wooden_barrels_01_barrel02_diff_8k.jpg",
+      "sourceMd5": "e9b9aab5bb0794a243a9fea7d6fca778",
+      "sourceChecksum": "sha256:33b84ffbf1143c0c9322ab2cf0c49e3a8eb2ebbf07336086233a88e371b191a3",
+      "sourceBytes": 31647150
+    },
+    {
+      "path": "textures/wooden_barrels_01_barrel02_nor_gl_8k.jpg",
+      "sourceUrl": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/8k/wooden_barrels_01/wooden_barrels_01_barrel02_nor_gl_8k.jpg",
+      "sourceMd5": "4d65edd65e9dfbb9169e0e2ed19129f1",
+      "sourceChecksum": "sha256:1b9f8e18c37e36917855a653b7aecb6a794ba67f4caa64090a034efa705ff91c",
+      "sourceBytes": 31815025
+    },
+    {
+      "path": "textures/wooden_barrels_01_barrel01_arm_8k.jpg",
+      "sourceUrl": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/8k/wooden_barrels_01/wooden_barrels_01_barrel01_arm_8k.jpg",
+      "sourceMd5": "4b5eb7df75b66154a3249b40be88a4ae",
+      "sourceChecksum": "sha256:1b6148b88fc43fcc98698953abec25e894b02fdeaf774dd5e09369a860cfc48c",
+      "sourceBytes": 38441814
+    },
+    {
+      "path": "textures/wooden_barrels_01_pieces_diff_8k.jpg",
+      "sourceUrl": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/8k/wooden_barrels_01/wooden_barrels_01_pieces_diff_8k.jpg",
+      "sourceMd5": "23e81a185346a3e55f77bb2853a64e2b",
+      "sourceChecksum": "sha256:dad7e7f06747c9c577a9ee073984d7bcfbfa45c47a4f600a063abcc902781583",
+      "sourceBytes": 33204819
+    }
+  ],
+  "sourceBytes": 311413500,
+  "runtimeBytes": 310456676,
+  "variants": [
+    {
+      "id": "stockpile-lod1",
+      "simplifyRatio": 0.38,
+      "simplifyError": 0.0012,
+      "textureSize": 8192,
+      "intendedUse": "instanced cinema village stockpile",
+      "maxInstances": 40,
+      "path": "models/wooden_barrels_01/wooden_barrels_01_stockpile-lod1.glb",
+      "processedPath": "desktop-packs/polyhaven/cinema-8k/models/wooden_barrels_01/wooden_barrels_01_stockpile-lod1.glb",
+      "processedChecksum": "sha256:8142d861e087cbe8e7f592e8c53c3a52ec2a4b7160972a71cefe320e8ff60de5",
+      "processedBytes": 310456676
+    }
+  ]
+}

@@ -1,0 +1,87 @@
+{
+  "schemaVersion": 1,
+  "asset": {
+    "id": "wooden-lantern-01",
+    "slug": "wooden_lantern_01",
+    "license": "CC0-1.0",
+    "attribution": "Poly Haven â€” wooden_lantern_01 (CC0 1.0)",
+    "sourceUrl": "https://polyhaven.com/a/wooden_lantern_01"
+  },
+  "pack": "desktop-2k",
+  "textureSourceResolution": "2k",
+  "sourceCache": ".asset-cache/polyhaven-models/wooden_lantern_01/2k",
+  "sourceFiles": [
+    {
+      "path": "wooden_lantern_01_2k.gltf",
+      "sourceUrl": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/2k/wooden_lantern_01/wooden_lantern_01_2k.gltf",
+      "sourceMd5": "e3d9a2c5ed27fffd16b1ac399cd72971",
+      "sourceChecksum": "sha256:6f92eae1fa0286ab2efa7a9ac39966fc7ae8ca71e27fdb01260c07bf9055656f",
+      "sourceBytes": 9540
+    },
+    {
+      "path": "textures/wooden_lantern_01_glass_arm_2k.jpg",
+      "sourceUrl": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/wooden_lantern_01/wooden_lantern_01_glass_arm_2k.jpg",
+      "sourceMd5": "ce281ac046731e51e6fd657ab985dff8",
+      "sourceChecksum": "sha256:be21ec21910483063763eb67ac5d64e9648297887c6ce65234f9f48afb1bb62c",
+      "sourceBytes": 2150139
+    },
+    {
+      "path": "textures/wooden_lantern_01_diff_2k.jpg",
+      "sourceUrl": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/wooden_lantern_01/wooden_lantern_01_diff_2k.jpg",
+      "sourceMd5": "7dca46f5007c610deebf328f61ff3886",
+      "sourceChecksum": "sha256:52273b03dda90f3e703e2a524817cf7c46b726e7a2011c84e1c02cb94ef8f777",
+      "sourceBytes": 2755465
+    },
+    {
+      "path": "textures/wooden_lantern_01_nor_gl_2k.jpg",
+      "sourceUrl": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/wooden_lantern_01/wooden_lantern_01_nor_gl_2k.jpg",
+      "sourceMd5": "d18c12a952a698528bee57bf9662517b",
+      "sourceChecksum": "sha256:375040c774f89483879b5790923c843749d30955be219109243bc031fa96cf65",
+      "sourceBytes": 3047934
+    },
+    {
+      "path": "textures/wooden_lantern_01_arm_2k.jpg",
+      "sourceUrl": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/wooden_lantern_01/wooden_lantern_01_arm_2k.jpg",
+      "sourceMd5": "aaf2b9c0c1b75f360d4680b21032e2b3",
+      "sourceChecksum": "sha256:91f36a21a9322d40aeb13b75d0d3e015f8c44b842b528369562c2dc1f7ddef68",
+      "sourceBytes": 3113676
+    },
+    {
+      "path": "textures/wooden_lantern_01_glass_nor_gl_2k.jpg",
+      "sourceUrl": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/wooden_lantern_01/wooden_lantern_01_glass_nor_gl_2k.jpg",
+      "sourceMd5": "6fb26883bdbdd7c543e2c3d7c062fd24",
+      "sourceChecksum": "sha256:6940dcd22bc21d0410838e432e4f66430bdb90a79576a61d2385850fab928efa",
+      "sourceBytes": 1029036
+    },
+    {
+      "path": "textures/wooden_lantern_01_glass_diff_2k.jpg",
+      "sourceUrl": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/2k/wooden_lantern_01/wooden_lantern_01_glass_diff_2k.jpg",
+      "sourceMd5": "1bb5f52db37aed590cfeba660dbb0ed6",
+      "sourceChecksum": "sha256:989446236405daa5251dca8126d68bbadb8d9aa17abf1dd3731e0abcccddd94a",
+      "sourceBytes": 1620643
+    },
+    {
+      "path": "wooden_lantern_01.bin",
+      "sourceUrl": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/8k/wooden_lantern_01/wooden_lantern_01.bin",
+      "sourceMd5": "3784667126369ce5c21db3c7436409cb",
+      "sourceChecksum": "sha256:65c6b1a776c66d4170dab3657f0809b1a8a88219507589d6c9aad70ffbe687a3",
+      "sourceBytes": 268136
+    }
+  ],
+  "sourceBytes": 13994569,
+  "runtimeBytes": 13771232,
+  "variants": [
+    {
+      "id": "lantern-lod1",
+      "simplifyRatio": 0.34,
+      "simplifyError": 0.002,
+      "textureSize": 2048,
+      "intendedUse": "instanced desktop village lantern",
+      "maxInstances": 24,
+      "path": "models/wooden_lantern_01/wooden_lantern_01_lantern-lod1.glb",
+      "processedPath": "desktop-packs/polyhaven/desktop-2k/models/wooden_lantern_01/wooden_lantern_01_lantern-lod1.glb",
+      "processedChecksum": "sha256:841ca93263415cc75b0c0830c8a45529b169f0a507d209e10049f0bb6bbf8497",
+      "processedBytes": 13771232
+    }
+  ]
+}

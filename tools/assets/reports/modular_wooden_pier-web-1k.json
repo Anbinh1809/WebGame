@@ -1,0 +1,87 @@
+{
+  "schemaVersion": 1,
+  "asset": {
+    "id": "modular-wooden-pier",
+    "slug": "modular_wooden_pier",
+    "license": "CC0-1.0",
+    "attribution": "Poly Haven â€” modular_wooden_pier (CC0 1.0)",
+    "sourceUrl": "https://polyhaven.com/a/modular_wooden_pier"
+  },
+  "pack": "web-1k",
+  "textureSourceResolution": "1k",
+  "sourceCache": ".asset-cache/polyhaven-models/modular_wooden_pier/1k",
+  "sourceFiles": [
+    {
+      "path": "modular_wooden_pier_1k.gltf",
+      "sourceUrl": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/1k/modular_wooden_pier/modular_wooden_pier_1k.gltf",
+      "sourceMd5": "5a5c75c7711b8804c680970a60bd382f",
+      "sourceChecksum": "sha256:eeea9853deb63e43510f8d9d6af21963c88adab77e17ccac9f9b8d3a7d34a923",
+      "sourceBytes": 21127
+    },
+    {
+      "path": "textures/modular_wooden_pier_poles_arm_1k.jpg",
+      "sourceUrl": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/modular_wooden_pier/modular_wooden_pier_poles_arm_1k.jpg",
+      "sourceMd5": "feb305e6fc0f59f48c57e0e5e591b637",
+      "sourceChecksum": "sha256:dacaff86f936bef10220aa60843efadae53039f064ad1a6fad735b912f1ba285",
+      "sourceBytes": 813524
+    },
+    {
+      "path": "modular_wooden_pier.bin",
+      "sourceUrl": "https://dl.polyhaven.org/file/ph-assets/Models/gltf/8k/modular_wooden_pier/modular_wooden_pier.bin",
+      "sourceMd5": "dbdbeca4676a3012a64b4daa75d1f97c",
+      "sourceChecksum": "sha256:6ec10b84aaaa02800b095850fc92cf850632e5becd76698dc6609f40f05e1b60",
+      "sourceBytes": 2651092
+    },
+    {
+      "path": "textures/modular_wooden_pier_planks_arm_1k.jpg",
+      "sourceUrl": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/modular_wooden_pier/modular_wooden_pier_planks_arm_1k.jpg",
+      "sourceMd5": "e6ffdf7314cc015aaa5c0899326b42a7",
+      "sourceChecksum": "sha256:4c03bcee7d0fb9708be5e5ebc4dd5fd73789f4eb24b6391dff6167f11c3ce95d",
+      "sourceBytes": 722511
+    },
+    {
+      "path": "textures/modular_wooden_pier_planks_diff_1k.jpg",
+      "sourceUrl": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/modular_wooden_pier/modular_wooden_pier_planks_diff_1k.jpg",
+      "sourceMd5": "f3fef39b0ec16e4006678c846d3601ab",
+      "sourceChecksum": "sha256:2670a7eae2a3104e8537e61d90a8d8b169c7eb0f69b51622bec10e9472dc4573",
+      "sourceBytes": 764066
+    },
+    {
+      "path": "textures/modular_wooden_pier_poles_diff_1k.jpg",
+      "sourceUrl": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/modular_wooden_pier/modular_wooden_pier_poles_diff_1k.jpg",
+      "sourceMd5": "7aade157e5892017ee86a6e13074b727",
+      "sourceChecksum": "sha256:da9e017b41e052d5e47558bb98e61b577f66e9d44eb2d26dc9b085e317bede9e",
+      "sourceBytes": 836152
+    },
+    {
+      "path": "textures/modular_wooden_pier_poles_nor_gl_1k.jpg",
+      "sourceUrl": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/modular_wooden_pier/modular_wooden_pier_poles_nor_gl_1k.jpg",
+      "sourceMd5": "2a6f536ed9057bb8e2a813b7755cc534",
+      "sourceChecksum": "sha256:9b2d7ca04642e249428969fa32189f36fcea8577a282dbccca1ac15d59dce18e",
+      "sourceBytes": 978238
+    },
+    {
+      "path": "textures/modular_wooden_pier_planks_nor_gl_1k.jpg",
+      "sourceUrl": "https://dl.polyhaven.org/file/ph-assets/Models/jpg/1k/modular_wooden_pier/modular_wooden_pier_planks_nor_gl_1k.jpg",
+      "sourceMd5": "b752108fe7504d5dd4ae0f4701b1218b",
+      "sourceChecksum": "sha256:b23d7b0c23c9a41d50b7e1691e183902765aa4c21ac6ca6da678e874c4ddfb04",
+      "sourceBytes": 1055218
+    }
+  ],
+  "sourceBytes": 7841928,
+  "runtimeBytes": 5294032,
+  "variants": [
+    {
+      "id": "coast-dock-lod1",
+      "simplifyRatio": 0.04,
+      "simplifyError": 0.0025,
+      "textureSize": 1024,
+      "intendedUse": "sparse coastal dock landmark",
+      "maxInstances": 6,
+      "path": "/assets/polyhaven/web-1k/models/modular_wooden_pier/modular_wooden_pier_coast-dock-lod1.glb",
+      "processedPath": "public/assets/polyhaven/web-1k/models/modular_wooden_pier/modular_wooden_pier_coast-dock-lod1.glb",
+      "processedChecksum": "sha256:a54baf98b9169c851615a9f632a329cc68a7992ccd3f373b8514ac704487bd26",
+      "processedBytes": 5294032
+    }
+  ]
+}

@@ -43,9 +43,9 @@ export interface AssetMaterialRuntimeDefinition {
 /** A mesh asset is curated separately from tileable PBR materials. */
 export interface AssetModelRuntimeDefinition {
   kind: 'model'
-  surface: 'foliage' | 'terrainRock' | 'terrainSand'
-  modelType: 'tree' | 'rock' | 'groundCover' | 'coastRock'
-  modelVariant: 'forest' | 'hero' | 'formation' | 'ground' | 'coast'
+  surface: 'foliage' | 'terrainRock' | 'terrainSand' | 'house'
+  modelType: 'tree' | 'rock' | 'groundCover' | 'coastRock' | 'settlementProp'
+  modelVariant: 'forest' | 'hero' | 'formation' | 'ground' | 'coast' | 'lantern' | 'stockpile'
   /** World-unit scale chosen during offline asset curation, never inferred from texture resolution. */
   worldScale: number
   /** Keeps deterministic instances from overlapping when an asset has a broad canopy. */

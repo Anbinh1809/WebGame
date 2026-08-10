@@ -12,6 +12,7 @@ import { desktopPackRoot, loadDesktopPackManifest } from '../assets/desktopPackM
 import { desktopEnvironmentModelEntries } from '../assets/environmentModelManifest'
 import { desktopTreeModelEntries } from '../assets/modelManifest'
 import { desktopRockModelEntries } from '../assets/rockModelManifest'
+import { desktopSettlementModelEntries } from '../assets/settlementModelManifest'
 import { assetsForPack } from '../assets/registry'
 import type { AssetManifestEntry, AssetMaterialSurface, AssetPackQuality } from '../assets/types'
 import { AssetPackManager } from './AssetPackManager'
@@ -21,6 +22,7 @@ import type { PolyHavenArtTargets } from './PolyHavenArt'
 import { FaunaLayer } from './FaunaLayer'
 import { SettlerLayer } from './SettlerLayer'
 import type { SettlerPlacement } from './SettlerLayer'
+import { AnimatedFaunaLayer, AnimatedSettlerLayer } from './AnimatedActorLayers'
 import {
   InstancedModelLayer,
   canLoadTreeModel,
@@ -29,8 +31,12 @@ import {
   loadInstancedCoastRockModel,
   loadInstancedGroundCoverModel,
   loadInstancedRockModel,
+  loadInstancedSettlementPropModel,
   loadInstancedTreeModel,
   rockModelAssetForPack,
+  settlementLanternModelAssetForPack,
+  settlementPropModelInstanceLimit,
+  settlementStockpileModelAssetForPack,
   treeModelAssetForPack,
   groundCoverModelInstanceLimit,
   sparseEnvironmentModelInstanceLimit,
@@ -43,6 +49,7 @@ import {
   GRAPHICS_QUALITY_COMPONENTS,
   qualityForProfileChange,
   qualitySettings,
+  renderFrameIntervalMs,
   resolveGraphicsQuality,
   waterSegmentsFor,
 } from './quality'
@@ -126,7 +133,8 @@ interface WaterRipple {
   phase: number
 }
 
-/** One pack resource owns PBR maps plus optional instanced environment models. */
+
+/** One pack resource owns PBR maps plus optional instanced environment and settlement models. */
 class WorldArtBundle {
   public constructor(
     private readonly materials: PolyHavenArtBundle,
@@ -134,21 +142,25 @@ class WorldArtBundle {
     public readonly rockLayer: InstancedModelLayer | undefined,
     public readonly groundCoverLayer: InstancedModelLayer | undefined,
     public readonly coastRockLayer: InstancedModelLayer | undefined,
+    public readonly lanternLayer: InstancedModelLayer | undefined,
+    public readonly stockpileLayer: InstancedModelLayer | undefined,
     public readonly treeFallback: boolean,
     public readonly rockFallback: boolean,
     public readonly groundCoverFallback: boolean,
     public readonly coastRockFallback: boolean,
+    public readonly lanternFallback: boolean,
+    public readonly stockpileFallback: boolean,
   ) {}
-
   public apply(targets: PolyHavenArtTargets): void {
     this.materials.apply(targets)
   }
-
   public dispose(): void {
     this.treeLayer?.dispose()
     this.rockLayer?.dispose()
     this.groundCoverLayer?.dispose()
     this.coastRockLayer?.dispose()
+    this.lanternLayer?.dispose()
+    this.stockpileLayer?.dispose()
     this.materials.dispose()
   }
 }
@@ -215,7 +227,7 @@ function createBeachDetailGeometry(): THREE.BufferGeometry {
   return merged
 }
 
-/** A compact tangent-space normal map makes the PBR water read as fine ripples at every quality tier. */
+/** A compact generated normal map supplies readable procedural water motion. */
 function createWaterNormalTexture(): THREE.DataTexture {
   const size = 128
   const data = new Uint8Array(size * size * 4)
@@ -265,10 +277,30 @@ function createWaterRippleGeometry(): THREE.TorusGeometry {
   return geometry
 }
 
+/** A compact bundle of barrel primitives gives workshops supplies without a model file. */
+function createWorkshopStockpileGeometry(): THREE.BufferGeometry {
+  const placements = [
+    [-0.11, 0.09, -0.035, 0.12],
+    [0.11, 0.09, 0.035, -0.16],
+    [0, 0.095, 0.1, 0.04],
+    [0.01, 0.245, 0, 0.22],
+  ] as const
+  const barrels = placements.map(([x, y, z, rotation]) => {
+    const barrel = new THREE.CylinderGeometry(0.085, 0.085, 0.24, 7)
+    barrel.rotateZ(Math.PI / 2)
+    barrel.rotateY(rotation)
+    barrel.translate(x, y, z)
+    return barrel
+  })
+  const merged = mergeGeometries(barrels, false)
+  for (const barrel of barrels) barrel.dispose()
+  if (!merged) throw new Error('Could not build the procedural workshop stockpile.')
+  return merged
+}
+
 function waterPlaneSize(size: number): number {
   return Math.max(2, (size - 1 + OCEAN_MARGIN_TILES * 2) * TILE_SCALE)
 }
-
 function waterNormalRepeat(waterSize: number): number {
   return Math.min(5, Math.max(3, waterSize / (TILE_SCALE * 45)))
 }
@@ -373,7 +405,6 @@ export interface RenderStats {
   assetPackReason: string
   assetLoadState: AssetLoadProgress['state']
 }
-
 export interface RendererCallbacks {
   onTileHover: (tile: HoveredTile | undefined) => void
   onTileActivate: (tileIndex: number) => void
@@ -479,18 +510,19 @@ export class WorldRenderer {
   }
   private readonly terrainHitMaterial = new THREE.MeshBasicMaterial({ colorWrite: false, depthWrite: false })
   private readonly waterNormalMap = createWaterNormalTexture()
-  private readonly waterMaterial = new THREE.MeshPhongMaterial({
+  private readonly waterMaterial = new THREE.MeshPhysicalMaterial({
     color: 0x1679ad,
-    specular: 0x8ad8ff,
-    shininess: 92,
     normalMap: this.waterNormalMap,
     normalScale: new THREE.Vector2(0.3, 0.24),
     emissive: 0x06263f,
     emissiveIntensity: 0.1,
+    roughness: 0.15,
+    metalness: 0.035,
+    clearcoat: 0.9,
+    clearcoatRoughness: 0.08,
   })
   private readonly treeGeometry = createStylizedCanopyGeometry()
-  // Distant canopies preserve the game's readable stylized silhouette while
-  // nearby, selected trees use the curated Poly Haven mesh.
+  // Deterministic low-poly trees are generated and instanced directly in the renderer.
   private readonly treeMaterial = new THREE.MeshStandardMaterial({ color: 0x4d7c42, flatShading: true, roughness: 0.9 })
   private readonly trunkGeometry = new THREE.CylinderGeometry(0.045, 0.062, 0.42, 5)
   private readonly trunkMaterial = new THREE.MeshStandardMaterial({ color: 0x62432c, flatShading: true, roughness: 0.94 })
@@ -518,6 +550,8 @@ export class WorldRenderer {
   private readonly roadMaterial = new THREE.MeshStandardMaterial({ color: 0x92795c, flatShading: true, roughness: 0.99 })
   private readonly workshopGeometry = new THREE.BoxGeometry(0.52, 0.34, 0.44)
   private readonly workshopMaterial = new THREE.MeshStandardMaterial({ color: 0x7a5138, flatShading: true, roughness: 0.88 })
+  private readonly stockpileGeometry = createWorkshopStockpileGeometry()
+  private readonly stockpileMaterial = new THREE.MeshStandardMaterial({ color: 0x8a5b32, flatShading: true, roughness: 0.92 })
   private readonly forgeGeometry = new THREE.CylinderGeometry(0.18, 0.23, 0.28, 6)
   private readonly forgeMaterial = new THREE.MeshStandardMaterial({ color: 0x6b6660, flatShading: true, roughness: 0.58, metalness: 0.38 })
   private readonly townHallGeometry = new THREE.BoxGeometry(0.74, 0.56, 0.64)
@@ -538,12 +572,14 @@ export class WorldRenderer {
   private polyHavenSkyTexture: THREE.Texture | undefined
   private readonly faunaLayer = new FaunaLayer(TILE_SCALE)
   private readonly settlerLayer = new SettlerLayer(TILE_SCALE, MAX_SETTLERS)
+  private readonly animatedFaunaLayer = new AnimatedFaunaLayer(TILE_SCALE)
+  private readonly animatedSettlerLayer = new AnimatedSettlerLayer(TILE_SCALE)
   /** Two vertices per drop make weather legible as rain streaks while retaining one draw call. */
   private readonly rainPositions = new Float32Array(MAX_RAIN_DROPS * 6)
   private terrainGroup!: THREE.Group
   private terrainHit!: THREE.Mesh<THREE.BufferGeometry, THREE.MeshBasicMaterial>
   private terrainSurfaces: Partial<Record<TerrainSurface, TerrainSurfaceMesh>> = {}
-  private water!: THREE.Mesh<THREE.PlaneGeometry, THREE.MeshPhongMaterial>
+  private water!: THREE.Mesh<THREE.PlaneGeometry, THREE.MeshPhysicalMaterial>
   private coastFoam!: THREE.InstancedMesh<THREE.PlaneGeometry, THREE.MeshBasicMaterial>
   private waterRippleMesh!: THREE.InstancedMesh<THREE.TorusGeometry, THREE.MeshBasicMaterial>
   private trees!: THREE.InstancedMesh
@@ -552,6 +588,8 @@ export class WorldRenderer {
   private rockModelLayer: InstancedModelLayer | undefined
   private groundCoverModelLayer: InstancedModelLayer | undefined
   private coastRockModelLayer: InstancedModelLayer | undefined
+  private lanternModelLayer: InstancedModelLayer | undefined
+  private stockpileModelLayer: InstancedModelLayer | undefined
   private rocks!: THREE.InstancedMesh
   private resources!: THREE.InstancedMesh
   private groundDetails!: THREE.InstancedMesh
@@ -562,6 +600,7 @@ export class WorldRenderer {
   private farms!: THREE.InstancedMesh
   private roads!: THREE.InstancedMesh
   private workshops!: THREE.InstancedMesh
+  private stockpiles!: THREE.InstancedMesh
   private forges!: THREE.InstancedMesh
   private townHalls!: THREE.InstancedMesh
   private lanterns!: THREE.InstancedMesh
@@ -576,9 +615,17 @@ export class WorldRenderer {
   private heatmap: HeatmapMode = 'địa hình'
   private tool: ToolId = 'raise'
   private elapsed = 0
+  /** Last fully rendered frame, distinct from browser callbacks skipped by the pacing budget. */
   private previousFrame = 0
+  private previousBrowserFrame = 0
+  private nextRenderAt = 0
+  private lastActorMotionAt = Number.NEGATIVE_INFINITY
+  private lastEnvironmentMotionAt = Number.NEGATIVE_INFINITY
+  private nextShadowUpdateAt = 0
   private statsElapsed = 0
   private framesSinceStats = 0
+  private browserStatsElapsed = 0
+  private browserFramesSinceStats = 0
   private lastHoverTime = 0
   private lastHoveredIndex: number | undefined
   private pointerDown: { x: number; y: number; pointerId: number } | undefined
@@ -586,6 +633,7 @@ export class WorldRenderer {
   private effectiveQuality: EffectiveQuality = 'medium'
   private graphicsOverrides: GraphicsQualityOverrides = createGraphicsQualityOverrides()
   private lastQualityChangeAt = 0
+  private settlementVisualKey = ''
   private waterWaveFrame = 0
   private waterSegments = 0
   private requestedAssetPack: AssetPackQuality | undefined
@@ -602,7 +650,8 @@ export class WorldRenderer {
   private rockModelFallback = false
   private groundCoverModelFallback = false
   private coastRockModelFallback = false
-
+  private lanternModelFallback = false
+  private stockpileModelFallback = false
   public constructor(
     private readonly host: HTMLElement,
     world: World,
@@ -698,7 +747,7 @@ export class WorldRenderer {
 
     this.writeTerrain()
     this.updateStaticInstances()
-    this.updateSettlementInstances()
+    this.updateSettlementInstances(true)
   }
 
   public updateSimulation(simulation: SimulationState): void {
@@ -723,6 +772,8 @@ export class WorldRenderer {
     this.effectiveQuality = this.capQualityForViewport(qualityForProfileChange(profile, previousProfile, this.effectiveQuality))
     // Auto begins at Low; the cooldown only governs later measured promotions or demotions.
     this.lastQualityChangeAt = profile === 'auto' ? 0 : performance.now()
+    this.nextRenderAt = 0
+    this.nextShadowUpdateAt = 0
     this.refreshQualityDependentScene()
   }
 
@@ -732,6 +783,8 @@ export class WorldRenderer {
     const unchanged = GRAPHICS_QUALITY_COMPONENTS.every((component) => next[component] === this.graphicsOverrides[component])
     if (unchanged) return
     this.graphicsOverrides = next
+    this.nextRenderAt = 0
+    this.nextShadowUpdateAt = 0
     this.refreshQualityDependentScene()
   }
 
@@ -748,7 +801,7 @@ export class WorldRenderer {
     this.setAssetPack(requestedPack)
   }
 
-  /** Web is hard-limited to 1K; desktop resolves installed 2K/4K manifests and entitled 8K safely. */
+  /** Web stays on 1K; desktop resolves local 2K, 4K, and entitled 8K packs safely. */
   public setAssetPack(requestedPack: AssetPackQuality): void {
     if (this.requestedAssetPack === requestedPack) return
     this.requestedAssetPack = requestedPack
@@ -757,9 +810,9 @@ export class WorldRenderer {
         ? ['cinema-8k', 'desktop-4k', 'desktop-2k'] as const
         : requestedPack === 'cinema-8k'
           ? ['desktop-4k', 'desktop-2k'] as const
-        : requestedPack === 'desktop-4k'
-          ? ['desktop-4k', 'desktop-2k'] as const
-          : ['desktop-2k'] as const
+          : requestedPack === 'desktop-4k'
+            ? ['desktop-4k', 'desktop-2k'] as const
+            : ['desktop-2k'] as const
       void Promise.allSettled(requestedDesktopPacks.map((pack) => loadDesktopPackManifest(pack))).then((results) => {
         if (this.isDisposed || this.requestedAssetPack !== requestedPack) return
         const desktopEntries = results.flatMap((result) => result.status === 'fulfilled' ? result.value : [])
@@ -768,8 +821,8 @@ export class WorldRenderer {
           ...desktopTreeModelEntries(desktopPackRoot()),
           ...desktopRockModelEntries(desktopPackRoot()),
           ...desktopEnvironmentModelEntries(desktopPackRoot()),
-        ]
-          .filter((entry) => availableDesktopPacks.some((pack) => pack === entry.pack))
+          ...desktopSettlementModelEntries(desktopPackRoot()),
+        ].filter((entry) => availableDesktopPacks.some((pack) => pack === entry.pack))
         this.applyAssetPack(requestedPack, [...ASSET_MANIFEST, ...desktopEntries, ...desktopModels])
       })
       return
@@ -786,6 +839,8 @@ export class WorldRenderer {
     this.detachRockModelLayer()
     this.detachGroundCoverModelLayer()
     this.detachCoastRockModelLayer()
+    this.detachLanternModelLayer()
+    this.detachStockpileModelLayer()
     this.hasPolyHavenTerrainArt = false
     this.refreshTerrainMaterialColoring()
     clearPolyHavenArt(this.polyHavenArtTargets)
@@ -808,67 +863,28 @@ export class WorldRenderer {
       {
         id: `polyhaven-${selectedPack}`,
         load: async () => {
-          const treeAsset = canLoadTreeModel(selection.textureSourceResolution)
-            ? treeModelAssetForPack(entries, selectedPack)
-            : undefined
-          const rockAsset = canLoadTreeModel(selection.textureSourceResolution)
-            ? rockModelAssetForPack(entries, selectedPack)
-            : undefined
-          const groundCoverAsset = canLoadTreeModel(selection.textureSourceResolution)
-            ? groundCoverModelAssetForPack(entries, selectedPack)
-            : undefined
-          const coastRockAsset = canLoadTreeModel(selection.textureSourceResolution)
-            ? coastRockModelAssetForPack(entries, selectedPack)
-            : undefined
-          const [materials, treeResult, rockResult, groundCoverResult, coastRockResult] = await Promise.all([
+          const canLoadModels = canLoadTreeModel(selection.textureSourceResolution)
+          const treeAsset = canLoadModels ? treeModelAssetForPack(entries, selectedPack) : undefined
+          const rockAsset = canLoadModels ? rockModelAssetForPack(entries, selectedPack) : undefined
+          const groundCoverAsset = canLoadModels ? groundCoverModelAssetForPack(entries, selectedPack) : undefined
+          const coastRockAsset = canLoadModels ? coastRockModelAssetForPack(entries, selectedPack) : undefined
+          const lanternAsset = canLoadModels ? settlementLanternModelAssetForPack(entries, selectedPack) : undefined
+          const stockpileAsset = canLoadModels ? settlementStockpileModelAssetForPack(entries, selectedPack) : undefined
+          const [materials, treeResult, rockResult, groundCoverResult, coastRockResult, lanternResult, stockpileResult] = await Promise.all([
             loadPolyHavenArt(this.renderer, this.polyHavenArtTargets, entries, selectedPack),
-            treeAsset
-              ? loadInstancedTreeModel(treeAsset)
-                .then((layer) => ({ layer, fallback: false }))
-                .catch(() => ({ layer: undefined, fallback: true }))
-              : Promise.resolve({ layer: undefined, fallback: true }),
-            rockAsset
-              ? loadInstancedRockModel(rockAsset)
-                .then((layer) => ({ layer, fallback: false }))
-                .catch(() => ({ layer: undefined, fallback: true }))
-              : Promise.resolve({ layer: undefined, fallback: true }),
-            groundCoverAsset
-              ? loadInstancedGroundCoverModel(groundCoverAsset)
-                .then((layer) => ({ layer, fallback: false }))
-                .catch(() => ({ layer: undefined, fallback: true }))
-              : Promise.resolve({ layer: undefined, fallback: true }),
-            coastRockAsset
-              ? loadInstancedCoastRockModel(coastRockAsset)
-                .then((layer) => ({ layer, fallback: false }))
-                .catch(() => ({ layer: undefined, fallback: true }))
-              : Promise.resolve({ layer: undefined, fallback: true }),
+            treeAsset ? loadInstancedTreeModel(treeAsset).then((layer) => ({ layer, fallback: false })).catch(() => ({ layer: undefined, fallback: true })) : Promise.resolve({ layer: undefined, fallback: true }),
+            rockAsset ? loadInstancedRockModel(rockAsset).then((layer) => ({ layer, fallback: false })).catch(() => ({ layer: undefined, fallback: true })) : Promise.resolve({ layer: undefined, fallback: true }),
+            groundCoverAsset ? loadInstancedGroundCoverModel(groundCoverAsset).then((layer) => ({ layer, fallback: false })).catch(() => ({ layer: undefined, fallback: true })) : Promise.resolve({ layer: undefined, fallback: true }),
+            coastRockAsset ? loadInstancedCoastRockModel(coastRockAsset).then((layer) => ({ layer, fallback: false })).catch(() => ({ layer: undefined, fallback: true })) : Promise.resolve({ layer: undefined, fallback: true }),
+            lanternAsset ? loadInstancedSettlementPropModel(lanternAsset).then((layer) => ({ layer, fallback: false })).catch(() => ({ layer: undefined, fallback: true })) : Promise.resolve({ layer: undefined, fallback: true }),
+            stockpileAsset ? loadInstancedSettlementPropModel(stockpileAsset).then((layer) => ({ layer, fallback: false })).catch(() => ({ layer: undefined, fallback: true })) : Promise.resolve({ layer: undefined, fallback: true }),
           ])
-          return new WorldArtBundle(
-            materials,
-            treeResult.layer,
-            rockResult.layer,
-            groundCoverResult.layer,
-            coastRockResult.layer,
-            treeResult.fallback,
-            rockResult.fallback,
-            groundCoverResult.fallback,
-            coastRockResult.fallback,
-          )
+          return new WorldArtBundle(materials, treeResult.layer, rockResult.layer, groundCoverResult.layer, coastRockResult.layer, lanternResult.layer, stockpileResult.layer, treeResult.fallback, rockResult.fallback, groundCoverResult.fallback, coastRockResult.fallback, lanternResult.fallback, stockpileResult.fallback)
         },
       },
       {
         id: 'procedural-art-fallback',
-        load: async () => new WorldArtBundle(
-          createProceduralArtFallback(),
-          undefined,
-          undefined,
-          undefined,
-          undefined,
-          true,
-          true,
-          true,
-          true,
-        ),
+        load: async () => new WorldArtBundle(createProceduralArtFallback(), undefined, undefined, undefined, undefined, undefined, undefined, true, true, true, true, true, true),
       },
     ).then((result) => {
       if (this.isDisposed || artLoadRevision !== this.artLoadRevision) {
@@ -881,24 +897,30 @@ export class WorldRenderer {
       this.rockModelLayer = result.value.rockLayer
       this.groundCoverModelLayer = result.value.groundCoverLayer
       this.coastRockModelLayer = result.value.coastRockLayer
+      this.lanternModelLayer = result.value.lanternLayer
+      this.stockpileModelLayer = result.value.stockpileLayer
       this.treeModelFallback = result.usedFallback || result.value.treeFallback
       this.rockModelFallback = result.usedFallback || result.value.rockFallback
       this.groundCoverModelFallback = result.usedFallback || result.value.groundCoverFallback
       this.coastRockModelFallback = result.usedFallback || result.value.coastRockFallback
+      this.lanternModelFallback = result.usedFallback || result.value.lanternFallback
+      this.stockpileModelFallback = result.usedFallback || result.value.stockpileFallback
       this.treeModelLayer?.attach(this.scene)
       this.rockModelLayer?.attach(this.scene)
       this.groundCoverModelLayer?.attach(this.scene)
       this.coastRockModelLayer?.attach(this.scene)
+      this.lanternModelLayer?.attach(this.scene)
+      this.stockpileModelLayer?.attach(this.scene)
       this.updateStaticInstances()
+      this.updateSettlementInstances(true)
       this.hasPolyHavenTerrainArt = !result.usedFallback
       this.refreshTerrainMaterialColoring()
       this.refreshEvolutionArt()
     }).catch(() => {
-      // The asset manager records an error state; the procedural materials stay playable.
+      // The asset manager records the failure while procedural art remains playable.
     })
   }
-
-  /** Loads only the deferred PBR maps whose era geometry is currently visible. */
+  /** Loads deferred material maps only when the matching era geometry is visible. */
   private refreshEvolutionArt(): void {
     const selectedPack = this.resolvedAssetPack
     if (!selectedPack || this.isDisposed) return
@@ -910,7 +932,6 @@ export class WorldRenderer {
     }
     if (highestToolTier >= 4) surfaces.add('metalwork')
     if (highestToolTier >= 6) surfaces.add('stonework')
-
     const entries = assetsForPack(this.activeAssetEntries, selectedPack).filter((entry) => (
       entry.runtime.kind === 'material'
       && entry.runtime.surface !== 'environment'
@@ -925,7 +946,6 @@ export class WorldRenderer {
     this.evolutionArtBundle?.dispose()
     this.evolutionArtBundle = undefined
     if (entries.length === 0) return
-
     void loadPolyHavenArt(this.renderer, this.evolutionArtTargets, entries, selectedPack, {
       includeDeferred: true,
       loadEnvironment: false,
@@ -937,7 +957,7 @@ export class WorldRenderer {
       bundle.apply(this.evolutionArtTargets)
       this.evolutionArtBundle = bundle
     }).catch(() => {
-      // Era geometry keeps its compact procedural material if an optional map fails.
+      // Optional era maps keep their compact procedural material when unavailable.
     })
   }
 
@@ -949,7 +969,6 @@ export class WorldRenderer {
     this.evolutionArtBundle = undefined
   }
 
-  /** The asset scope owns disposal; the renderer only detaches stale geometry. */
   private detachTreeModelLayer(): void {
     this.treeModelLayer?.detach()
     this.treeModelLayer = undefined
@@ -957,7 +976,6 @@ export class WorldRenderer {
     if (this.trees && this.trunks) this.updateStaticInstances()
   }
 
-  /** The asset scope owns disposal; the renderer only detaches stale geometry. */
   private detachRockModelLayer(): void {
     this.rockModelLayer?.detach()
     this.rockModelLayer = undefined
@@ -979,6 +997,20 @@ export class WorldRenderer {
     if (this.sandDetails) this.updateStaticInstances()
   }
 
+  private detachLanternModelLayer(): void {
+    this.lanternModelLayer?.detach()
+    this.lanternModelLayer = undefined
+    this.lanternModelFallback = false
+    if (this.lanterns) this.updateSettlementInstances(true)
+  }
+
+  private detachStockpileModelLayer(): void {
+    this.stockpileModelLayer?.detach()
+    this.stockpileModelLayer = undefined
+    this.stockpileModelFallback = false
+    if (this.stockpiles) this.updateSettlementInstances(true)
+  }
+
   private get polyHavenArtTargets(): PolyHavenArtTargets {
     return {
       scene: this.scene,
@@ -998,7 +1030,6 @@ export class WorldRenderer {
     }
   }
 
-  /** Era-specific maps are a secondary scope, so they never replace the HDRI. */
   private get evolutionArtTargets(): PolyHavenArtTargets {
     return {
       scene: this.scene,
@@ -1011,7 +1042,6 @@ export class WorldRenderer {
     }
   }
 
-  /** The HDRI is a real local Poly Haven sky; the procedural dome is its safe fallback. */
   private setPolyHavenSkyTexture(texture: THREE.Texture | undefined): void {
     this.polyHavenSkyTexture = texture
     this.skyDome.visible = texture === undefined
@@ -1019,7 +1049,7 @@ export class WorldRenderer {
     this.scene.background = texture ?? this.skyColor
   }
 
-  /** Terrain maps own the natural biome palette; heatmaps deliberately restore vertex-color overlays. */
+  /** Terrain maps own the natural palette; heatmaps deliberately restore vertex colors. */
   private refreshTerrainMaterialColoring(): void {
     const useVertexColors = !this.hasPolyHavenTerrainArt || this.heatmap !== 'địa hình'
     for (const material of Object.values(this.terrainMaterials)) {
@@ -1028,7 +1058,6 @@ export class WorldRenderer {
       material.needsUpdate = true
     }
   }
-
   private capQualityForViewport(quality: EffectiveQuality): EffectiveQuality {
     return capQualityForMobile(quality, isMobileViewport())
   }
@@ -1103,6 +1132,10 @@ export class WorldRenderer {
     clearPolyHavenArt(this.polyHavenArtTargets)
     this.detachTreeModelLayer()
     this.detachRockModelLayer()
+    this.detachGroundCoverModelLayer()
+    this.detachCoastRockModelLayer()
+    this.detachLanternModelLayer()
+    this.detachStockpileModelLayer()
     this.assetPackManager.dispose()
     this.disposeWorldObjects()
     this.previewMaterial.dispose()
@@ -1129,6 +1162,7 @@ export class WorldRenderer {
     this.waterRippleGeometry.dispose()
     this.waterRippleMaterial.dispose()
     this.faunaLayer.dispose()
+    this.animatedFaunaLayer.dispose()
     this.houseGeometry.dispose()
     this.houseMaterial.dispose()
     this.roofGeometry.dispose()
@@ -1140,7 +1174,9 @@ export class WorldRenderer {
     this.roadGeometry.dispose()
     this.roadMaterial.dispose()
     this.workshopGeometry.dispose()
+    this.stockpileGeometry.dispose()
     this.workshopMaterial.dispose()
+    this.stockpileMaterial.dispose()
     this.forgeGeometry.dispose()
     this.forgeMaterial.dispose()
     this.townHallGeometry.dispose()
@@ -1148,6 +1184,7 @@ export class WorldRenderer {
     this.lanternGeometry.dispose()
     this.lanternMaterial.dispose()
     this.settlerLayer.dispose()
+    this.animatedSettlerLayer.dispose()
     this.skyDome.geometry.dispose()
     this.skyDome.material.dispose()
     this.controls.dispose()
@@ -1200,19 +1237,22 @@ export class WorldRenderer {
     this.farms = new THREE.InstancedMesh(this.farmGeometry, this.farmMaterial, MAX_FARMS)
     this.roads = new THREE.InstancedMesh(this.roadGeometry, this.roadMaterial, MAX_ROADS)
     this.workshops = new THREE.InstancedMesh(this.workshopGeometry, this.workshopMaterial, MAX_WORKSHOPS)
+    this.stockpiles = new THREE.InstancedMesh(this.stockpileGeometry, this.stockpileMaterial, MAX_WORKSHOPS)
     this.forges = new THREE.InstancedMesh(this.forgeGeometry, this.forgeMaterial, MAX_FORGES)
     this.townHalls = new THREE.InstancedMesh(this.townHallGeometry, this.townHallMaterial, MAX_TOWN_HALLS)
     this.lanterns = new THREE.InstancedMesh(this.lanternGeometry, this.lanternMaterial, MAX_LANTERNS)
 
-    for (const object of [this.trees, this.trunks, this.rocks, this.resources, this.groundDetails, this.sandDetails, this.houses, this.roofs, this.thatchRoofs, this.farms, this.roads, this.workshops, this.forges, this.townHalls, this.lanterns]) {
+    for (const object of [this.trees, this.trunks, this.rocks, this.resources, this.groundDetails, this.sandDetails, this.houses, this.roofs, this.thatchRoofs, this.farms, this.roads, this.workshops, this.stockpiles, this.forges, this.townHalls, this.lanterns]) {
       object.castShadow = true
       object.receiveShadow = true
       object.frustumCulled = true
       this.scene.add(object)
     }
     this.settlerLayer.attach(this.scene)
+    this.animatedSettlerLayer.attach(this.scene)
     this.sandDetails.castShadow = false
     this.faunaLayer.attach(this.scene)
+    this.animatedFaunaLayer.attach(this.scene)
 
     this.rainGeometry.setAttribute('position', new THREE.BufferAttribute(this.rainPositions, 3))
     this.rain = new THREE.LineSegments(this.rainGeometry, this.rainMaterial)
@@ -1229,7 +1269,7 @@ export class WorldRenderer {
     this.createClouds()
     this.writeTerrain()
     this.updateStaticInstances()
-    this.updateSettlementInstances()
+    this.updateSettlementInstances(true)
   }
 
   /** Five fixed terrain batches preserve biome-specific PBR art without per-tile draw calls. */
@@ -1319,11 +1359,13 @@ export class WorldRenderer {
     if (this.waterRippleMesh) this.scene.remove(this.waterRippleMesh)
     this.waterRipples.length = 0
     if (this.coastFoam) this.scene.remove(this.coastFoam)
-    for (const object of [this.trees, this.trunks, this.rocks, this.resources, this.groundDetails, this.sandDetails, this.houses, this.roofs, this.thatchRoofs, this.farms, this.roads, this.workshops, this.forges, this.townHalls, this.lanterns]) {
+    for (const object of [this.trees, this.trunks, this.rocks, this.resources, this.groundDetails, this.sandDetails, this.houses, this.roofs, this.thatchRoofs, this.farms, this.roads, this.workshops, this.stockpiles, this.forges, this.townHalls, this.lanterns]) {
       if (object) this.scene.remove(object)
     }
     this.faunaLayer.detach()
+    this.animatedFaunaLayer.detach()
     this.settlerLayer.detach()
+    this.animatedSettlerLayer.detach()
     if (this.rain) this.scene.remove(this.rain)
     if (this.preview) {
       this.scene.remove(this.preview)
@@ -1569,10 +1611,10 @@ export class WorldRenderer {
     const modelMatrices: THREE.Matrix4[] = []
     if (this.treeModelLayer) {
       const modelLimit = sparseEnvironmentModelInstanceLimit(natureQuality, this.treeModelLayer.maximumInstances)
-      const modelCandidates: TreePlacement[] = []
       const qualityMinimumSpacing = natureQuality === 'low' ? 1.55 : natureQuality === 'medium' ? 1.35 : 1.15
       const minimumModelSpacing = Math.max(qualityMinimumSpacing, this.treeModelLayer.minimumSpacing)
       const minimumModelSpacingSquared = minimumModelSpacing * minimumModelSpacing
+      const modelCandidates: TreePlacement[] = []
       for (const candidate of [...treeCandidates].sort((left, right) => left.priority - right.priority || left.id - right.id)) {
         if (modelCandidates.length >= modelLimit) break
         const overlapsSelectedTree = modelCandidates.some((selected) => {
@@ -1597,7 +1639,7 @@ export class WorldRenderer {
     const modeledRockIds = new Set<number>()
     const rockModelMatrices: THREE.Matrix4[] = []
     if (this.rockModelLayer) {
-      const modelLimit = sparseEnvironmentModelInstanceLimit(this.graphicsQuality('nature'), this.rockModelLayer.maximumInstances)
+      const modelLimit = sparseEnvironmentModelInstanceLimit(natureQuality, this.rockModelLayer.maximumInstances)
       const minimumModelSpacing = Math.max(0.45, this.rockModelLayer.minimumSpacing)
       const minimumModelSpacingSquared = minimumModelSpacing * minimumModelSpacing
       const modelCandidates: RockPlacement[] = []
@@ -1628,10 +1670,7 @@ export class WorldRenderer {
       const minimumSpacingSquared = this.groundCoverModelLayer.minimumSpacing * this.groundCoverModelLayer.minimumSpacing
       const modelCandidates: DetailPlacement[] = []
       for (const candidate of [...groundDetailCandidates].sort((left, right) => left.priority - right.priority || left.id - right.id)) {
-        // Fern_02 is a forest-floor asset; grassland and snow keep their own
-        // lower-cost fallback detail instead of receiving an implausible fern.
-        if (candidate.color !== 0x3d7b46) continue
-        if (modelCandidates.length >= modelLimit) break
+        if (candidate.color !== 0x3d7b46 || modelCandidates.length >= modelLimit) continue
         const overlaps = modelCandidates.some((selected) => {
           const dx = candidate.x - selected.x
           const dz = candidate.z - selected.z
@@ -1676,7 +1715,6 @@ export class WorldRenderer {
       }
       this.coastRockModelLayer.setMatrices(matrices, modelLimit)
     }
-
     let rockCount = 0
     for (const rock of rockCandidates) {
       if (modeledRockIds.has(rock.id) || rockCount >= this.rocks.instanceMatrix.count) continue
@@ -1753,22 +1791,47 @@ export class WorldRenderer {
     this.groundDetails.computeBoundingSphere()
     this.sandDetails.computeBoundingSphere()
     this.faunaLayer.setWorld(this.world, natureQuality)
+    this.animatedFaunaLayer.setWorld(this.world, natureQuality)
   }
 
-  private updateSettlementInstances(): void {
+  private settlementVisualStateKey(natureQuality: EffectiveQuality): string {
+    return [
+      this.world.config.seed,
+      this.world.config.size,
+      natureQuality,
+      ...this.simulation.villages.map((village) => [
+        village.id,
+        village.tileIndex,
+        village.population,
+        village.homes,
+        village.tools.join(','),
+      ].join(':')),
+    ].join('|')
+  }
+
+  private updateSettlementInstances(force = false): void {
+    const natureQuality = this.graphicsQuality('nature')
+    const visualStateKey = this.settlementVisualStateKey(natureQuality)
+    if (!force && visualStateKey === this.settlementVisualKey) return
+    this.settlementVisualKey = visualStateKey
+
     let houseCount = 0
     let roofCount = 0
     let thatchRoofCount = 0
     let farmCount = 0
     let roadCount = 0
     let workshopCount = 0
+    let stockpileCount = 0
     let forgeCount = 0
     let townHallCount = 0
     let lanternCount = 0
     const settlerPlacements: SettlerPlacement[] = []
     const seed = seedToUint32(this.world.config.seed)
-    const settings = qualitySettings(this.graphicsQuality('nature'))
-
+    const settings = qualitySettings(natureQuality)
+    const stockpileModelLimit = this.stockpileModelLayer ? settlementPropModelInstanceLimit(natureQuality, this.stockpileModelLayer.maximumInstances) : 0
+    const lanternModelLimit = this.lanternModelLayer ? settlementPropModelInstanceLimit(natureQuality, this.lanternModelLayer.maximumInstances) : 0
+    const stockpileModelMatrices: THREE.Matrix4[] = []
+    const lanternModelMatrices: THREE.Matrix4[] = []
     for (const village of this.simulation.villages) {
       const home = this.world.tiles[village.tileIndex]
       if (!home) continue
@@ -1837,6 +1900,21 @@ export class WorldRenderer {
           this.workshops.setMatrixAt(workshopCount, this.dummy.matrix)
           workshopCount += 1
         }
+
+        {
+          const angle = hash2d(localSeed, 83, 89) * Math.PI * 2
+          const radius = 0.76 + hash2d(localSeed, 97, 101) * 0.16
+          this.dummy.position.set(base.x + Math.cos(angle) * radius, base.y + 0.08, base.z + Math.sin(angle) * radius)
+          this.dummy.rotation.set(0, angle + Math.PI / 2, 0)
+          this.dummy.scale.setScalar(0.9 + hash2d(localSeed, 103, 107) * 0.16)
+          this.dummy.updateMatrix()
+          if (stockpileModelMatrices.length < stockpileModelLimit) {
+            stockpileModelMatrices.push(this.dummy.matrix.clone())
+          } else if (stockpileCount < this.stockpiles.instanceMatrix.count) {
+            this.stockpiles.setMatrixAt(stockpileCount, this.dummy.matrix)
+            stockpileCount += 1
+          }
+        }
       }
 
       if (hasMetalwork) {
@@ -1888,11 +1966,14 @@ export class WorldRenderer {
           this.dummy.rotation.set(0, 0, 0)
           this.dummy.scale.setScalar(0.9 + (index % 2) * 0.18)
           this.dummy.updateMatrix()
-          this.lanterns.setMatrixAt(lanternCount, this.dummy.matrix)
-          lanternCount += 1
+          if (lanternModelMatrices.length < lanternModelLimit) {
+            lanternModelMatrices.push(this.dummy.matrix.clone())
+          } else if (lanternCount < this.lanterns.instanceMatrix.count) {
+            this.lanterns.setMatrixAt(lanternCount, this.dummy.matrix)
+            lanternCount += 1
+          }
         }
       }
-
       const visibleResidents = Math.min(village.population, settings.maxSettlers)
       for (let index = 0; index < visibleResidents && settlerPlacements.length < MAX_SETTLERS; index += 1) {
         const tool = village.tools[(index + Math.floor(hash2d(localSeed, index, 79) * village.tools.length)) % village.tools.length] ?? 'stone-handaxe'
@@ -1910,12 +1991,15 @@ export class WorldRenderer {
       }
     }
 
+    this.stockpileModelLayer?.setMatrices(stockpileModelMatrices, stockpileModelLimit)
+    this.lanternModelLayer?.setMatrices(lanternModelMatrices, lanternModelLimit)
     this.houses.count = houseCount
     this.roofs.count = roofCount
     this.thatchRoofs.count = thatchRoofCount
     this.farms.count = farmCount
     this.roads.count = roadCount
     this.workshops.count = workshopCount
+    this.stockpiles.count = stockpileCount
     this.forges.count = forgeCount
     this.townHalls.count = townHallCount
     this.lanterns.count = lanternCount
@@ -1925,6 +2009,7 @@ export class WorldRenderer {
     this.farms.instanceMatrix.needsUpdate = true
     this.roads.instanceMatrix.needsUpdate = true
     this.workshops.instanceMatrix.needsUpdate = true
+    this.stockpiles.instanceMatrix.needsUpdate = true
     this.forges.instanceMatrix.needsUpdate = true
     this.townHalls.instanceMatrix.needsUpdate = true
     this.lanterns.instanceMatrix.needsUpdate = true
@@ -1934,11 +2019,12 @@ export class WorldRenderer {
     this.farms.computeBoundingSphere()
     this.roads.computeBoundingSphere()
     this.workshops.computeBoundingSphere()
+    this.stockpiles.computeBoundingSphere()
     this.forges.computeBoundingSphere()
     this.townHalls.computeBoundingSphere()
     this.lanterns.computeBoundingSphere()
     this.settlerLayer.setSettlers(this.world, settlerPlacements)
-    this.refreshEvolutionArt()
+    this.animatedSettlerLayer.setSettlers(this.world, settlerPlacements, natureQuality)
   }
 
   private createClouds(): void {
@@ -1966,7 +2052,6 @@ export class WorldRenderer {
     // The cloud mesh moves as a single batch, so culling a stale instance bound would pop it in and out of view.
     this.cloudMesh.frustumCulled = false
     this.cloudMesh.visible = this.polyHavenSkyTexture === undefined
-
     for (let index = 0; index < cloudCount; index += 1) {
       const baseX = random.range(-worldWidth / 2 - 8, worldWidth / 2 + 8)
       const baseZ = random.range(-worldWidth / 2 - 6, worldWidth / 2 + 6)
@@ -2027,7 +2112,7 @@ export class WorldRenderer {
     return { x: (tile.x - half) * TILE_SCALE, y: tile.height, z: (tile.z - half) * TILE_SCALE }
   }
 
-  private updateSky(delta: number, reducedMotion: boolean): void {
+  private updateSky(delta: number, reducedMotion: boolean, updateDynamicMotion: boolean): void {
     const phase = (this.simulation.tick % 96) / 96
     const sunArc = Math.sin(phase * Math.PI * 2)
     const daylight = clamp(sunArc * 0.8 + 0.45, 0.14, 1)
@@ -2049,8 +2134,9 @@ export class WorldRenderer {
     if (fog) fog.color.copy(this.skyHorizonColor)
     this.waterMaterial.color.setHSL(0.55, 0.74 - stormStrength * 0.16, 0.18 + daylight * 0.08)
     this.waterMaterial.emissive.setHSL(0.56, 0.54, 0.018 + daylight * 0.026)
-    this.waterMaterial.specular.setHSL(0.56, 0.72, 0.54 + daylight * 0.18)
-    this.waterMaterial.shininess = 74 - stormStrength * 28
+    this.waterMaterial.roughness = 0.11 + stormStrength * 0.22
+    this.waterMaterial.clearcoat = 0.92 - stormStrength * 0.32
+    this.waterMaterial.clearcoatRoughness = 0.04 + stormStrength * 0.22
     this.waterMaterial.normalScale.set(0.14 + stormStrength * 0.16, 0.11 + stormStrength * 0.12)
     if (this.cloudMaterial) {
       this.cloudMaterial.color.copy(stormStrength > 0 ? STORM_CLOUD : CLEAR_CLOUD)
@@ -2061,7 +2147,7 @@ export class WorldRenderer {
     this.coastFoamMaterial.opacity = 0.24 + daylight * 0.08 + stormStrength * 0.12
     this.waterRippleMaterial.opacity = 0.17 + daylight * 0.09 + stormStrength * 0.11
     this.water.position.y = getWaterLevel(this.world.config) + 0.016
-    if (!reducedMotion) {
+    if (!reducedMotion && updateDynamicMotion) {
       this.waterWaveFrame += 1
       this.waterNormalMap.offset.set((this.elapsed * 0.008) % 1, (this.elapsed * 0.005) % 1)
       if (this.waterWaveFrame % qualitySettings(this.graphicsQuality('water')).waterWaveInterval === 0) this.updateWaterSurface()
@@ -2070,7 +2156,7 @@ export class WorldRenderer {
     }
 
     this.rain.visible = Boolean(storm) && !reducedMotion
-    if (!storm || reducedMotion) return
+    if (!storm || reducedMotion || !updateDynamicMotion) return
     const waterHeight = getWaterLevel(this.world.config)
     const rainDropCount = Math.floor(this.rainGeometry.drawRange.count / 2)
     for (let index = 0; index < rainDropCount; index += 1) {
@@ -2180,7 +2266,7 @@ export class WorldRenderer {
     this.rebuildWaterRipples()
     this.refreshCloudQuality()
     this.updateStaticInstances()
-    this.updateSettlementInstances()
+    this.updateSettlementInstances(true)
   }
 
   private applyQuality(): void {
@@ -2188,11 +2274,12 @@ export class WorldRenderer {
     const effectSettings = qualitySettings(this.graphicsQuality('effects'))
     const waterSettings = qualitySettings(this.graphicsQuality('water'))
     this.renderer.shadowMap.enabled = shadowSettings.shadows
+    this.renderer.shadowMap.autoUpdate = false
     this.sun.castShadow = shadowSettings.shadows
     this.sun.shadow.mapSize.set(shadowSettings.shadowMapSize, shadowSettings.shadowMapSize)
-    this.renderer.shadowMap.needsUpdate = true
+    this.nextShadowUpdateAt = 0
+    this.renderer.shadowMap.needsUpdate = shadowSettings.shadows
     this.rainGeometry.setDrawRange(0, effectSettings.rainDropCount * 2)
-    this.waterMaterial.shininess = waterSettings.shadows ? 92 : 48
     this.waterMaterial.normalScale.setScalar(waterSettings.shadows ? 0.28 : 0.14)
   }
 
@@ -2263,6 +2350,14 @@ export class WorldRenderer {
 
   private readonly handleVisibilityChange = (): void => {
     this.previousFrame = 0
+    this.previousBrowserFrame = 0
+    this.nextRenderAt = 0
+    this.lastActorMotionAt = Number.NEGATIVE_INFINITY
+    this.lastEnvironmentMotionAt = Number.NEGATIVE_INFINITY
+    this.statsElapsed = 0
+    this.framesSinceStats = 0
+    this.browserStatsElapsed = 0
+    this.browserFramesSinceStats = 0
     this.renderer.setAnimationLoop(document.hidden ? null : this.renderFrame)
   }
 
@@ -2272,58 +2367,116 @@ export class WorldRenderer {
     this.callbacks.onWebGlError('Đồ họa 3D đã mất kết nối. Hãy dùng nút “Thử lại đồ họa 3D” để dựng lại bản đồ.')
   }
 
+  private shouldRenderAt(timestamp: number): boolean {
+    const interval = renderFrameIntervalMs(this.qualityProfile, this.graphicsQuality('scene'))
+    if (this.nextRenderAt === 0) {
+      this.nextRenderAt = timestamp + interval
+      return true
+    }
+    if (timestamp + 0.2 < this.nextRenderAt) return false
+    this.nextRenderAt = timestamp - this.nextRenderAt > interval
+      ? timestamp + interval
+      : this.nextRenderAt + interval
+    return true
+  }
+
+  private takeActorMotionDelta(timestamp: number): number | undefined {
+    const interval = qualitySettings(this.graphicsQuality('nature')).motionUpdateIntervalMs
+    if (timestamp - this.lastActorMotionAt < interval) return undefined
+    const delta = Number.isFinite(this.lastActorMotionAt)
+      ? Math.min((timestamp - this.lastActorMotionAt) / 1000, 0.1)
+      : 0
+    this.lastActorMotionAt = timestamp
+    return delta
+  }
+
+  private takeEnvironmentMotionDelta(timestamp: number): number | undefined {
+    const interval = qualitySettings(this.graphicsQuality('effects')).motionUpdateIntervalMs
+    if (timestamp - this.lastEnvironmentMotionAt < interval) return undefined
+    const delta = Number.isFinite(this.lastEnvironmentMotionAt)
+      ? Math.min((timestamp - this.lastEnvironmentMotionAt) / 1000, 0.1)
+      : 0
+    this.lastEnvironmentMotionAt = timestamp
+    return delta
+  }
+
+  private scheduleShadowUpdate(timestamp: number): void {
+    const settings = qualitySettings(this.graphicsQuality('shadows'))
+    if (!settings.shadows || timestamp < this.nextShadowUpdateAt) return
+    this.renderer.shadowMap.needsUpdate = true
+    this.nextShadowUpdateAt = timestamp + settings.shadowUpdateIntervalMs
+  }
+
+  private reportStats(timestamp: number): void {
+    if (this.statsElapsed < 0.9) return
+    const info = this.renderer.info
+    const fps = Math.round(this.framesSinceStats / this.statsElapsed)
+    const availableFps = this.browserStatsElapsed > 0
+      ? Math.round(this.browserFramesSinceStats / this.browserStatsElapsed)
+      : fps
+    const nextQuality = this.capQualityForViewport(effectiveQualityFor(this.qualityProfile, availableFps, this.effectiveQuality))
+    if (nextQuality !== this.effectiveQuality && canApplyAutoQualityChange(timestamp, this.lastQualityChangeAt)) {
+      this.effectiveQuality = nextQuality
+      this.lastQualityChangeAt = timestamp
+      this.refreshQualityDependentScene()
+    }
+    const assetSelection = this.assetPackManager.currentSelection
+    this.callbacks.onStats({
+      fps,
+      drawCalls: info.render.calls,
+      triangles: info.render.triangles,
+      textures: info.memory.textures,
+      assetLoadDurationMs: Math.round(this.assetPackManager.loadDurationMs),
+      assetPack: assetSelection?.selectedPack ?? 'procedural',
+      assetPackFallback: this.assetPackManager.loadUsedFallback || assetSelection?.usedFallback === true || !assetSelection || this.treeModelFallback || this.rockModelFallback || this.groundCoverModelFallback || this.coastRockModelFallback || this.lanternModelFallback || this.stockpileModelFallback,
+      assetPackReason: assetSelection?.reason ?? 'Äang chá» gÃ³i Ä‘á»“ há»a.',
+      assetLoadState: this.assetPackManager.loadProgress.state,
+    })
+    this.statsElapsed = 0
+    this.framesSinceStats = 0
+    this.browserStatsElapsed = 0
+    this.browserFramesSinceStats = 0
+  }
+
   private readonly renderFrame = (timestamp: number): void => {
-    if (!this.previousFrame) this.previousFrame = timestamp
-    const delta = Math.min((timestamp - this.previousFrame) / 1000, 0.1)
+    if (this.previousBrowserFrame) {
+      const browserDelta = Math.min((timestamp - this.previousBrowserFrame) / 1000, 0.25)
+      this.statsElapsed += browserDelta
+      this.browserStatsElapsed += browserDelta
+      this.browserFramesSinceStats += 1
+    }
+    this.previousBrowserFrame = timestamp
+    if (!this.shouldRenderAt(timestamp)) return
+
+    const delta = this.previousFrame
+      ? Math.min((timestamp - this.previousFrame) / 1000, 0.1)
+      : 0
     this.previousFrame = timestamp
     const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
     const motionDelta = reducedMotion ? 0 : delta
     this.elapsed += motionDelta
-    this.statsElapsed += delta
     this.framesSinceStats += 1
-    this.updateSky(motionDelta, reducedMotion)
-    this.faunaLayer.update(this.elapsed, reducedMotion)
-    this.settlerLayer.update(this.elapsed, reducedMotion)
-    this.controls.update()
-    this.renderer.render(this.scene, this.camera)
 
-    if (this.statsElapsed >= 0.9) {
-      const info = this.renderer.info
-      const fps = Math.round(this.framesSinceStats / this.statsElapsed)
-      const nextQuality = this.capQualityForViewport(effectiveQualityFor(this.qualityProfile, fps, this.effectiveQuality))
-      if (nextQuality !== this.effectiveQuality && canApplyAutoQualityChange(timestamp, this.lastQualityChangeAt)) {
-        this.effectiveQuality = nextQuality
-        this.lastQualityChangeAt = timestamp
-        this.refreshQualityDependentScene()
-      }
-      this.callbacks.onStats({
-        fps,
-        drawCalls: info.render.calls,
-        triangles: info.render.triangles,
-        textures: info.memory.textures,
-        assetLoadDurationMs: Math.round(this.assetPackManager.loadDurationMs),
-        assetPack: this.assetPackManager.currentSelection?.selectedPack ?? 'procedural',
-        assetPackFallback: (this.assetPackManager.currentSelection?.usedFallback ?? true)
-          || this.assetPackManager.loadUsedFallback
-          || this.treeModelFallback
-          || this.rockModelFallback
-          || this.groundCoverModelFallback
-          || this.coastRockModelFallback,
-        assetPackReason: this.assetPackManager.loadUsedFallback
-          ? 'The selected Poly Haven pack could not load; procedural materials are active.'
-          : this.treeModelFallback
-            ? 'Poly Haven materials are active; the tree model could not load, so procedural trees remain visible.'
-            : this.rockModelFallback
-              ? 'Poly Haven materials are active; the rock model could not load, so procedural rocks remain visible.'
-              : this.groundCoverModelFallback
-                ? 'Poly Haven materials are active; the ground-cover model could not load, so procedural grass remains visible.'
-                : this.coastRockModelFallback
-                  ? 'Poly Haven materials are active; the shoreline-rock model could not load, so procedural coastal detail remains visible.'
-              : this.assetPackManager.currentSelection?.reason ?? 'No asset pack is active.',
-        assetLoadState: this.assetPackManager.loadProgress.state,
-      })
-      this.statsElapsed = 0
-      this.framesSinceStats = 0
+    const actorMotionDelta = this.takeActorMotionDelta(timestamp)
+    const environmentMotionDelta = this.takeEnvironmentMotionDelta(timestamp)
+    this.updateSky(environmentMotionDelta ?? 0, reducedMotion, environmentMotionDelta !== undefined)
+    if (actorMotionDelta !== undefined) {
+      this.faunaLayer.update(this.elapsed, reducedMotion)
+      this.settlerLayer.update(this.elapsed, reducedMotion)
+      this.animatedFaunaLayer.update(actorMotionDelta, this.elapsed, reducedMotion)
+      this.animatedSettlerLayer.update(actorMotionDelta, this.elapsed, reducedMotion)
     }
+    if (environmentMotionDelta !== undefined) {
+      this.treeModelLayer?.animate(this.elapsed, reducedMotion)
+      this.rockModelLayer?.animate(this.elapsed, reducedMotion)
+      this.groundCoverModelLayer?.animate(this.elapsed, reducedMotion)
+      this.coastRockModelLayer?.animate(this.elapsed, reducedMotion)
+      this.lanternModelLayer?.animate(this.elapsed, reducedMotion)
+      this.stockpileModelLayer?.animate(this.elapsed, reducedMotion)
+    }
+    this.controls.update()
+    this.scheduleShadowUpdate(timestamp)
+    this.renderer.render(this.scene, this.camera)
+    this.reportStats(timestamp)
   }
 }

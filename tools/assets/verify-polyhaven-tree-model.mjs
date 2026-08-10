@@ -11,14 +11,21 @@ const SUPPORTED_ASSETS = new Set([
   'fern_02',
   'coast_rocks_05',
   'boulder_01',
+  'wooden_lantern_01',
+  'wooden_barrels_01',
+  'modular_wooden_pier',
 ])
 const ENVIRONMENT_ASSETS = ['island_tree_01', 'fern_02', 'coast_rocks_05', 'boulder_01']
+const SETTLEMENT_ASSETS = ['wooden_lantern_01', 'wooden_barrels_01']
+const COAST_STRUCTURE_ASSETS = ['modular_wooden_pier']
 
 function parseAssets(argumentsList) {
   const assetIndex = argumentsList.indexOf('--asset')
   const slug = assetIndex >= 0 ? argumentsList[assetIndex + 1] : 'tree_small_02'
   if (slug === 'environment') return ENVIRONMENT_ASSETS
-  if (!SUPPORTED_ASSETS.has(slug)) throw new Error(`Expected --asset environment, ${[...SUPPORTED_ASSETS].join(', ')}; received ${String(slug)}.`)
+  if (slug === 'settlement') return SETTLEMENT_ASSETS
+  if (slug === 'coast-structure') return COAST_STRUCTURE_ASSETS
+  if (!SUPPORTED_ASSETS.has(slug)) throw new Error(`Expected --asset environment, settlement, coast-structure, ${[...SUPPORTED_ASSETS].join(', ')}; received ${String(slug)}.`)
   return [slug]
 }
 

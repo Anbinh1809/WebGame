@@ -22,6 +22,10 @@ export interface QualitySettings {
   maxDpr: number
   shadowMapSize: number
   shadows: boolean
+  /** Shadow rendering is costly on the CPU as well as the GPU, so it has its own cadence. */
+  shadowUpdateIntervalMs: number
+  /** Small distant actors remain fluid enough at this cadence without rewriting matrices every display refresh. */
+  motionUpdateIntervalMs: number
   cloudCount: number
   rainDropCount: number
   vegetationDensity: number
@@ -96,12 +100,30 @@ export function canApplyAutoQualityChange(timestamp: number, lastChangeAt: numbe
   return timestamp - lastChangeAt >= AUTO_QUALITY_CHANGE_COOLDOWN_MS
 }
 
+/**
+ * Limits manual profiles to a useful presentation rate instead of spending a
+ * 120/144 Hz display refresh on simulation-side matrix writes. Auto remains
+ * responsive at 60 FPS so its promotion logic can still observe headroom.
+ */
+export function renderFrameIntervalMs(
+  profile: QualityProfile,
+  sceneQuality: EffectiveQuality,
+): number {
+  if (profile === 'auto') return 1000 / 60
+  if (sceneQuality === 'low') return 1000 / 30
+  if (sceneQuality === 'medium') return 1000 / 45
+  if (sceneQuality === 'ultra') return 1000 / 48
+  return 1000 / 60
+}
+
 export function qualitySettings(profile: EffectiveQuality): QualitySettings {
   if (profile === 'low') {
     return {
       maxDpr: 0.8,
       shadowMapSize: 512,
       shadows: false,
+      shadowUpdateIntervalMs: 1_000,
+      motionUpdateIntervalMs: 100,
       cloudCount: 3,
       rainDropCount: 80,
       vegetationDensity: 0.48,
@@ -124,6 +146,8 @@ export function qualitySettings(profile: EffectiveQuality): QualitySettings {
       maxDpr: 2,
       shadowMapSize: 4096,
       shadows: true,
+      shadowUpdateIntervalMs: 100,
+      motionUpdateIntervalMs: 33,
       cloudCount: 12,
       rainDropCount: 640,
       vegetationDensity: 1.25,
@@ -145,6 +169,8 @@ export function qualitySettings(profile: EffectiveQuality): QualitySettings {
       maxDpr: 2,
       shadowMapSize: 2048,
       shadows: true,
+      shadowUpdateIntervalMs: 125,
+      motionUpdateIntervalMs: 33,
       cloudCount: 10,
       rainDropCount: 360,
       vegetationDensity: 1,
@@ -165,6 +191,8 @@ export function qualitySettings(profile: EffectiveQuality): QualitySettings {
     maxDpr: 1.25,
     shadowMapSize: 1024,
     shadows: true,
+    shadowUpdateIntervalMs: 250,
+    motionUpdateIntervalMs: 50,
     cloudCount: 5,
     rainDropCount: 180,
     vegetationDensity: 0.78,

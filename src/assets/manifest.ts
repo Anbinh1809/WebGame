@@ -1,5 +1,6 @@
 import type { AssetManifestEntry, AssetMaterialSurface } from './types'
 import { WEB_ENVIRONMENT_MODEL_ASSET_MANIFEST } from './environmentModelManifest'
+import { WEB_SETTLEMENT_MODEL_ASSET_MANIFEST } from './settlementModelManifest'
 import { WEB_MODEL_ASSET_MANIFEST } from './modelManifest'
 import { WEB_ROCK_MODEL_ASSET_MANIFEST } from './rockModelManifest'
 
@@ -116,6 +117,7 @@ export const ASSET_MANIFEST: readonly AssetManifestEntry[] = [
     runtime: { kind: 'environment', surface: 'environment', environmentRole: 'sky', files: [{ role: 'environment', path: '/assets/polyhaven/web-1k/cloud_layers/environment.hdr', colorSpace: 'linear' }] },
   },
   ...WEB_ENVIRONMENT_MODEL_ASSET_MANIFEST,
+  ...WEB_SETTLEMENT_MODEL_ASSET_MANIFEST,
   ...WEB_MODEL_ASSET_MANIFEST,
   ...WEB_ROCK_MODEL_ASSET_MANIFEST,
 ]

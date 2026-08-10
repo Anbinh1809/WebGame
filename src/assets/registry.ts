@@ -43,8 +43,11 @@ export function validateAssetManifest(entries: readonly AssetManifestEntry[]): A
       const validCoastRock = runtime.modelType === 'coastRock'
         && runtime.surface === 'terrainSand'
         && runtime.modelVariant === 'coast'
+      const validSettlementProp = runtime.modelType === 'settlementProp'
+        && runtime.surface === 'house'
+        && (runtime.modelVariant === 'lantern' || runtime.modelVariant === 'stockpile')
       if (
-        (!validTree && !validRock && !validGroundCover && !validCoastRock)
+        (!validTree && !validRock && !validGroundCover && !validCoastRock && !validSettlementProp)
         || runtime.worldScale <= 0
         || runtime.minimumSpacing <= 0
         || runtimeFiles.length !== 1

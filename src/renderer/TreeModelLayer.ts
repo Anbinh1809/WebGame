@@ -32,6 +32,13 @@ function cloneModelMaterial(source: THREE.Material): THREE.Material {
     material.side = THREE.DoubleSide
     material.needsUpdate = true
   }
+  if (material instanceof THREE.MeshStandardMaterial && /glass/i.test(material.name)) {
+    // The source lantern glass has no emissive map. A restrained warm emission
+    // preserves the gameplay cue that the old primitive lantern provided.
+    material.emissive.setHex(0x8d4d16)
+    material.emissiveIntensity = 0.42
+    material.needsUpdate = true
+  }
   return material
 }
 
@@ -77,6 +84,12 @@ export function sparseEnvironmentModelInstanceLimit(quality: EffectiveQuality, a
 /** Ferns are low-poly enough to make the forest floor feel populated without a tile-count cost. */
 export function groundCoverModelInstanceLimit(quality: EffectiveQuality, assetLimit: number): number {
   const target = quality === 'low' ? 4 : quality === 'medium' ? 8 : quality === 'high' ? 12 : 16
+  return Math.max(0, Math.min(assetLimit, target))
+}
+
+/** Village props stay sparse: authored models replace focal decoration, not every settlement primitive. */
+export function settlementPropModelInstanceLimit(quality: EffectiveQuality, assetLimit: number): number {
+  const target = quality === 'low' ? 1 : quality === 'medium' ? 2 : quality === 'high' ? 3 : 4
   return Math.max(0, Math.min(assetLimit, target))
 }
 
@@ -136,6 +149,36 @@ export function coastRockModelAssetForPack(
   return undefined
 }
 
+function settlementPropModelAssetForPack(
+  entries: readonly AssetManifestEntry[],
+  pack: AssetPackQuality,
+  variant: 'lantern' | 'stockpile',
+): AssetManifestEntry | undefined {
+  for (const candidatePack of fallbackModelPacks(pack)) {
+    const model = assetsForPack(entries, candidatePack).find((entry) => (
+      entry.runtime.kind === 'model'
+      && entry.runtime.modelType === 'settlementProp'
+      && entry.runtime.modelVariant === variant
+    ))
+    if (model) return model
+  }
+  return undefined
+}
+
+export function settlementLanternModelAssetForPack(
+  entries: readonly AssetManifestEntry[],
+  pack: AssetPackQuality,
+): AssetManifestEntry | undefined {
+  return settlementPropModelAssetForPack(entries, pack, 'lantern')
+}
+
+export function settlementStockpileModelAssetForPack(
+  entries: readonly AssetManifestEntry[],
+  pack: AssetPackQuality,
+): AssetManifestEntry | undefined {
+  return settlementPropModelAssetForPack(entries, pack, 'stockpile')
+}
+
 /**
  * One shared geometry/material set is instanced for every selected tree. The
  * layer owns its GLTF GPU resources and is safe to detach during a pack swap.
@@ -143,6 +186,9 @@ export function coastRockModelAssetForPack(
 export class InstancedModelLayer implements DisposableResource {
   private readonly group = new THREE.Group()
   private readonly combinedMatrix = new THREE.Matrix4()
+  private readonly motionMatrix = new THREE.Matrix4()
+  private placements: THREE.Matrix4[] = []
+  private activeCount = 0
   private attachedScene: THREE.Scene | undefined
   private disposed = false
 
@@ -151,6 +197,7 @@ export class InstancedModelLayer implements DisposableResource {
     public readonly maximumInstances: number,
     public readonly worldScale: number,
     public readonly minimumSpacing: number,
+    private readonly motion: 'foliage' | 'lantern' | 'none' = 'none',
     name = 'polyhaven-instanced-model',
   ) {
     this.group.name = name
@@ -175,25 +222,47 @@ export class InstancedModelLayer implements DisposableResource {
 
   public setMatrices(placements: readonly THREE.Matrix4[], requestedLimit: number): number {
     if (this.disposed) return 0
-    const count = Math.min(this.maximumInstances, requestedLimit, placements.length)
+    this.activeCount = Math.min(this.maximumInstances, requestedLimit, placements.length)
+    this.placements = placements.slice(0, this.activeCount).map((placement) => placement.clone())
+    this.writeMatrices(0, true, true)
+    return this.activeCount
+  }
+
+  /** Applies bounded presentation-only motion; placement and simulation stay deterministic. */
+  public animate(elapsed: number, reducedMotion: boolean): void {
+    if (this.disposed || this.activeCount === 0 || this.motion === 'none') return
+    this.writeMatrices(elapsed, reducedMotion, false)
+  }
+
+  private writeMatrices(elapsed: number, reducedMotion: boolean, recomputeBounds: boolean): void {
     for (const part of this.parts) {
-      for (let index = 0; index < count; index += 1) {
-        const placement = placements[index]
+      for (let index = 0; index < this.activeCount; index += 1) {
+        const placement = this.placements[index]
         if (!placement) continue
-        this.combinedMatrix.multiplyMatrices(placement, part.localMatrix)
+        this.motionMatrix.identity()
+        if (!reducedMotion && this.motion === 'foliage') {
+          const sway = Math.sin(elapsed * 1.35 + index * 1.791) * 0.03
+          this.motionMatrix.makeRotationZ(sway)
+        } else if (!reducedMotion && this.motion === 'lantern') {
+          const pulse = 1 + Math.sin(elapsed * 2.7 + index * 1.277) * 0.025
+          this.motionMatrix.makeScale(pulse, pulse, pulse)
+        }
+        this.combinedMatrix.multiplyMatrices(placement, this.motionMatrix)
+        this.combinedMatrix.multiply(part.localMatrix)
         part.mesh.setMatrixAt(index, this.combinedMatrix)
       }
-      part.mesh.count = count
+      part.mesh.count = this.activeCount
       part.mesh.instanceMatrix.needsUpdate = true
-      part.mesh.computeBoundingSphere()
+      if (recomputeBounds) part.mesh.computeBoundingSphere()
     }
-    return count
   }
 
   public dispose(): void {
     if (this.disposed) return
     this.disposed = true
     this.detach()
+    this.placements = []
+    this.activeCount = 0
     const materials = new Set<THREE.Material>()
     const textures = new Set<THREE.Texture>()
     for (const part of this.parts) {
@@ -239,11 +308,15 @@ async function loadInstancedModel(asset: AssetManifestEntry, expectedType: Asset
   for (const geometry of sourceGeometries) geometry.dispose()
   for (const material of sourceMaterials) material.dispose()
   if (parts.length === 0) throw new Error(`${asset.id} contains no renderable mesh.`)
+  const motion: 'foliage' | 'lantern' | 'none' = expectedType === 'tree' || expectedType === 'groundCover'
+    ? 'foliage'
+    : expectedType === 'settlementProp' && asset.runtime.modelVariant === 'lantern' ? 'lantern' : 'none'
   return new InstancedModelLayer(
     parts,
     asset.runtimeBudget.maxInstances,
     asset.runtime.worldScale,
     asset.runtime.minimumSpacing,
+    motion,
     `polyhaven-${asset.id}-instanced`,
   )
 }
@@ -262,4 +335,8 @@ export function loadInstancedGroundCoverModel(asset: AssetManifestEntry): Promis
 
 export function loadInstancedCoastRockModel(asset: AssetManifestEntry): Promise<InstancedModelLayer> {
   return loadInstancedModel(asset, 'coastRock')
+}
+
+export function loadInstancedSettlementPropModel(asset: AssetManifestEntry): Promise<InstancedModelLayer> {
+  return loadInstancedModel(asset, 'settlementProp')
 }
