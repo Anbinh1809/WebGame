@@ -1,10 +1,11 @@
-import { useEffect, useRef, useState } from 'react'
+import { memo, useEffect, useRef, useState } from 'react'
 import type { JSX } from 'react'
 import { WorldRenderer } from '../renderer/WorldRenderer'
 import type { HoveredTile, RenderStats } from '../renderer/WorldRenderer'
 import type { SimulationState } from '../simulation/types'
 import type { HeatmapMode, ToolId, World } from '../world/types'
 import type { GraphicsQualityOverrides, QualityProfile } from '../renderer/quality'
+import type { MotionPreference } from '../renderer/MotionPreference'
 import type { AssetPackQuality } from '../assets/types'
 import type { AssetPackEntitlements, GameEdition } from '../renderer/AssetPackManager'
 
@@ -15,6 +16,7 @@ interface WorldViewportProps {
   heatmap: HeatmapMode
   photoSignal: number
   quality: QualityProfile
+  motionPreference: MotionPreference
   graphicsOverrides: GraphicsQualityOverrides
   assetPackQuality: AssetPackQuality
   assetPackEntitlements: AssetPackEntitlements
@@ -26,13 +28,14 @@ interface WorldViewportProps {
   onPhotoError: (message: string) => void
 }
 
-export function WorldViewport({
+export const WorldViewport = memo(function WorldViewport({
   world,
   simulation,
   tool,
   heatmap,
   photoSignal,
   quality,
+  motionPreference,
   graphicsOverrides,
   assetPackQuality,
   assetPackEntitlements,
@@ -114,6 +117,10 @@ export function WorldViewport({
   }, [quality])
 
   useEffect(() => {
+    rendererRef.current?.setMotionPreference(motionPreference)
+  }, [motionPreference])
+
+  useEffect(() => {
     rendererRef.current?.setGraphicsOverrides(graphicsOverrides)
   }, [graphicsOverrides])
 
@@ -153,4 +160,4 @@ export function WorldViewport({
       <div className="viewport-vignette" aria-hidden="true" />
     </div>
   )
-}
+})

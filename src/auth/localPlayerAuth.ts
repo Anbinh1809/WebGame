@@ -366,3 +366,11 @@ export function signOutLocalPlayer(environment?: LocalAuthEnvironment): LocalSig
     return { ok: false, message: 'Không thể đóng hồ sơ cục bộ. Hãy kiểm tra quyền lưu dữ liệu của trang.' }
   }
 }
+
+export function listSavedAccountProfiles(environment?: LocalAuthEnvironment): Array<{ id: string; displayName: string }> {
+  const resolved = resolvedEnvironment(environment)
+  if (!resolved) return []
+  const accounts = readAccounts(resolved.accountStorage)
+  if (!accounts.ok) return []
+  return accounts.accounts.map((a) => ({ id: a.id, displayName: a.displayName }))
+}

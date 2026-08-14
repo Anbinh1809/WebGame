@@ -92,14 +92,21 @@ export default defineConfig(({ mode }) => {
   const isDesktopMode = environment.VITE_AETHERIA_EDITION === 'desktop'
 
   return {
+    // Defaults to a custom-domain root. CI can set VITE_PUBLIC_BASE to the
+    // repository path so static hosts also resolve /play and its assets.
+    base: environment.VITE_PUBLIC_BASE || '/',
     plugins: [react(), ...(isDesktopMode ? [localDesktopPackPlugin()] : [])],
     // Loopback hosting keeps local browser smoke tests deterministic.
     server: { host: '127.0.0.1' },
     preview: { host: '127.0.0.1' },
     build: {
-      rolldownOptions: {
+      rollupOptions: {
         output: {
-          manualChunks: (id) => id.includes('node_modules/three/') ? 'three' : undefined,
+          manualChunks: (id) => {
+            if (id.includes('node_modules/three/')) return 'three'
+            if (id.includes('node_modules/react/') || id.includes('node_modules/react-dom/')) return 'react-vendor'
+            return undefined
+          },
         },
       },
     },

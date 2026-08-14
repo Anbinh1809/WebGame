@@ -23,6 +23,9 @@ import { FaunaLayer } from './FaunaLayer'
 import { SettlerLayer } from './SettlerLayer'
 import type { SettlerPlacement } from './SettlerLayer'
 import { AnimatedFaunaLayer, AnimatedSettlerLayer } from './AnimatedActorLayers'
+import { AmbientLifeLayer } from './AmbientLifeLayer'
+import { isReducedMotion } from './MotionPreference'
+import type { MotionPreference } from './MotionPreference'
 import {
   InstancedModelLayer,
   canLoadTreeModel,
@@ -133,7 +136,6 @@ interface WaterRipple {
   phase: number
 }
 
-
 /** One pack resource owns PBR maps plus optional instanced environment and settlement models. */
 class WorldArtBundle {
   public constructor(
@@ -169,7 +171,7 @@ function createTerrainMaterial(): THREE.MeshStandardMaterial {
   return new THREE.MeshStandardMaterial({
     vertexColors: true,
     flatShading: false,
-    roughness: 0.88,
+    roughness: 0.84,
     metalness: 0.015,
     normalScale: new THREE.Vector2(0.58, 0.58),
   })
@@ -186,6 +188,7 @@ function createGrassClumpGeometry(): THREE.BufferGeometry {
   const merged = mergeGeometries(blades, false)
   for (const blade of blades) blade.dispose()
   if (!merged) throw new Error('Could not build the grass-clump geometry.')
+  merged.computeVertexNormals()
   return merged
 }
 
@@ -198,22 +201,23 @@ function createStylizedCanopyGeometry(): THREE.BufferGeometry {
     [0, -0.11, -0.15, 0.2],
   ] as const
   const geometries = lobes.map(([x, y, z, radius]) => {
-    const geometry = new THREE.DodecahedronGeometry(radius, 0)
+    const geometry = new THREE.IcosahedronGeometry(radius, 2)
     geometry.translate(x, y, z)
     return geometry
   })
   const merged = mergeGeometries(geometries, false)
   for (const geometry of geometries) geometry.dispose()
   if (!merged) throw new Error('Could not build the clustered fallback canopy.')
+  merged.computeVertexNormals()
   return merged
 }
 
 /** A compact cluster of pebbles and shell-like stones replaces grass-shaped cones on beaches. */
 function createBeachDetailGeometry(): THREE.BufferGeometry {
   const pebbles = [
-    new THREE.DodecahedronGeometry(0.13, 0),
-    new THREE.DodecahedronGeometry(0.09, 0),
-    new THREE.DodecahedronGeometry(0.06, 0),
+    new THREE.DodecahedronGeometry(0.13, 1),
+    new THREE.DodecahedronGeometry(0.09, 1),
+    new THREE.DodecahedronGeometry(0.06, 1),
   ]
   pebbles[0]?.scale(1, 0.2, 0.68)
   pebbles[0]?.translate(-0.075, 0.026, 0.035)
@@ -224,6 +228,7 @@ function createBeachDetailGeometry(): THREE.BufferGeometry {
   const merged = mergeGeometries(pebbles, false)
   for (const pebble of pebbles) pebble.dispose()
   if (!merged) throw new Error('Could not build the beach detail geometry.')
+  merged.computeVertexNormals()
   return merged
 }
 
@@ -272,7 +277,13 @@ function createCoastFoamGeometry(): THREE.PlaneGeometry {
 
 /** A short, curved crest reads as a wave from the isometric camera while remaining instanced in one draw call. */
 function createWaterRippleGeometry(): THREE.TorusGeometry {
-  const geometry = new THREE.TorusGeometry(0.32, 0.014, 5, 20, Math.PI * 0.72)
+  const geometry = new THREE.TorusGeometry(0.32, 0.016, 8, 36, Math.PI * 0.72)
+  geometry.rotateX(-Math.PI / 2)
+  return geometry
+}
+
+function createActionPulseGeometry(): THREE.RingGeometry {
+  const geometry = new THREE.RingGeometry(0.14, 0.42, 48)
   geometry.rotateX(-Math.PI / 2)
   return geometry
 }
@@ -286,7 +297,7 @@ function createWorkshopStockpileGeometry(): THREE.BufferGeometry {
     [0.01, 0.245, 0, 0.22],
   ] as const
   const barrels = placements.map(([x, y, z, rotation]) => {
-    const barrel = new THREE.CylinderGeometry(0.085, 0.085, 0.24, 7)
+    const barrel = new THREE.CylinderGeometry(0.085, 0.085, 0.24, 14)
     barrel.rotateZ(Math.PI / 2)
     barrel.rotateY(rotation)
     barrel.translate(x, y, z)
@@ -295,12 +306,14 @@ function createWorkshopStockpileGeometry(): THREE.BufferGeometry {
   const merged = mergeGeometries(barrels, false)
   for (const barrel of barrels) barrel.dispose()
   if (!merged) throw new Error('Could not build the procedural workshop stockpile.')
+  merged.computeVertexNormals()
   return merged
 }
 
 function waterPlaneSize(size: number): number {
   return Math.max(2, (size - 1 + OCEAN_MARGIN_TILES * 2) * TILE_SCALE)
 }
+
 function waterNormalRepeat(waterSize: number): number {
   return Math.min(5, Math.max(3, waterSize / (TILE_SCALE * 45)))
 }
@@ -320,7 +333,7 @@ function cloudPuffCount(quality: EffectiveQuality): number {
   return 5
 }
 
-/** Use shared height samples so separately batched biome meshes still shade as one smooth landform. */
+/** 3x3 Sobel Gaussian-weighted kernel creates buttery smooth terrain lighting without faceted quad creases. */
 function terrainNormalAt(world: World, x: number, z: number, target: THREE.Vector3): THREE.Vector3 {
   const size = world.config.size
   const sampleHeight = (sampleX: number, sampleZ: number): number => {
@@ -328,14 +341,17 @@ function terrainNormalAt(world: World, x: number, z: number, target: THREE.Vecto
     const clampedZ = clamp(sampleZ, 0, size - 1)
     return world.tiles[clampedZ * size + clampedX]?.height ?? 0
   }
-  const left = Math.max(0, x - 1)
-  const right = Math.min(size - 1, x + 1)
-  const north = Math.max(0, z - 1)
-  const south = Math.min(size - 1, z + 1)
-  const xSpan = Math.max(TILE_SCALE, (right - left) * TILE_SCALE)
-  const zSpan = Math.max(TILE_SCALE, (south - north) * TILE_SCALE)
-  const slopeX = (sampleHeight(right, z) - sampleHeight(left, z)) / xSpan
-  const slopeZ = (sampleHeight(x, south) - sampleHeight(x, north)) / zSpan
+  const nw = sampleHeight(x - 1, z - 1)
+  const n = sampleHeight(x, z - 1)
+  const ne = sampleHeight(x + 1, z - 1)
+  const w = sampleHeight(x - 1, z)
+  const e = sampleHeight(x + 1, z)
+  const sw = sampleHeight(x - 1, z + 1)
+  const s = sampleHeight(x, z + 1)
+  const se = sampleHeight(x + 1, z + 1)
+
+  const slopeX = ((ne + 2 * e + se) - (nw + 2 * w + sw)) / (8 * TILE_SCALE)
+  const slopeZ = ((sw + 2 * s + se) - (nw + 2 * n + ne)) / (8 * TILE_SCALE)
   return target.set(-slopeX, 1, -slopeZ).normalize()
 }
 
@@ -405,6 +421,7 @@ export interface RenderStats {
   assetPackReason: string
   assetLoadState: AssetLoadProgress['state']
 }
+
 export interface RendererCallbacks {
   onTileHover: (tile: HoveredTile | undefined) => void
   onTileActivate: (tileIndex: number) => void
@@ -416,14 +433,23 @@ function clamp(value: number, minimum: number, maximum: number): number {
   return Math.min(maximum, Math.max(minimum, value))
 }
 
-function terrainColor(tile: Tile, mode: HeatmapMode, simulation: SimulationState, world: World): THREE.Color {
+const scratchColor = new THREE.Color()
+const scratchColorSecondary = new THREE.Color()
+
+function terrainColor(
+  tile: Tile,
+  mode: HeatmapMode,
+  simulation: SimulationState,
+  world: World,
+  target: THREE.Color = scratchColor,
+): THREE.Color {
   if (mode === 'tài nguyên') {
-    return new THREE.Color().setHSL(0.08 + tile.resources * 0.28, 0.72, 0.28 + tile.resources * 0.3)
+    return target.setHSL(0.08 + tile.resources * 0.28, 0.72, 0.28 + tile.resources * 0.3)
   }
 
   if (mode === 'hạnh phúc') {
     const happiness = happinessAtTile(tile, world, simulation)
-    return new THREE.Color().setHSL(0.02 + happiness * 0.31, 0.78, 0.28 + happiness * 0.26)
+    return target.setHSL(0.02 + happiness * 0.31, 0.78, 0.28 + happiness * 0.26)
   }
 
   const palette: Record<Tile['biome'], number> = {
@@ -439,12 +465,14 @@ function terrainColor(tile: Tile, mode: HeatmapMode, simulation: SimulationState
   const variation = hash2d(seedToUint32(world.config.seed) ^ 0x4f1bbcdc, tile.x, tile.z)
   if (tile.biome === 'biển') {
     const depth = clamp((-tile.height + 0.03) / 0.62, 0, 1)
-    return new THREE.Color(0x286f99).lerp(new THREE.Color(0x0c365d), depth).offsetHSL((variation - 0.5) * 0.018, 0, 0)
+    target.setHex(0x286f99).lerp(scratchColorSecondary.setHex(0x0c365d), depth).offsetHSL((variation - 0.5) * 0.018, 0, 0)
+    return target
   }
   if (tile.biome === 'bờ cát') {
-    return new THREE.Color(0xe1c47f).lerp(new THREE.Color(0x9d956d), clamp(tile.moisture * 0.22, 0, 0.22)).offsetHSL(0.008, 0, (variation - 0.5) * 0.06)
+    target.setHex(0xe1c47f).lerp(scratchColorSecondary.setHex(0x9d956d), clamp(tile.moisture * 0.22, 0, 0.22)).offsetHSL(0.008, 0, (variation - 0.5) * 0.06)
+    return target
   }
-  return new THREE.Color(palette[tile.biome]).offsetHSL((variation - 0.5) * 0.025, 0, (variation - 0.5) * 0.065)
+  return target.setHex(palette[tile.biome]).offsetHSL((variation - 0.5) * 0.025, 0, (variation - 0.5) * 0.065)
 }
 
 export interface WebGlCanvasLike {
@@ -522,45 +550,47 @@ export class WorldRenderer {
     clearcoatRoughness: 0.08,
   })
   private readonly treeGeometry = createStylizedCanopyGeometry()
-  // Deterministic low-poly trees are generated and instanced directly in the renderer.
-  private readonly treeMaterial = new THREE.MeshStandardMaterial({ color: 0x4d7c42, flatShading: true, roughness: 0.9 })
-  private readonly trunkGeometry = new THREE.CylinderGeometry(0.045, 0.062, 0.42, 5)
-  private readonly trunkMaterial = new THREE.MeshStandardMaterial({ color: 0x62432c, flatShading: true, roughness: 0.94 })
-  private readonly rockGeometry = new THREE.DodecahedronGeometry(0.18, 0)
-  private readonly rockMaterial = new THREE.MeshStandardMaterial({ color: 0x87909a, flatShading: true, roughness: 0.84, metalness: 0.08 })
-  private readonly resourceGeometry = new THREE.ConeGeometry(0.12, 0.45, 5)
-  private readonly resourceMaterial = new THREE.MeshStandardMaterial({ color: 0xf4be64, flatShading: true, roughness: 0.47, metalness: 0.36 })
+  // Deterministic trees and props are generated and instanced directly in the renderer with smooth shading.
+  private readonly treeMaterial = new THREE.MeshStandardMaterial({ color: 0x4d7c42, flatShading: false, roughness: 0.82 })
+  private readonly trunkGeometry = new THREE.CylinderGeometry(0.048, 0.068, 0.42, 14)
+  private readonly trunkMaterial = new THREE.MeshStandardMaterial({ color: 0x62432c, flatShading: false, roughness: 0.88 })
+  private readonly rockGeometry = new THREE.DodecahedronGeometry(0.18, 1)
+  private readonly rockMaterial = new THREE.MeshStandardMaterial({ color: 0x87909a, flatShading: false, roughness: 0.78, metalness: 0.08 })
+  private readonly resourceGeometry = new THREE.ConeGeometry(0.12, 0.45, 16)
+  private readonly resourceMaterial = new THREE.MeshStandardMaterial({ color: 0xf4be64, flatShading: false, roughness: 0.38, metalness: 0.42 })
   private readonly groundDetailGeometry = createGrassClumpGeometry()
-  private readonly groundDetailMaterial = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.92, side: THREE.DoubleSide })
+  private readonly groundDetailMaterial = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.9, side: THREE.DoubleSide })
   private readonly sandDetailGeometry = createBeachDetailGeometry()
-  private readonly sandDetailMaterial = new THREE.MeshStandardMaterial({ vertexColors: true, flatShading: true, roughness: 0.98 })
+  private readonly sandDetailMaterial = new THREE.MeshStandardMaterial({ vertexColors: true, flatShading: false, roughness: 0.92 })
   private readonly coastFoamGeometry = createCoastFoamGeometry()
   private readonly coastFoamMaterial = new THREE.MeshBasicMaterial({ color: 0xd8f1f8, vertexColors: true, transparent: true, opacity: 0.34, depthWrite: false, blending: THREE.AdditiveBlending })
   private readonly waterRippleGeometry = createWaterRippleGeometry()
   private readonly waterRippleMaterial = new THREE.MeshBasicMaterial({ color: 0xc6ebf7, transparent: true, opacity: 0.28, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide })
   private readonly houseGeometry = new THREE.BoxGeometry(0.38, 0.32, 0.36)
-  private readonly houseMaterial = new THREE.MeshStandardMaterial({ color: 0xb8714e, flatShading: true, roughness: 0.82 })
-  private readonly roofGeometry = new THREE.ConeGeometry(0.35, 0.34, 4)
-  private readonly roofMaterial = new THREE.MeshStandardMaterial({ color: 0x5e3c34, flatShading: true, roughness: 0.9 })
-  private readonly thatchRoofGeometry = new THREE.ConeGeometry(0.38, 0.38, 4)
-  private readonly thatchRoofMaterial = new THREE.MeshStandardMaterial({ color: 0x9b7b42, flatShading: true, roughness: 0.98 })
+  private readonly houseMaterial = new THREE.MeshStandardMaterial({ color: 0xb8714e, flatShading: false, roughness: 0.78 })
+  private readonly roofGeometry = new THREE.ConeGeometry(0.36, 0.34, 16)
+  private readonly roofMaterial = new THREE.MeshStandardMaterial({ color: 0x5e3c34, flatShading: false, roughness: 0.86 })
+  private readonly thatchRoofGeometry = new THREE.ConeGeometry(0.4, 0.38, 16)
+  private readonly thatchRoofMaterial = new THREE.MeshStandardMaterial({ color: 0x9b7b42, flatShading: false, roughness: 0.92 })
   private readonly farmGeometry = new THREE.BoxGeometry(0.56, 0.026, 0.3)
-  private readonly farmMaterial = new THREE.MeshStandardMaterial({ color: 0x9fb652, flatShading: true, roughness: 0.95 })
+  private readonly farmMaterial = new THREE.MeshStandardMaterial({ color: 0x9fb652, flatShading: false, roughness: 0.88 })
   private readonly roadGeometry = new THREE.BoxGeometry(0.16, 0.018, 0.78)
-  private readonly roadMaterial = new THREE.MeshStandardMaterial({ color: 0x92795c, flatShading: true, roughness: 0.99 })
+  private readonly roadMaterial = new THREE.MeshStandardMaterial({ color: 0x92795c, flatShading: false, roughness: 0.92 })
   private readonly workshopGeometry = new THREE.BoxGeometry(0.52, 0.34, 0.44)
-  private readonly workshopMaterial = new THREE.MeshStandardMaterial({ color: 0x7a5138, flatShading: true, roughness: 0.88 })
+  private readonly workshopMaterial = new THREE.MeshStandardMaterial({ color: 0x7a5138, flatShading: false, roughness: 0.84 })
   private readonly stockpileGeometry = createWorkshopStockpileGeometry()
-  private readonly stockpileMaterial = new THREE.MeshStandardMaterial({ color: 0x8a5b32, flatShading: true, roughness: 0.92 })
-  private readonly forgeGeometry = new THREE.CylinderGeometry(0.18, 0.23, 0.28, 6)
-  private readonly forgeMaterial = new THREE.MeshStandardMaterial({ color: 0x6b6660, flatShading: true, roughness: 0.58, metalness: 0.38 })
+  private readonly stockpileMaterial = new THREE.MeshStandardMaterial({ color: 0x8a5b32, flatShading: false, roughness: 0.86 })
+  private readonly forgeGeometry = new THREE.CylinderGeometry(0.18, 0.23, 0.28, 16)
+  private readonly forgeMaterial = new THREE.MeshStandardMaterial({ color: 0x6b6660, flatShading: false, roughness: 0.52, metalness: 0.38 })
   private readonly townHallGeometry = new THREE.BoxGeometry(0.74, 0.56, 0.64)
-  private readonly townHallMaterial = new THREE.MeshStandardMaterial({ color: 0x858887, flatShading: true, roughness: 0.9 })
-  private readonly lanternGeometry = new THREE.SphereGeometry(0.065, 6, 4)
-  private readonly lanternMaterial = new THREE.MeshStandardMaterial({ color: 0xffcc73, emissive: 0x8d4d16, emissiveIntensity: 0.55, flatShading: true, roughness: 0.6 })
+  private readonly townHallMaterial = new THREE.MeshStandardMaterial({ color: 0x858887, flatShading: false, roughness: 0.84 })
+  private readonly lanternGeometry = new THREE.SphereGeometry(0.075, 14, 10)
+  private readonly lanternMaterial = new THREE.MeshStandardMaterial({ color: 0xffcc73, emissive: 0x8d4d16, emissiveIntensity: 0.55, flatShading: false, roughness: 0.5 })
   private readonly rainGeometry = new THREE.BufferGeometry()
   private readonly rainMaterial = new THREE.LineBasicMaterial({ color: 0xbdeaff, transparent: true, opacity: 0.84, depthWrite: false, depthTest: false })
   private readonly previewMaterial = new THREE.MeshBasicMaterial({ transparent: true, opacity: 0.68, side: THREE.DoubleSide })
+  private readonly actionPulseGeometry = createActionPulseGeometry()
+  private readonly actionPulseMaterial = new THREE.MeshBasicMaterial({ transparent: true, opacity: 0.72, side: THREE.DoubleSide, depthWrite: false, blending: THREE.AdditiveBlending })
   private readonly clouds: Array<{ baseX: number; baseZ: number; altitude: number; speed: number; variation: number }> = []
   private readonly waterRipples: WaterRipple[] = []
   private readonly sun = new THREE.DirectionalLight(0xfff0bc, 2.3)
@@ -574,6 +604,7 @@ export class WorldRenderer {
   private readonly settlerLayer = new SettlerLayer(TILE_SCALE, MAX_SETTLERS)
   private readonly animatedFaunaLayer = new AnimatedFaunaLayer(TILE_SCALE)
   private readonly animatedSettlerLayer = new AnimatedSettlerLayer(TILE_SCALE)
+  private readonly ambientLifeLayer = new AmbientLifeLayer(TILE_SCALE)
   /** Two vertices per drop make weather legible as rain streaks while retaining one draw call. */
   private readonly rainPositions = new Float32Array(MAX_RAIN_DROPS * 6)
   private terrainGroup!: THREE.Group
@@ -606,6 +637,7 @@ export class WorldRenderer {
   private lanterns!: THREE.InstancedMesh
   private rain!: THREE.LineSegments<THREE.BufferGeometry, THREE.LineBasicMaterial>
   private preview!: THREE.Mesh<THREE.RingGeometry, THREE.MeshBasicMaterial>
+  private actionPulse!: THREE.Mesh<THREE.RingGeometry, THREE.MeshBasicMaterial>
   private cloudGeometry: THREE.IcosahedronGeometry | undefined
   private cloudMaterial: THREE.MeshPhysicalMaterial | undefined
   private cloudMesh: THREE.InstancedMesh<THREE.IcosahedronGeometry, THREE.MeshPhysicalMaterial> | undefined
@@ -632,10 +664,12 @@ export class WorldRenderer {
   private qualityProfile: QualityProfile = 'auto'
   private effectiveQuality: EffectiveQuality = 'medium'
   private graphicsOverrides: GraphicsQualityOverrides = createGraphicsQualityOverrides()
+  private motionPreference: MotionPreference = 'system'
   private lastQualityChangeAt = 0
   private settlementVisualKey = ''
   private waterWaveFrame = 0
   private waterSegments = 0
+  private actionPulseStartedAt = Number.NEGATIVE_INFINITY
   private requestedAssetPack: AssetPackQuality | undefined
   private assetPackEntitlements: AssetPackEntitlements
   private artLoadRevision = 0
@@ -678,9 +712,9 @@ export class WorldRenderer {
     this.renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' })
     this.renderer.outputColorSpace = THREE.SRGBColorSpace
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping
-    this.renderer.toneMappingExposure = 1.02
+    this.renderer.toneMappingExposure = 1.06
     this.renderer.shadowMap.enabled = true
-    this.renderer.shadowMap.type = THREE.PCFShadowMap
+    this.renderer.shadowMap.type = THREE.PCFSoftShadowMap
     this.waterNormalMap.anisotropy = Math.min(4, this.renderer.capabilities.getMaxAnisotropy())
     this.renderer.domElement.className = 'world-canvas'
     this.renderer.domElement.tabIndex = 0
@@ -711,12 +745,16 @@ export class WorldRenderer {
     this.sun.shadow.camera.right = 15
     this.sun.shadow.camera.top = 15
     this.sun.shadow.camera.bottom = -15
-    this.sun.shadow.normalBias = 0.025
+    this.sun.shadow.radius = 2.5
+    this.sun.shadow.bias = -0.0002
+    this.sun.shadow.normalBias = 0.032
     this.skyDome.scale.setScalar(86)
     this.skyDome.frustumCulled = false
     this.frameWorld(world)
     this.applyQuality()
     this.scene.add(this.skyDome, this.skyLight, this.sun, this.sun.target)
+    this.ambientLifeLayer.attach(this.scene)
+    this.ambientLifeLayer.setSimulation(this.simulation)
 
     this.createWorldObjects(world)
     this.setAssetPack('web-1k')
@@ -752,6 +790,10 @@ export class WorldRenderer {
 
   public updateSimulation(simulation: SimulationState): void {
     this.simulation = simulation
+    this.ambientLifeLayer.setSimulation(simulation)
+    const stormActive = Boolean(simulation.activeStorm)
+    this.faunaLayer.setStormActive(stormActive)
+    this.animatedFaunaLayer.setStormActive(stormActive)
     this.updateSettlementInstances()
   }
 
@@ -766,6 +808,19 @@ export class WorldRenderer {
     this.writeTerrain()
   }
 
+  /** A short, non-simulation pulse makes every map power legible at the point of use. */
+  public playActionEffect(tileIndex: number, tool: ToolId): void {
+    const tile = this.world.tiles[tileIndex]
+    if (!tile || !this.actionPulse) return
+    const position = this.tilePosition(tile)
+    this.actionPulse.position.set(position.x, position.y + 0.045, position.z)
+    this.actionPulse.scale.setScalar(0.45)
+    this.actionPulseMaterial.color.setHex(toolColor(tool))
+    this.actionPulseMaterial.opacity = 0.76
+    this.actionPulse.visible = true
+    this.actionPulseStartedAt = this.elapsed
+  }
+
   public setQuality(profile: QualityProfile): void {
     const previousProfile = this.qualityProfile
     this.qualityProfile = profile
@@ -775,6 +830,11 @@ export class WorldRenderer {
     this.nextRenderAt = 0
     this.nextShadowUpdateAt = 0
     this.refreshQualityDependentScene()
+  }
+
+  public setMotionPreference(preference: MotionPreference): void {
+    this.motionPreference = preference
+    this.nextRenderAt = 0
   }
 
   /** Applies only presentation overrides; world generation and simulation stay deterministic. */
@@ -1139,6 +1199,8 @@ export class WorldRenderer {
     this.assetPackManager.dispose()
     this.disposeWorldObjects()
     this.previewMaterial.dispose()
+    this.actionPulseGeometry.dispose()
+    this.actionPulseMaterial.dispose()
     this.terrainHitMaterial.dispose()
     for (const material of Object.values(this.terrainMaterials)) material.dispose()
     this.waterMaterial.dispose()
@@ -1163,6 +1225,7 @@ export class WorldRenderer {
     this.waterRippleMaterial.dispose()
     this.faunaLayer.dispose()
     this.animatedFaunaLayer.dispose()
+    this.ambientLifeLayer.dispose()
     this.houseGeometry.dispose()
     this.houseMaterial.dispose()
     this.roofGeometry.dispose()
@@ -1195,6 +1258,7 @@ export class WorldRenderer {
   }
 
   private createWorldObjects(world: World): void {
+    this.ambientLifeLayer.setWorld(world, this.graphicsQuality('effects'))
     this.createTerrainSurfaces(world)
 
     const size = world.config.size
@@ -1259,12 +1323,18 @@ export class WorldRenderer {
     this.rain.visible = false
     this.scene.add(this.rain)
 
-    const previewGeometry = new THREE.RingGeometry(0.18, 0.34, 6)
+    const previewGeometry = new THREE.RingGeometry(0.18, 0.34, 32)
     previewGeometry.rotateX(-Math.PI / 2)
     this.preview = new THREE.Mesh(previewGeometry, this.previewMaterial)
     this.preview.visible = false
     this.previewMaterial.color.setHex(toolColor(this.tool))
     this.scene.add(this.preview)
+
+    this.actionPulse = new THREE.Mesh(this.actionPulseGeometry, this.actionPulseMaterial)
+    this.actionPulse.name = 'aetheria-action-pulse'
+    this.actionPulse.visible = false
+    this.actionPulse.renderOrder = 2
+    this.scene.add(this.actionPulse)
 
     this.createClouds()
     this.writeTerrain()
@@ -1371,6 +1441,7 @@ export class WorldRenderer {
       this.scene.remove(this.preview)
       this.preview.geometry.dispose()
     }
+    if (this.actionPulse) this.scene.remove(this.actionPulse)
     this.disposeClouds()
   }
 
@@ -1382,17 +1453,17 @@ export class WorldRenderer {
     this.terrainHit.geometry.computeVertexNormals()
     this.terrainHit.geometry.computeBoundingSphere()
 
+    const normal = new THREE.Vector3()
     for (const terrainSurface of Object.values(this.terrainSurfaces)) {
       if (!terrainSurface) continue
       const geometry = terrainSurface.mesh.geometry
       const positions = geometry.getAttribute('position') as THREE.BufferAttribute
       const normals = geometry.getAttribute('normal') as THREE.BufferAttribute
       const colors = geometry.getAttribute('color') as THREE.BufferAttribute
-      const normal = new THREE.Vector3()
       for (let index = 0; index < terrainSurface.tileIndices.length; index += 1) {
         const tile = this.world.tiles[terrainSurface.tileIndices[index] ?? 0]
         if (!tile) continue
-        const color = terrainColor(tile, this.heatmap, this.simulation, this.world)
+        const color = terrainColor(tile, this.heatmap, this.simulation, this.world, scratchColor)
         terrainNormalAt(this.world, tile.x, tile.z, normal)
         positions.setXYZ(index, (tile.x - half) * TILE_SCALE, tile.height, (tile.z - half) * TILE_SCALE)
         normals.setXYZ(index, normal.x, normal.y, normal.z)
@@ -1977,6 +2048,17 @@ export class WorldRenderer {
       const visibleResidents = Math.min(village.population, settings.maxSettlers)
       for (let index = 0; index < visibleResidents && settlerPlacements.length < MAX_SETTLERS; index += 1) {
         const tool = village.tools[(index + Math.floor(hash2d(localSeed, index, 79) * village.tools.length)) % village.tools.length] ?? 'stone-handaxe'
+        const activity = this.simulation.activeStorm
+          ? index % 4 === 0 ? 'guard' : 'shelter'
+          : village.food < village.population * 1.35
+            ? 'forage'
+            : hasFarming && index % 3 === 0
+              ? 'farm'
+              : hasMetalwork && index % 4 === 0
+                ? 'craft'
+                : village.happiness < 38 && index % 5 === 0
+                  ? 'rest'
+                  : 'forage'
         settlerPlacements.push({
           id: `${village.id}-settler-${index}`,
           anchorTileX: home.x,
@@ -1987,6 +2069,7 @@ export class WorldRenderer {
           clothingColor: index % 2 === 0 ? 0x8eb5d1 : 0xb87858,
           skinColor: index % 3 === 0 ? 0xc98d65 : 0xf4d6a4,
           tool,
+          activity,
         })
       }
     }
@@ -2177,14 +2260,18 @@ export class WorldRenderer {
     const positions = this.water.geometry.getAttribute('position') as THREE.BufferAttribute
     const stormStrength = this.simulation.activeStorm ? clamp(this.simulation.activeStorm.intensity / 2.2, 0, 0.78) : 0
     const swellAmplitude = 0.008 + stormStrength * 0.032
+    const timeA = this.elapsed * 0.92
+    const timeB = this.elapsed * 0.68
+    const timeC = this.elapsed * 1.24
+    const count = positions.count
 
-    for (let index = 0; index < positions.count; index += 1) {
+    for (let index = 0; index < count; index += 1) {
       const x = positions.getX(index)
       const z = positions.getZ(index)
-      const broadSwell = Math.sin(x * 0.38 + z * 0.16 + this.elapsed * 0.92)
-        + Math.cos(z * 0.46 - x * 0.11 - this.elapsed * 0.68) * 0.64
-      const crossSwell = Math.sin((x + z) * 0.72 - this.elapsed * 1.24) * 0.28
-      positions.setY(index, broadSwell * swellAmplitude + crossSwell * swellAmplitude)
+      const broadSwell = Math.sin(x * 0.38 + z * 0.16 + timeA)
+        + Math.cos(z * 0.46 - x * 0.11 - timeB) * 0.64
+      const crossSwell = Math.sin((x + z) * 0.72 - timeC) * 0.28
+      positions.setY(index, (broadSwell + crossSwell) * swellAmplitude)
     }
 
     positions.needsUpdate = true
@@ -2274,12 +2361,17 @@ export class WorldRenderer {
     const effectSettings = qualitySettings(this.graphicsQuality('effects'))
     const waterSettings = qualitySettings(this.graphicsQuality('water'))
     this.renderer.shadowMap.enabled = shadowSettings.shadows
+    this.renderer.shadowMap.type = THREE.PCFSoftShadowMap
     this.renderer.shadowMap.autoUpdate = false
     this.sun.castShadow = shadowSettings.shadows
+    this.sun.shadow.radius = 2.5
+    this.sun.shadow.bias = -0.0002
+    this.sun.shadow.normalBias = 0.032
     this.sun.shadow.mapSize.set(shadowSettings.shadowMapSize, shadowSettings.shadowMapSize)
     this.nextShadowUpdateAt = 0
     this.renderer.shadowMap.needsUpdate = shadowSettings.shadows
     this.rainGeometry.setDrawRange(0, effectSettings.rainDropCount * 2)
+    this.ambientLifeLayer.setQuality(this.graphicsQuality('effects'))
     this.waterMaterial.normalScale.setScalar(waterSettings.shadows ? 0.28 : 0.14)
   }
 
@@ -2334,9 +2426,11 @@ export class WorldRenderer {
     this.pointerDown = undefined
     if (!down || down.pointerId !== event.pointerId || Math.hypot(event.clientX - down.x, event.clientY - down.y) > 7) return
     const hovered = this.pickTile(event)
-    if (hovered) this.callbacks.onTileActivate(hovered.index)
+    if (hovered) {
+      this.playActionEffect(hovered.index, this.tool)
+      this.callbacks.onTileActivate(hovered.index)
+    }
   }
-
   private readonly handlePointerCancel = (event: PointerEvent): void => {
     if (this.pointerDown?.pointerId === event.pointerId) this.pointerDown = undefined
   }
@@ -2400,6 +2494,22 @@ export class WorldRenderer {
     return delta
   }
 
+  private updateActionPulse(reducedMotion: boolean): void {
+    if (!this.actionPulse?.visible) return
+    if (reducedMotion) {
+      this.actionPulse.visible = false
+      return
+    }
+    const age = this.elapsed - this.actionPulseStartedAt
+    if (age > 0.8) {
+      this.actionPulse.visible = false
+      return
+    }
+    const progress = Math.max(0, age / 0.8)
+    this.actionPulse.scale.setScalar(0.45 + progress * 2.7)
+    this.actionPulseMaterial.opacity = (1 - progress) * 0.76
+  }
+
   private scheduleShadowUpdate(timestamp: number): void {
     const settings = qualitySettings(this.graphicsQuality('shadows'))
     if (!settings.shadows || timestamp < this.nextShadowUpdateAt) return
@@ -2429,7 +2539,7 @@ export class WorldRenderer {
       assetLoadDurationMs: Math.round(this.assetPackManager.loadDurationMs),
       assetPack: assetSelection?.selectedPack ?? 'procedural',
       assetPackFallback: this.assetPackManager.loadUsedFallback || assetSelection?.usedFallback === true || !assetSelection || this.treeModelFallback || this.rockModelFallback || this.groundCoverModelFallback || this.coastRockModelFallback || this.lanternModelFallback || this.stockpileModelFallback,
-      assetPackReason: assetSelection?.reason ?? 'Äang chá» gÃ³i Ä‘á»“ há»a.',
+      assetPackReason: assetSelection?.reason ?? 'Đang chờ gói đồ họa.',
       assetLoadState: this.assetPackManager.loadProgress.state,
     })
     this.statsElapsed = 0
@@ -2452,7 +2562,10 @@ export class WorldRenderer {
       ? Math.min((timestamp - this.previousFrame) / 1000, 0.1)
       : 0
     this.previousFrame = timestamp
-    const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    const reducedMotion = isReducedMotion(
+      this.motionPreference,
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches,
+    )
     const motionDelta = reducedMotion ? 0 : delta
     this.elapsed += motionDelta
     this.framesSinceStats += 1
@@ -2460,6 +2573,7 @@ export class WorldRenderer {
     const actorMotionDelta = this.takeActorMotionDelta(timestamp)
     const environmentMotionDelta = this.takeEnvironmentMotionDelta(timestamp)
     this.updateSky(environmentMotionDelta ?? 0, reducedMotion, environmentMotionDelta !== undefined)
+    if (environmentMotionDelta !== undefined) this.ambientLifeLayer.update(this.elapsed, reducedMotion, Boolean(this.simulation.activeStorm))
     if (actorMotionDelta !== undefined) {
       this.faunaLayer.update(this.elapsed, reducedMotion)
       this.settlerLayer.update(this.elapsed, reducedMotion)
@@ -2474,6 +2588,7 @@ export class WorldRenderer {
       this.lanternModelLayer?.animate(this.elapsed, reducedMotion)
       this.stockpileModelLayer?.animate(this.elapsed, reducedMotion)
     }
+    this.updateActionPulse(reducedMotion)
     this.controls.update()
     this.scheduleShadowUpdate(timestamp)
     this.renderer.render(this.scene, this.camera)

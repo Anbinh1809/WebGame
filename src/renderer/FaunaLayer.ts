@@ -3,6 +3,7 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js'
 import { FAUNA_SPECIES, generateFauna } from '../world/fauna'
 import type { FaunaSpawn, FaunaSpecies } from '../world/fauna'
 import type { World } from '../world/types'
+import { faunaMotionPose } from './ActorMotion'
 import type { EffectiveQuality } from './quality'
 import { sampleTerrainPointAtScene, sampleTerrainPointAtTile, solveTwoBoneKnee, WORLD_UP } from './TerrainPose'
 
@@ -50,11 +51,11 @@ function faunaLimitsFor(quality: EffectiveQuality): FaunaLimits {
 
 function creatureMaterial(species: FaunaSpecies): THREE.MeshStandardMaterial {
   switch (species) {
-    case 'hươu-rừng': return new THREE.MeshStandardMaterial({ color: 0xa87545, flatShading: true, roughness: 0.86 })
-    case 'lợn-rừng': return new THREE.MeshStandardMaterial({ color: 0x4e392e, flatShading: true, roughness: 0.92 })
-    case 'sơn-dương': return new THREE.MeshStandardMaterial({ color: 0x8f8d7b, flatShading: true, roughness: 0.9 })
-    case 'hồn-cát': return new THREE.MeshStandardMaterial({ color: 0xe7bd67, emissive: 0x6a3c10, emissiveIntensity: 0.8, transparent: true, opacity: 0.88, flatShading: true, roughness: 0.72, depthWrite: false })
-    case 'thạch-thú': return new THREE.MeshStandardMaterial({ color: 0x58636a, emissive: 0x163539, emissiveIntensity: 0.46, flatShading: true, roughness: 0.8, metalness: 0.08 })
+    case 'hươu-rừng': return new THREE.MeshStandardMaterial({ color: 0xa87545, flatShading: false, roughness: 0.82 })
+    case 'lợn-rừng': return new THREE.MeshStandardMaterial({ color: 0x4e392e, flatShading: false, roughness: 0.88 })
+    case 'sơn-dương': return new THREE.MeshStandardMaterial({ color: 0x8f8d7b, flatShading: false, roughness: 0.86 })
+    case 'hồn-cát': return new THREE.MeshStandardMaterial({ color: 0xe7bd67, emissive: 0x6a3c10, emissiveIntensity: 0.8, transparent: true, opacity: 0.88, flatShading: false, roughness: 0.68, depthWrite: false })
+    case 'thạch-thú': return new THREE.MeshStandardMaterial({ color: 0x58636a, emissive: 0x163539, emissiveIntensity: 0.46, flatShading: false, roughness: 0.74, metalness: 0.08 })
   }
 }
 
@@ -84,23 +85,23 @@ function mergedCreature(parts: readonly THREE.BufferGeometry[]): THREE.BufferGeo
 
 function hornedQuadrupedRig(headScale: readonly [number, number, number], hornHeight: number): QuadrupedRig {
   const bodyGeometry = mergedCreature([
-    transformedPart(new THREE.DodecahedronGeometry(0.27, 0), [0.88, 0.52, 1.18], [0, 0.3, -0.035]),
+    transformedPart(new THREE.DodecahedronGeometry(0.27, 1), [0.88, 0.52, 1.18], [0, 0.3, -0.035]),
   ])
   const headParts: THREE.BufferGeometry[] = [
-    transformedPart(new THREE.DodecahedronGeometry(0.16, 0), headScale, [0, 0, 0]),
-    transformedPart(new THREE.ConeGeometry(0.055, 0.14, 4), [1, 1, 1], [-0.09, 0.18, 0.02], [0, 0, -0.24]),
-    transformedPart(new THREE.ConeGeometry(0.055, 0.14, 4), [1, 1, 1], [0.09, 0.18, 0.02], [0, 0, 0.24]),
+    transformedPart(new THREE.DodecahedronGeometry(0.16, 1), headScale, [0, 0, 0]),
+    transformedPart(new THREE.ConeGeometry(0.055, 0.14, 10), [1, 1, 1], [-0.09, 0.18, 0.02], [0, 0, -0.24]),
+    transformedPart(new THREE.ConeGeometry(0.055, 0.14, 10), [1, 1, 1], [0.09, 0.18, 0.02], [0, 0, 0.24]),
   ]
   if (hornHeight > 0) {
     headParts.push(
-      transformedPart(new THREE.CylinderGeometry(0.014, 0.018, hornHeight, 4), [1, 1, 1], [-0.072, 0.23 + hornHeight / 2, 0.02], [0, 0, -0.16]),
-      transformedPart(new THREE.CylinderGeometry(0.014, 0.018, hornHeight, 4), [1, 1, 1], [0.072, 0.23 + hornHeight / 2, 0.02], [0, 0, 0.16]),
+      transformedPart(new THREE.CylinderGeometry(0.014, 0.018, hornHeight, 8), [1, 1, 1], [-0.072, 0.23 + hornHeight / 2, 0.02], [0, 0, -0.16]),
+      transformedPart(new THREE.CylinderGeometry(0.014, 0.018, hornHeight, 8), [1, 1, 1], [0.072, 0.23 + hornHeight / 2, 0.02], [0, 0, 0.16]),
     )
   }
   return {
     bodyGeometry,
     headGeometry: mergedCreature(headParts),
-    legGeometry: new THREE.CylinderGeometry(1, 1, 1, 4),
+    legGeometry: new THREE.CylinderGeometry(1, 1, 1, 10),
     headAnchor: new THREE.Vector3(0, 0.39, 0.29),
     hips: [
       new THREE.Vector3(-0.15, 0.3, -0.19),
@@ -115,18 +116,18 @@ function hornedQuadrupedRig(headScale: readonly [number, number, number], hornHe
 
 function boarRig(): QuadrupedRig {
   const bodyGeometry = mergedCreature([
-    transformedPart(new THREE.DodecahedronGeometry(0.28, 0), [1.05, 0.58, 1.16], [0, 0.27, -0.045]),
+    transformedPart(new THREE.DodecahedronGeometry(0.28, 1), [1.05, 0.58, 1.16], [0, 0.27, -0.045]),
   ])
   const headGeometry = mergedCreature([
-    transformedPart(new THREE.DodecahedronGeometry(0.15, 0), [0.86, 0.66, 0.82], [0, 0, 0]),
-    transformedPart(new THREE.ConeGeometry(0.07, 0.18, 4), [1, 0.52, 1], [0, -0.02, 0.13], [Math.PI / 2, 0, 0]),
-    transformedPart(new THREE.ConeGeometry(0.06, 0.12, 4), [1, 1, 1], [-0.1, 0.17, -0.02], [0, 0, -0.52]),
-    transformedPart(new THREE.ConeGeometry(0.06, 0.12, 4), [1, 1, 1], [0.1, 0.17, -0.02], [0, 0, 0.52]),
+    transformedPart(new THREE.DodecahedronGeometry(0.15, 1), [0.86, 0.66, 0.82], [0, 0, 0]),
+    transformedPart(new THREE.ConeGeometry(0.07, 0.18, 10), [1, 0.52, 1], [0, -0.02, 0.13], [Math.PI / 2, 0, 0]),
+    transformedPart(new THREE.ConeGeometry(0.06, 0.12, 10), [1, 1, 1], [-0.1, 0.17, -0.02], [0, 0, -0.52]),
+    transformedPart(new THREE.ConeGeometry(0.06, 0.12, 10), [1, 1, 1], [0.1, 0.17, -0.02], [0, 0, 0.52]),
   ])
   return {
     bodyGeometry,
     headGeometry,
-    legGeometry: new THREE.CylinderGeometry(1, 1, 1, 4),
+    legGeometry: new THREE.CylinderGeometry(1, 1, 1, 10),
     headAnchor: new THREE.Vector3(0, 0.32, 0.3),
     hips: [
       new THREE.Vector3(-0.16, 0.27, -0.17),
@@ -150,23 +151,23 @@ function quadrupedRigFor(species: FaunaSpecies): QuadrupedRig | undefined {
 
 function sandWraithGeometry(): THREE.BufferGeometry {
   return mergedCreature([
-    transformedPart(new THREE.ConeGeometry(0.24, 0.62, 5), [1, 1, 1], [0, 0.37, 0], [0, Math.PI / 5, 0]),
-    transformedPart(new THREE.DodecahedronGeometry(0.16, 0), [0.92, 0.8, 0.92], [0, 0.68, 0]),
-    transformedPart(new THREE.ConeGeometry(0.095, 0.28, 4), [1, 1, 1], [-0.19, 0.38, -0.03], [0, 0, Math.PI / 2]),
-    transformedPart(new THREE.ConeGeometry(0.095, 0.28, 4), [1, 1, 1], [0.19, 0.38, -0.03], [0, 0, -Math.PI / 2]),
+    transformedPart(new THREE.ConeGeometry(0.24, 0.62, 14), [1, 1, 1], [0, 0.37, 0], [0, Math.PI / 5, 0]),
+    transformedPart(new THREE.DodecahedronGeometry(0.16, 1), [0.92, 0.8, 0.92], [0, 0.68, 0]),
+    transformedPart(new THREE.ConeGeometry(0.095, 0.28, 10), [1, 1, 1], [-0.19, 0.38, -0.03], [0, 0, Math.PI / 2]),
+    transformedPart(new THREE.ConeGeometry(0.095, 0.28, 10), [1, 1, 1], [0.19, 0.38, -0.03], [0, 0, -Math.PI / 2]),
   ])
 }
 
 function stoneBeastGeometry(): THREE.BufferGeometry {
   return mergedCreature([
-    transformedPart(new THREE.DodecahedronGeometry(0.28, 0), [0.96, 0.76, 1], [0, 0.31, -0.03]),
-    transformedPart(new THREE.DodecahedronGeometry(0.17, 0), [0.88, 0.8, 0.86], [0, 0.37, 0.29]),
-    transformedPart(new THREE.ConeGeometry(0.08, 0.2, 4), [1, 1, 1], [-0.14, 0.63, -0.04]),
-    transformedPart(new THREE.ConeGeometry(0.08, 0.2, 4), [1, 1, 1], [0.14, 0.63, -0.04]),
-    transformedPart(new THREE.DodecahedronGeometry(0.095, 0), [1.1, 0.42, 1], [-0.17, 0.1, -0.17]),
-    transformedPart(new THREE.DodecahedronGeometry(0.095, 0), [1.1, 0.42, 1], [0.17, 0.1, -0.17]),
-    transformedPart(new THREE.DodecahedronGeometry(0.095, 0), [1.1, 0.42, 1], [-0.17, 0.1, 0.18]),
-    transformedPart(new THREE.DodecahedronGeometry(0.095, 0), [1.1, 0.42, 1], [0.17, 0.1, 0.18]),
+    transformedPart(new THREE.DodecahedronGeometry(0.28, 1), [0.96, 0.76, 1], [0, 0.31, -0.03]),
+    transformedPart(new THREE.DodecahedronGeometry(0.17, 1), [0.88, 0.8, 0.86], [0, 0.37, 0.29]),
+    transformedPart(new THREE.ConeGeometry(0.08, 0.2, 10), [1, 1, 1], [-0.14, 0.63, -0.04]),
+    transformedPart(new THREE.ConeGeometry(0.08, 0.2, 10), [1, 1, 1], [0.14, 0.63, -0.04]),
+    transformedPart(new THREE.DodecahedronGeometry(0.095, 1), [1.1, 0.42, 1], [-0.17, 0.1, -0.17]),
+    transformedPart(new THREE.DodecahedronGeometry(0.095, 1), [1.1, 0.42, 1], [0.17, 0.1, -0.17]),
+    transformedPart(new THREE.DodecahedronGeometry(0.095, 1), [1.1, 0.42, 1], [-0.17, 0.1, 0.18]),
+    transformedPart(new THREE.DodecahedronGeometry(0.095, 1), [1.1, 0.42, 1], [0.17, 0.1, 0.18]),
   ])
 }
 
@@ -214,6 +215,7 @@ export class FaunaLayer {
   private readonly legPhase = [0, Math.PI, Math.PI, 0] as const
   private attachedScene: THREE.Scene | undefined
   private world: World | undefined
+  private fleeing = false
   private disposed = false
   private poseTileX = 0
   private poseTileZ = 0
@@ -271,6 +273,12 @@ export class FaunaLayer {
       if (batch) batch.placements = selected.filter((spawn) => spawn.species === species)
     }
     this.updateMatrices(0, true, true)
+  }
+
+  /** Weather changes presentation only; generated fauna positions remain deterministic. */
+  public setStormActive(active: boolean): void {
+    if (this.fleeing === active) return
+    this.fleeing = active
   }
 
   public update(elapsed: number, reducedMotion: boolean): void {
@@ -406,29 +414,11 @@ export class FaunaLayer {
 
   /** Gives every animal a small smooth wandering route instead of a tick-by-tick teleport. */
   private setWanderPose(spawn: FaunaSpawn, elapsed: number, reducedMotion: boolean): void {
-    if (reducedMotion) {
-      this.poseTileX = spawn.x
-      this.poseTileZ = spawn.z
-      this.poseHeading = spawn.rotation
-      this.poseGait = 0
-      return
-    }
-    const travel = elapsed * spawn.pace * 0.5 + spawn.phase
-    const forwardX = Math.sin(spawn.rotation)
-    const forwardZ = Math.cos(spawn.rotation)
-    const sideX = -forwardZ
-    const sideZ = forwardX
-    const along = Math.sin(travel) * 0.34
-    const across = Math.sin(travel * 0.67 + spawn.phase) * 0.14
-    const alongVelocity = Math.cos(travel) * 0.34
-    const acrossVelocity = Math.cos(travel * 0.67 + spawn.phase) * 0.094
-    const velocityX = forwardX * alongVelocity + sideX * acrossVelocity
-    const velocityZ = forwardZ * alongVelocity + sideZ * acrossVelocity
-
-    this.poseTileX = spawn.x + forwardX * along + sideX * across
-    this.poseTileZ = spawn.z + forwardZ * along + sideZ * across
-    this.poseHeading = Math.atan2(velocityX, velocityZ)
-    this.poseGait = Math.sin(elapsed * spawn.pace * 7.4 + spawn.phase)
+    const pose = faunaMotionPose(spawn, elapsed, reducedMotion, this.fleeing)
+    this.poseTileX = pose.tileX
+    this.poseTileZ = pose.tileZ
+    this.poseHeading = pose.heading
+    this.poseGait = reducedMotion ? 0 : Math.sin(elapsed * spawn.pace * 9.6 + spawn.phase)
   }
 
   private setRootOrientation(normal: THREE.Vector3, heading: number): void {

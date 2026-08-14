@@ -32,20 +32,25 @@ const settler: SettlerPlacement = {
 
 describe('animated actor presentation policy', () => {
   it('keeps skinned foreground actors bounded by graphics quality', () => {
-    expect(__animatedActorTestables.animatedActorLimit('low')).toBe(0)
-    expect(__animatedActorTestables.animatedActorLimit('medium')).toBe(1)
-    expect(__animatedActorTestables.animatedActorLimit('high')).toBe(2)
-    expect(__animatedActorTestables.animatedActorLimit('ultra')).toBe(2)
+    expect(__animatedActorTestables.animatedActorLimit('low')).toBe(1)
+    expect(__animatedActorTestables.animatedActorLimit('medium')).toBe(2)
+    expect(__animatedActorTestables.animatedActorLimit('high')).toBe(3)
+    expect(__animatedActorTestables.animatedActorLimit('ultra')).toBe(3)
   })
 
   it('uses a deterministic fauna route and calm action choices', () => {
     const reduced = __animatedActorTestables.faunaMotionPose(deer, 5, true)
     const moving = __animatedActorTestables.faunaMotionPose(deer, 0, false)
-    expect(reduced).toEqual({ tileX: deer.x, tileZ: deer.z, heading: deer.rotation, movement: 0 })
+    const later = __animatedActorTestables.faunaMotionPose(deer, 2, false)
+    expect(reduced).toEqual({ tileX: deer.x, tileZ: deer.z, heading: deer.rotation, movement: 0, activity: 'rest' })
     expect(moving.movement).toBeGreaterThan(0)
+    expect(Math.hypot(later.tileX - deer.x, later.tileZ - deer.z)).toBeGreaterThan(0.5)
     expect(__animatedActorTestables.faunaClipFor(deer, 0, true, moving.movement)).toBe('idle')
     expect(__animatedActorTestables.faunaClipFor(deer, 0, false, 0.2)).toBe('walk')
     expect(__animatedActorTestables.faunaClipFor(deer, 2, false, 0)).toBe('forage')
+    const fleeing = __animatedActorTestables.faunaMotionPose(deer, 0, false, true)
+    expect(fleeing.activity).toBe('flee')
+    expect(fleeing.movement).toBeGreaterThan(moving.movement)
   })
 
   it('keeps a reduced-motion resident at a deterministic resting point', () => {
@@ -54,4 +59,18 @@ describe('animated actor presentation policy', () => {
     expect(pose.tileZ).toBeCloseTo(7)
     expect(pose.heading).toBeCloseTo(0)
   })
+
+  it('gives an active resident a visible route without moving the reduced-motion pose', () => {
+    const start = __animatedActorTestables.settlerMotionPose(settler, 0, false)
+    const later = __animatedActorTestables.settlerMotionPose(settler, 3, false)
+    expect(Math.hypot(later.tileX - start.tileX, later.tileZ - start.tileZ)).toBeGreaterThan(0.5)
+  })
+  it('changes resident routes and work pulses with their simulation role', () => {
+    const farmer = __animatedActorTestables.settlerMotionPose({ ...settler, activity: 'farm' }, 1.3, false)
+    const sheltering = __animatedActorTestables.settlerMotionPose({ ...settler, activity: 'shelter' }, 1.3, false)
+    expect(farmer.activity).toBe('farm')
+    expect(Math.abs(farmer.workPulse)).toBeGreaterThan(0.01)
+    expect(sheltering.movement).toBeGreaterThan(farmer.movement)
+  })
+
 })

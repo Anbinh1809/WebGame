@@ -8,12 +8,17 @@ describe('graphics settings', () => {
     const markup = renderToStaticMarkup(
       <GraphicsSettings
         quality="ultra"
+        motionPreference="system"
+        soundEnabled
         overrides={createGraphicsQualityOverrides({ shadows: 'ultra', water: 'low' })}
         assetPackQuality="cinema-8k"
         desktopEdition
         desktopPackAvailability={{ 'desktop-2k': true, 'desktop-4k': true, 'cinema-8k': false }}
         cinema8kEntitled={false}
         onQualityChange={() => undefined}
+        onMotionPreferenceChange={() => undefined}
+        onSoundEnabledChange={() => undefined}
+        onOpenTutorial={() => undefined}
         onOverridesChange={() => undefined}
         onAssetPackQualityChange={() => undefined}
       />,

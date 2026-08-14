@@ -1,6 +1,8 @@
 import * as THREE from 'three'
 import type { VillageToolId } from '../simulation/types'
 import type { World } from '../world/types'
+import { settlerMotionPose } from './ActorMotion'
+import type { SettlerActivity } from './ActorMotion'
 import { sampleTerrainPointAtScene, sampleTerrainPointAtTile, solveTwoBoneKnee, WORLD_UP } from './TerrainPose'
 
 export interface SettlerPlacement {
@@ -13,6 +15,8 @@ export interface SettlerPlacement {
   clothingColor: number
   skinColor: number
   tool: VillageToolId
+  /** Presentation-only role derived from the deterministic village simulation. */
+  activity?: SettlerActivity
 }
 
 interface ToolVisual {
@@ -57,13 +61,13 @@ function createInstancedMesh<G extends THREE.BufferGeometry>(
  */
 export class SettlerLayer {
   private readonly group = new THREE.Group()
-  private readonly bodyMaterial = new THREE.MeshStandardMaterial({ vertexColors: true, flatShading: true, roughness: 0.78 })
-  private readonly skinMaterial = new THREE.MeshStandardMaterial({ vertexColors: true, flatShading: true, roughness: 0.82 })
-  private readonly toolMaterial = new THREE.MeshStandardMaterial({ vertexColors: true, flatShading: true, roughness: 0.62, metalness: 0.18 })
-  private readonly torsoGeometry = new THREE.CapsuleGeometry(0.055, 0.13, 2, 6)
-  private readonly headGeometry = new THREE.SphereGeometry(0.065, 7, 5)
-  private readonly limbGeometry = new THREE.CylinderGeometry(1, 1, 1, 4)
-  private readonly toolHandleGeometry = new THREE.CylinderGeometry(0.012, 0.016, 0.32, 5)
+  private readonly bodyMaterial = new THREE.MeshStandardMaterial({ vertexColors: true, flatShading: false, roughness: 0.74 })
+  private readonly skinMaterial = new THREE.MeshStandardMaterial({ vertexColors: true, flatShading: false, roughness: 0.78 })
+  private readonly toolMaterial = new THREE.MeshStandardMaterial({ vertexColors: true, flatShading: false, roughness: 0.58, metalness: 0.22 })
+  private readonly torsoGeometry = new THREE.CapsuleGeometry(0.055, 0.13, 4, 12)
+  private readonly headGeometry = new THREE.SphereGeometry(0.065, 14, 10)
+  private readonly limbGeometry = new THREE.CylinderGeometry(1, 1, 1, 10)
+  private readonly toolHandleGeometry = new THREE.CylinderGeometry(0.012, 0.016, 0.32, 8)
   private readonly toolHeadGeometry = new THREE.BoxGeometry(0.1, 0.07, 0.06)
   private readonly bodies: THREE.InstancedMesh<THREE.CapsuleGeometry, THREE.MeshStandardMaterial>
   private readonly heads: THREE.InstancedMesh<THREE.SphereGeometry, THREE.MeshStandardMaterial>
@@ -150,12 +154,12 @@ export class SettlerLayer {
     for (let index = 0; index < this.placements.length; index += 1) {
       const settler = this.placements[index]
       if (!settler) continue
-      const walkPhase = elapsed * (0.58 + (settler.phase % 0.18)) + settler.phase
-      const orbit = reducedMotion ? settler.phase : walkPhase
-      const tileX = settler.anchorTileX + Math.cos(orbit) * settler.radius
-      const tileZ = settler.anchorTileZ + Math.sin(orbit) * settler.radius
-      const heading = Math.atan2(-Math.sin(orbit), Math.cos(orbit))
-      const gait = reducedMotion ? 0 : Math.sin(elapsed * 5.6 + settler.phase)
+      const pose = settlerMotionPose(settler, elapsed, reducedMotion)
+      const tileX = pose.tileX
+      const tileZ = pose.tileZ
+      const heading = pose.heading
+      const walking = pose.movement > 0.26
+      const gait = reducedMotion ? 0 : Math.sin(elapsed * (walking ? 5.6 : 3.4) + settler.phase)
 
       sampleTerrainPointAtTile(this.world, this.tileScale, tileX, tileZ, this.rootPosition, this.surfaceNormal)
       this.rootPosition.y += reducedMotion ? 0 : Math.abs(gait) * 0.014 * settler.scale
@@ -191,7 +195,7 @@ export class SettlerLayer {
 
       this.updateLeg(index, -1, gait, settler.scale)
       this.updateLeg(index, 1, -gait, settler.scale)
-      this.updateArmsAndTool(index, settler, gait, updateColors)
+      this.updateArmsAndTool(index, settler, gait, pose.workPulse, walking, updateColors)
     }
 
     const count = this.placements.length
@@ -231,10 +235,20 @@ export class SettlerLayer {
     this.setSegmentMatrix(this.legs, segmentIndex + 1, this.kneePosition, this.footPosition, 0.018 * scale)
   }
 
-  private updateArmsAndTool(index: number, settler: SettlerPlacement, gait: number, updateColors: boolean): void {
+  private updateArmsAndTool(
+    index: number,
+    settler: SettlerPlacement,
+    gait: number,
+    workPulse: number,
+    walking: boolean,
+    updateColors: boolean,
+  ): void {
     const visual = toolVisual(settler.tool)
+    const working = settler.activity === 'farm' || settler.activity === 'craft'
     for (const sideSign of [-1, 1] as const) {
-      const swing = sideSign < 0 ? -gait : gait * 0.32
+      const swing = working
+        ? sideSign < 0 ? workPulse * 0.32 : -workPulse
+        : walking ? sideSign < 0 ? -gait : gait * 0.32 : gait * 0.16
       this.shoulderPosition.set(sideSign * 0.082 * settler.scale, 0.39 * settler.scale, 0).applyQuaternion(this.rootQuaternion).add(this.rootPosition)
       this.handPosition
         .set(sideSign * 0.13 * settler.scale, (0.24 - swing * 0.035) * settler.scale, swing * 0.075 * settler.scale)

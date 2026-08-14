@@ -391,11 +391,142 @@ export function decodeSave(raw: string): SaveDecodeResult {
   }
 }
 
-export function saveToLocalStorage(game: GameState, storage: Storage = window.localStorage): void {
-  storage.setItem(SAVE_STORAGE_KEY, serializeSave(game))
+function defaultStorage(): Storage | undefined {
+  return typeof window !== 'undefined' ? window.localStorage : undefined
 }
 
-export function loadFromLocalStorage(storage: Storage = window.localStorage): SaveDecodeResult {
-  const raw = storage.getItem(SAVE_STORAGE_KEY)
-  return raw ? decodeSave(raw) : { ok: false, reason: 'Chưa có bản lưu cục bộ trên thiết bị này.' }
+export function saveToLocalStorage(game: GameState, storage: Storage | undefined = defaultStorage()): boolean {
+  if (!storage) return false
+  try {
+    storage.setItem(SAVE_STORAGE_KEY, serializeSave(game))
+    return true
+  } catch {
+    return false
+  }
+}
+
+export function loadFromLocalStorage(storage: Storage | undefined = defaultStorage()): SaveDecodeResult {
+  try {
+    const raw = storage?.getItem(SAVE_STORAGE_KEY)
+    return raw ? decodeSave(raw) : { ok: false, reason: 'Chưa có bản lưu cục bộ trên thiết bị này.' }
+  } catch {
+    return { ok: false, reason: 'Không thể truy cập bộ nhớ cục bộ trên thiết bị này.' }
+  }
+}
+
+export const MULTI_SAVE_INDEX_KEY = 'aetheria-world-shaper.save-index.v1'
+export const SAVE_SLOT_KEY_PREFIX = 'aetheria-world-shaper.slot.'
+
+export interface SaveSlotMeta {
+  slotId: string
+  worldName: string
+  seed: string
+  era: string
+  population: number
+  days: number
+  savedAt: string
+  scenarioId?: string | undefined
+}
+
+export function listSaveSlots(storage: Storage | undefined = defaultStorage()): SaveSlotMeta[] {
+  if (!storage) return []
+  try {
+    const rawIndex = storage.getItem(MULTI_SAVE_INDEX_KEY)
+    if (!rawIndex) return []
+    const parsed = JSON.parse(rawIndex) as unknown
+    if (!Array.isArray(parsed)) return []
+    return parsed.filter((item): item is SaveSlotMeta => (
+      isRecord(item) &&
+      typeof item.slotId === 'string' &&
+      typeof item.worldName === 'string' &&
+      typeof item.seed === 'string'
+    ))
+  } catch {
+    return []
+  }
+}
+
+export function saveGameToSlot(
+  game: GameState,
+  worldName: string,
+  slotId?: string,
+  scenarioId?: string,
+  storage: Storage | undefined = defaultStorage(),
+): SaveSlotMeta {
+  const id = slotId || `slot-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`
+  const serialized = serializeSave(game)
+
+  if (storage) {
+    try {
+      storage.setItem(`${SAVE_SLOT_KEY_PREFIX}${id}`, serialized)
+      // Also update default slot for backward compatibility
+      storage.setItem(SAVE_STORAGE_KEY, serialized)
+    } catch {
+      // Gracefully survive quota exceeded error
+    }
+  }
+
+  const village = game.session.simulation.villages[0]
+  const population = village?.population ?? 0
+  const era = village ? villageEraForTools(village.tools) : 'Thời Đồ Đá'
+  const days = Math.floor(game.session.simulation.tick / 6) + 1
+
+  const meta: SaveSlotMeta = {
+    slotId: id,
+    worldName: worldName.trim() || `Thế giới ${game.session.world.config.seed}`,
+    seed: game.session.world.config.seed,
+    era,
+    population,
+    days,
+    savedAt: new Date().toISOString(),
+    scenarioId: scenarioId ?? undefined,
+  }
+
+  if (storage) {
+    try {
+      const existingSlots = listSaveSlots(storage).filter((s) => s.slotId !== id)
+      const updatedSlots = [meta, ...existingSlots]
+      storage.setItem(MULTI_SAVE_INDEX_KEY, JSON.stringify(updatedSlots))
+    } catch {
+      // Gracefully survive quota exceeded error
+    }
+  }
+
+  return meta
+}
+
+export function loadGameFromSlot(slotId: string, storage: Storage | undefined = defaultStorage()): SaveDecodeResult {
+  try {
+    const raw = storage?.getItem(`${SAVE_SLOT_KEY_PREFIX}${slotId}`)
+    if (!raw) return { ok: false, reason: `Không tìm thấy bản lưu cho slot: ${slotId}` }
+    return decodeSave(raw)
+  } catch {
+    return { ok: false, reason: `Không thể đọc bản lưu cho slot: ${slotId}` }
+  }
+}
+
+export function deleteSaveSlot(slotId: string, storage: Storage | undefined = defaultStorage()): boolean {
+  if (!storage) return false
+  try {
+    storage.removeItem(`${SAVE_SLOT_KEY_PREFIX}${slotId}`)
+    const remaining = listSaveSlots(storage).filter((s) => s.slotId !== slotId)
+    storage.setItem(MULTI_SAVE_INDEX_KEY, JSON.stringify(remaining))
+    return true
+  } catch {
+    return false
+  }
+}
+
+export function renameSaveSlot(slotId: string, newWorldName: string, storage: Storage | undefined = defaultStorage()): boolean {
+  if (!storage) return false
+  try {
+    const slots = listSaveSlots(storage)
+    const target = slots.find((s) => s.slotId === slotId)
+    if (!target) return false
+    target.worldName = newWorldName.trim() || target.worldName
+    storage.setItem(MULTI_SAVE_INDEX_KEY, JSON.stringify(slots))
+    return true
+  } catch {
+    return false
+  }
 }

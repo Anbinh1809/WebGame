@@ -1,5 +1,7 @@
 import type { ChangeEvent, JSX } from 'react'
 import type { AssetPackQuality } from '../assets/types'
+import { MOTION_PREFERENCE_LABELS } from '../renderer/MotionPreference'
+import type { MotionPreference } from '../renderer/MotionPreference'
 import type { DesktopPackAvailability } from '../assets/desktopPackManifest'
 import { ASSET_PACK_LABELS, DESKTOP_TEXTURE_PACKS } from '../runtime/edition'
 import {
@@ -17,6 +19,11 @@ import type {
 
 interface GraphicsSettingsProps {
   quality: QualityProfile
+  motionPreference: MotionPreference
+  soundEnabled: boolean
+  masterVolume?: number
+  musicVolume?: number
+  sfxVolume?: number
   overrides: GraphicsQualityOverrides
   assetPackQuality: AssetPackQuality
   desktopEdition: boolean
@@ -25,6 +32,12 @@ interface GraphicsSettingsProps {
   isCheckingDesktopPacks?: boolean
   isCheckingCinemaEntitlement?: boolean
   onQualityChange: (quality: QualityProfile) => void
+  onMotionPreferenceChange: (preference: MotionPreference) => void
+  onSoundEnabledChange: (enabled: boolean) => void
+  onMasterVolumeChange?: (volume: number) => void
+  onMusicVolumeChange?: (volume: number) => void
+  onSfxVolumeChange?: (volume: number) => void
+  onOpenTutorial: () => void
   onOverridesChange: (overrides: GraphicsQualityOverrides) => void
   onAssetPackQualityChange: (pack: AssetPackQuality) => void
 }
@@ -75,6 +88,11 @@ function GraphicsOverrideSelect({
 
 export function GraphicsSettings({
   quality,
+  motionPreference,
+  soundEnabled,
+  masterVolume = 1.0,
+  musicVolume = 0.55,
+  sfxVolume = 0.85,
   overrides,
   assetPackQuality,
   desktopEdition,
@@ -83,6 +101,12 @@ export function GraphicsSettings({
   isCheckingDesktopPacks = false,
   isCheckingCinemaEntitlement = false,
   onQualityChange,
+  onMotionPreferenceChange,
+  onSoundEnabledChange,
+  onMasterVolumeChange,
+  onMusicVolumeChange,
+  onSfxVolumeChange,
+  onOpenTutorial,
   onOverridesChange,
   onAssetPackQualityChange,
 }: GraphicsSettingsProps): JSX.Element {
@@ -111,8 +135,8 @@ export function GraphicsSettings({
     <section className="graphics-settings panel-surface" aria-labelledby="graphics-settings-heading">
       <div className="panel-heading">
         <div>
-          <span className="eyebrow">Đồ họa 3D</span>
-          <h2 id="graphics-settings-heading">Tùy chỉnh đồ họa</h2>
+          <span className="eyebrow">Đồ họa 3D & Âm thanh</span>
+          <h2 id="graphics-settings-heading">Tùy chỉnh đồ họa & âm thanh</h2>
         </div>
       </div>
 
@@ -124,6 +148,65 @@ export function GraphicsSettings({
           {(Object.keys(QUALITY_LABELS) as QualityProfile[]).map((profile) => <option key={profile} value={profile}>{QUALITY_LABELS[profile]}</option>)}
         </select>
       </label>
+
+      <fieldset className="graphics-experience-controls">
+        <legend>Âm thanh & Trải nghiệm</legend>
+        <label className="field-label" htmlFor="graphics-motion-preference">
+          <span>Chuyển động</span>
+          <select id="graphics-motion-preference" value={motionPreference} onChange={(event) => onMotionPreferenceChange(event.target.value as MotionPreference)}>
+            {(Object.keys(MOTION_PREFERENCE_LABELS) as MotionPreference[]).map((preference) => <option key={preference} value={preference}>{MOTION_PREFERENCE_LABELS[preference]}</option>)}
+          </select>
+        </label>
+        <label className="toggle-field">
+          <input type="checkbox" checked={soundEnabled} onChange={(event) => onSoundEnabledChange(event.target.checked)} />
+          <span>Bật toàn bộ âm thanh & nhạc nền không gian</span>
+        </label>
+
+        {soundEnabled ? (
+          <div className="audio-sliders-container" style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', marginTop: '0.5rem' }}>
+            <label className="field-label" htmlFor="audio-master-volume">
+              <span>Âm lượng tổng: <strong>{Math.round(masterVolume * 100)}%</strong></span>
+              <input
+                id="audio-master-volume"
+                type="range"
+                min="0"
+                max="100"
+                step="5"
+                value={Math.round(masterVolume * 100)}
+                onChange={(e) => onMasterVolumeChange?.(Number(e.target.value) / 100)}
+              />
+            </label>
+
+            <label className="field-label" htmlFor="audio-music-volume">
+              <span>Nhạc nền (BGM): <strong>{Math.round(musicVolume * 100)}%</strong></span>
+              <input
+                id="audio-music-volume"
+                type="range"
+                min="0"
+                max="100"
+                step="5"
+                value={Math.round(musicVolume * 100)}
+                onChange={(e) => onMusicVolumeChange?.(Number(e.target.value) / 100)}
+              />
+            </label>
+
+            <label className="field-label" htmlFor="audio-sfx-volume">
+              <span>Hiệu ứng thao tác (SFX): <strong>{Math.round(sfxVolume * 100)}%</strong></span>
+              <input
+                id="audio-sfx-volume"
+                type="range"
+                min="0"
+                max="100"
+                step="5"
+                value={Math.round(sfxVolume * 100)}
+                onChange={(e) => onSfxVolumeChange?.(Number(e.target.value) / 100)}
+              />
+            </label>
+          </div>
+        ) : null}
+
+        <button type="button" className="secondary-button" style={{ marginTop: '0.5rem' }} onClick={onOpenTutorial}>Xem lại hướng dẫn chơi</button>
+      </fieldset>
 
       {desktopEdition ? (
         <label className="field-label graphics-texture-pack" htmlFor="graphics-texture-pack">

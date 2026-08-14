@@ -6,6 +6,7 @@ import { ANIMATED_FAUNA_ASSETS, ANIMATED_SETTLER_ASSET } from '../assets/animati
 import { generateFauna } from '../world/fauna'
 import type { FaunaSpawn, FaunaSpecies } from '../world/fauna'
 import type { World } from '../world/types'
+import { faunaMotionPose, settlerMotionPose } from './ActorMotion'
 import type { EffectiveQuality } from './quality'
 import type { SettlerPlacement } from './SettlerLayer'
 import { sampleTerrainPointAtTile, WORLD_UP } from './TerrainPose'
@@ -49,27 +50,15 @@ interface SurfacePoseScratch {
   yaw: THREE.Quaternion
 }
 
-interface FaunaMotionPose {
-  tileX: number
-  tileZ: number
-  heading: number
-  movement: number
-}
-
-interface SettlerMotionPose {
-  tileX: number
-  tileZ: number
-  heading: number
-}
-
 interface FbxAnimationGroup extends THREE.Group {
   animations: THREE.AnimationClip[]
 }
 
 function animatedActorLimit(quality: EffectiveQuality): number {
-  if (quality === 'low') return 0
-  if (quality === 'medium') return 1
-  return 2
+  // One foreground rig remains visible at Low; the instanced crowd handles scale.
+  if (quality === 'low') return 1
+  if (quality === 'medium') return 2
+  return 3
 }
 
 function createSurfacePoseScratch(): SurfacePoseScratch {
@@ -164,43 +153,10 @@ function applySurfacePose(
   root.scale.setScalar(scale)
 }
 
-function faunaMotionPose(spawn: FaunaSpawn, elapsed: number, reducedMotion: boolean): FaunaMotionPose {
-  if (reducedMotion) {
-    return { tileX: spawn.x, tileZ: spawn.z, heading: spawn.rotation, movement: 0 }
-  }
-  const travel = elapsed * spawn.pace * 0.5 + spawn.phase
-  const forwardX = Math.sin(spawn.rotation)
-  const forwardZ = Math.cos(spawn.rotation)
-  const sideX = -forwardZ
-  const sideZ = forwardX
-  const along = Math.sin(travel) * 0.34
-  const across = Math.sin(travel * 0.67 + spawn.phase) * 0.14
-  const alongVelocity = Math.cos(travel) * 0.34
-  const acrossVelocity = Math.cos(travel * 0.67 + spawn.phase) * 0.094
-  const velocityX = forwardX * alongVelocity + sideX * acrossVelocity
-  const velocityZ = forwardZ * alongVelocity + sideZ * acrossVelocity
-  return {
-    tileX: spawn.x + forwardX * along + sideX * across,
-    tileZ: spawn.z + forwardZ * along + sideZ * across,
-    heading: Math.atan2(velocityX, velocityZ),
-    movement: Math.hypot(velocityX, velocityZ),
-  }
-}
-
 function faunaClipFor(spawn: FaunaSpawn, elapsed: number, reducedMotion: boolean, movement: number): FaunaClipKey {
   if (reducedMotion) return 'idle'
-  if (movement > 0.17) return 'walk'
+  if (movement > 0.15) return 'walk'
   return Math.sin(elapsed * 0.31 + spawn.phase) > 0.15 ? 'forage' : 'idle'
-}
-
-function settlerMotionPose(settler: SettlerPlacement, elapsed: number, reducedMotion: boolean): SettlerMotionPose {
-  const walkPhase = elapsed * (0.58 + (settler.phase % 0.18)) + settler.phase
-  const orbit = reducedMotion ? settler.phase : walkPhase
-  return {
-    tileX: settler.anchorTileX + Math.cos(orbit) * settler.radius,
-    tileZ: settler.anchorTileZ + Math.sin(orbit) * settler.radius,
-    heading: Math.atan2(-Math.sin(orbit), Math.cos(orbit)),
-  }
 }
 
 function sameIds<T extends { id: string }>(current: readonly T[], next: readonly T[]): boolean {
@@ -231,6 +187,7 @@ export class AnimatedFaunaLayer {
   private attachedScene: THREE.Scene | undefined
   private world: World | undefined
   private selected: readonly FaunaSpawn[] = []
+  private fleeing = false
   private disposed = false
 
   public constructor(private readonly tileScale: number) {
@@ -270,12 +227,17 @@ export class AnimatedFaunaLayer {
   public update(delta: number, elapsed: number, reducedMotion: boolean): void {
     const world = this.world
     if (this.disposed || !world) return
+    const clampedDelta = Math.min(Math.max(0, delta), 0.1)
     for (const actor of this.actors) {
-      const pose = faunaMotionPose(actor.spawn, elapsed, reducedMotion)
+      const pose = faunaMotionPose(actor.spawn, elapsed, reducedMotion, this.fleeing)
       applySurfacePose(actor.root, world, this.tileScale, pose.tileX, pose.tileZ, pose.heading, actor.spawn.scale, this.surface)
       transitionTo(actor, faunaClipFor(actor.spawn, elapsed, reducedMotion, pose.movement))
-      if (!reducedMotion) actor.mixer.update(delta)
+      if (!reducedMotion) actor.mixer.update(clampedDelta)
     }
+  }
+
+  public setStormActive(active: boolean): void {
+    this.fleeing = active
   }
 
   public dispose(): void {
@@ -342,7 +304,6 @@ export class AnimatedFaunaLayer {
         activeAction: undefined,
       }
       transitionTo(actor, 'idle')
-      this.actors.push(actor)
       this.group.add(root)
     }
   }
@@ -401,11 +362,12 @@ export class AnimatedSettlerLayer {
   public update(delta: number, elapsed: number, reducedMotion: boolean): void {
     const world = this.world
     if (this.disposed || !world) return
+    const clampedDelta = Math.min(Math.max(0, delta), 0.1)
     for (const actor of this.actors) {
       const pose = settlerMotionPose(actor.settler, elapsed, reducedMotion)
       applySurfacePose(actor.root, world, this.tileScale, pose.tileX, pose.tileZ, pose.heading, actor.settler.scale, this.surface)
-      transitionTo(actor, reducedMotion ? 'idle' : 'run')
-      if (!reducedMotion) actor.mixer.update(delta * 0.62)
+      transitionTo(actor, reducedMotion || pose.movement < 0.26 ? 'idle' : 'run')
+      if (!reducedMotion) actor.mixer.update(clampedDelta * 0.62)
     }
   }
 

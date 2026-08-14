@@ -77,19 +77,30 @@ interface SettlementEcology {
 function settlementEcology(world: World, tileIndex: number): SettlementEcology {
   const home = world.tiles[tileIndex]
   if (!home) return { fertility: 0.2, water: 0.2, forest: 0 }
+  const size = world.config.size
   let weightTotal = 0
   let fertility = 0
   let water = 0
   let forest = 0
 
-  for (const tile of world.tiles) {
-    const distance = Math.abs(tile.x - home.x) + Math.abs(tile.z - home.z)
-    if (distance > 3) continue
-    const weight = 1 - distance / 4
-    weightTotal += weight
-    fertility += weight * (tile.soil === 'màu mỡ' ? 1 : tile.soil === 'thường' ? 0.48 : 0.08)
-    water += weight * (tile.biome === 'biển' || tile.moisture > 0.72 ? 1 : tile.moisture * 0.52)
-    forest += weight * (tile.forest ? 1 : 0)
+  const minZ = Math.max(0, home.z - 3)
+  const maxZ = Math.min(size - 1, home.z + 3)
+  const minX = Math.max(0, home.x - 3)
+  const maxX = Math.min(size - 1, home.x + 3)
+
+  for (let z = minZ; z <= maxZ; z += 1) {
+    const rowOffset = z * size
+    for (let x = minX; x <= maxX; x += 1) {
+      const distance = Math.abs(x - home.x) + Math.abs(z - home.z)
+      if (distance > 3) continue
+      const tile = world.tiles[rowOffset + x]
+      if (!tile) continue
+      const weight = 1 - distance / 4
+      weightTotal += weight
+      fertility += weight * (tile.soil === 'màu mỡ' ? 1 : tile.soil === 'thường' ? 0.48 : 0.08)
+      water += weight * (tile.biome === 'biển' || tile.moisture > 0.72 ? 1 : tile.moisture * 0.52)
+      forest += weight * (tile.forest ? 1 : 0)
+    }
   }
 
   const divisor = Math.max(weightTotal, 1)
@@ -99,14 +110,25 @@ function settlementEcology(world: World, tileIndex: number): SettlementEcology {
 function localizedResourceScore(world: World, tileIndex: number): number {
   const home = world.tiles[tileIndex]
   if (!home) return 0.35
+  const size = world.config.size
   let resourceScore = home.resources * 1.35
   let samples = 1
 
-  for (const tile of world.tiles) {
-    const distance = Math.abs(tile.x - home.x) + Math.abs(tile.z - home.z)
-    if (distance > 3 || tile.biome === 'biển') continue
-    resourceScore += tile.resources * (1 - distance / 5)
-    samples += 1
+  const minZ = Math.max(0, home.z - 3)
+  const maxZ = Math.min(size - 1, home.z + 3)
+  const minX = Math.max(0, home.x - 3)
+  const maxX = Math.min(size - 1, home.x + 3)
+
+  for (let z = minZ; z <= maxZ; z += 1) {
+    const rowOffset = z * size
+    for (let x = minX; x <= maxX; x += 1) {
+      const distance = Math.abs(x - home.x) + Math.abs(z - home.z)
+      if (distance > 3) continue
+      const tile = world.tiles[rowOffset + x]
+      if (!tile || tile.biome === 'biển') continue
+      resourceScore += tile.resources * (1 - distance / 5)
+      samples += 1
+    }
   }
 
   return resourceScore / samples
