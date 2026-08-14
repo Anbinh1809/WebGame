@@ -5,13 +5,14 @@ export interface VersionInfo {
   notes?: string
 }
 
-export const CURRENT_CLIENT_VERSION = '0.1.5'
+export const CURRENT_CLIENT_VERSION = '0.1.6'
 export const CURRENT_BUILD_TIME = '2026-08-14T19:00:00.000Z'
 
 export type UpdateCallback = (newVersion: VersionInfo) => void
 
 export class UpdateService {
   private timer: ReturnType<typeof setInterval> | undefined
+  private startupTimeout: ReturnType<typeof setTimeout> | undefined
   private listeners = new Set<UpdateCallback>()
   private updateAvailable: VersionInfo | null = null
 
@@ -19,10 +20,11 @@ export class UpdateService {
 
   public start(): void {
     if (typeof window === 'undefined') return
-    if (this.timer) return
+    if (this.timer || this.startupTimeout) return
 
     // Run first check after 10s to let game load smoothly
-    setTimeout(() => {
+    this.startupTimeout = setTimeout(() => {
+      this.startupTimeout = undefined
       void this.checkForUpdates()
     }, 10_000)
 
@@ -32,6 +34,10 @@ export class UpdateService {
   }
 
   public stop(): void {
+    if (this.startupTimeout) {
+      clearTimeout(this.startupTimeout)
+      this.startupTimeout = undefined
+    }
     if (this.timer) {
       clearInterval(this.timer)
       this.timer = undefined

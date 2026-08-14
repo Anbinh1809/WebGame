@@ -133,6 +133,7 @@ export function LandingPage(): JSX.Element {
 
   const handleImportSave = async (event: ChangeEvent<HTMLInputElement>): Promise<void> => {
     const file = event.target.files?.[0]
+    event.target.value = ''
     if (!file) return
     try {
       const text = await file.text()
@@ -451,7 +452,7 @@ export function LandingPage(): JSX.Element {
               </div>
 
               <div className="desktop-download-actions">
-                <span className="badge-pill badge-era">Phiên bản Desktop v0.1.5 Alpha</span>
+                <span className="badge-pill badge-era">Phiên bản Desktop v0.1.6 Alpha</span>
                 <p>Hỗ trợ Windows 10/11, macOS và Linux. Đã tối ưu hóa tài nguyên 3D và hệ thống âm thanh.</p>
               </div>
             </div>

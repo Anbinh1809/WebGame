@@ -10,7 +10,7 @@ describe('packManifest', () => {
   })
 
   it('defines ambient audio paths correctly', () => {
-    expect(GAME_PACK_AUDIO.ambientTheme).toContain('.ogg')
-    expect(GAME_PACK_AUDIO.ambientExplore).toContain('.ogg')
+    expect(GAME_PACK_AUDIO.ambientTheme).toMatch(/\.(ogg|wav|mp3)$/)
+    expect(GAME_PACK_AUDIO.ambientExplore).toMatch(/\.(ogg|wav|mp3)$/)
   })
 })

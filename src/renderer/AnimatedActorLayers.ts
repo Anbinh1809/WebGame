@@ -55,10 +55,9 @@ interface FbxAnimationGroup extends THREE.Group {
 }
 
 function animatedActorLimit(quality: EffectiveQuality): number {
-  // One foreground rig remains visible at Low; the instanced crowd handles scale.
-  if (quality === 'low') return 1
-  if (quality === 'medium') return 2
-  return 3
+  if (quality === 'low') return 16
+  if (quality === 'medium') return 32
+  return 64
 }
 
 function createSurfacePoseScratch(): SurfacePoseScratch {
@@ -146,6 +145,7 @@ function applySurfacePose(
   scratch: SurfacePoseScratch,
 ): void {
   sampleTerrainPointAtTile(world, tileScale, tileX, tileZ, scratch.position, scratch.normal)
+  scratch.position.y = Math.max(0.08, scratch.position.y)
   scratch.slope.setFromUnitVectors(WORLD_UP, scratch.normal)
   scratch.yaw.setFromAxisAngle(WORLD_UP, heading)
   root.position.copy(scratch.position)
@@ -174,7 +174,7 @@ function requiredFbxClip(source: THREE.Group, path: string): THREE.AnimationClip
 }
 
 /**
- * A handful of skinned animals are reserved for close, high-quality moments.
+ * A handful of skinned animals and monsters are reserved for close, high-quality moments.
  * The original instanced fauna remains the scalable fallback for the rest.
  */
 export class AnimatedFaunaLayer {
@@ -210,7 +210,7 @@ export class AnimatedFaunaLayer {
     if (this.disposed) return
     this.world = world
     const limit = animatedActorLimit(quality)
-    const candidates = generateFauna(world).filter((spawn) => spawn.category === 'animal')
+    const candidates = generateFauna(world)
     const next: FaunaSpawn[] = []
     for (const asset of ANIMATED_FAUNA_ASSETS) {
       if (next.length >= limit) break
@@ -273,13 +273,15 @@ export class AnimatedFaunaLayer {
   private async loadTemplate(asset: (typeof ANIMATED_FAUNA_ASSETS)[number]): Promise<FaunaTemplate> {
     const gltf = await new GLTFLoader().loadAsync(asset.path)
     const clips = new Map<FaunaClipKey, THREE.AnimationClip>()
+    const fallbackClip = gltf.animations[0]
     for (const key of ['idle', 'forage', 'walk'] as const) {
-      const clip = clipForName(gltf.animations, asset.clips[key])
+      const clip = clipForName(gltf.animations, asset.clips[key]) ?? fallbackClip
       if (clip) clips.set(key, clip)
     }
-    if (!clips.has('idle') || !clips.has('walk')) {
-      disposeObjectResources(gltf.scene)
-      throw new Error(`Animated fauna asset is missing required idle or walk clips: ${asset.path}`)
+    if (clips.size === 0 && fallbackClip) {
+      clips.set('idle', fallbackClip)
+      clips.set('walk', fallbackClip)
+      clips.set('forage', fallbackClip)
     }
     setShadowFlags(gltf.scene)
     return { visual: gltf.scene, clips }
@@ -291,7 +293,14 @@ export class AnimatedFaunaLayer {
       const template = this.templates.get(spawn.species)
       if (!template) continue
       const root = new THREE.Group()
-      const visual = createNormalisedVisual(template.visual, 0.78)
+      const targetHeight = spawn.species === 'dực-long' || spawn.species === 'dực-điểu'
+        ? 1.45
+        : spawn.species === 'thạch-thú' || spawn.species === 'mộc-quái' || spawn.species === 'cự-tượng'
+        ? 1.35
+        : spawn.species === 'lang-tộc' || spawn.species === 'lợn-rừng'
+        ? 1.05
+        : 0.82
+      const visual = createNormalisedVisual(template.visual, targetHeight)
       root.name = `aetheria-animated-${spawn.species}-${spawn.id}`
       root.add(visual)
       const mixer = new THREE.AnimationMixer(visual)
@@ -303,7 +312,10 @@ export class AnimatedFaunaLayer {
         actions: addActions(mixer, template.clips),
         activeAction: undefined,
       }
-      transitionTo(actor, 'idle')
+      if (template.clips.size > 0) {
+        transitionTo(actor, 'idle')
+      }
+      this.actors.push(actor)
       this.group.add(root)
     }
   }
@@ -400,20 +412,38 @@ export class AnimatedSettlerLayer {
   }
 
   private async createTemplate(): Promise<SettlerTemplate> {
-    const loader = new FBXLoader()
-    const [model, idleSource, runSource, jumpSource] = await Promise.all([
-      loader.loadAsync(ANIMATED_SETTLER_ASSET.modelPath),
-      loader.loadAsync(ANIMATED_SETTLER_ASSET.clips.idle),
-      loader.loadAsync(ANIMATED_SETTLER_ASSET.clips.run),
-      loader.loadAsync(ANIMATED_SETTLER_ASSET.clips.jump),
+    if (ANIMATED_SETTLER_ASSET.modelPath.endsWith('.glb') || ANIMATED_SETTLER_ASSET.modelPath.endsWith('.gltf')) {
+      const gltf = await new GLTFLoader().loadAsync(ANIMATED_SETTLER_ASSET.modelPath)
+      const clips = new Map<SettlerClipKey, THREE.AnimationClip>()
+      const fallbackClip = gltf.animations[0]
+      for (const key of ['idle', 'run', 'jump'] as const) {
+        const clip = clipForName(gltf.animations, ANIMATED_SETTLER_ASSET.clips[key]) ?? fallbackClip
+        if (clip) clips.set(key, clip)
+      }
+      if (clips.size === 0 && fallbackClip) {
+        clips.set('idle', fallbackClip)
+        clips.set('run', fallbackClip)
+        clips.set('jump', fallbackClip)
+      }
+      setShadowFlags(gltf.scene)
+      return { visual: gltf.scene, clips }
+    }
+
+    const [character, idle, run, jump] = await Promise.all([
+      new FBXLoader().loadAsync(ANIMATED_SETTLER_ASSET.modelPath),
+      new FBXLoader().loadAsync(ANIMATED_SETTLER_ASSET.clips.idle),
+      new FBXLoader().loadAsync(ANIMATED_SETTLER_ASSET.clips.run),
+      new FBXLoader().loadAsync(ANIMATED_SETTLER_ASSET.clips.jump),
     ])
+
     const clips = new Map<SettlerClipKey, THREE.AnimationClip>([
-      ['idle', requiredFbxClip(idleSource, ANIMATED_SETTLER_ASSET.clips.idle)],
-      ['run', requiredFbxClip(runSource, ANIMATED_SETTLER_ASSET.clips.run)],
-      ['jump', requiredFbxClip(jumpSource, ANIMATED_SETTLER_ASSET.clips.jump)],
+      ['idle', requiredFbxClip(idle, ANIMATED_SETTLER_ASSET.clips.idle)],
+      ['run', requiredFbxClip(run, ANIMATED_SETTLER_ASSET.clips.run)],
+      ['jump', requiredFbxClip(jump, ANIMATED_SETTLER_ASSET.clips.jump)],
     ])
-    setShadowFlags(model)
-    return { visual: model, clips }
+
+    setShadowFlags(character)
+    return { visual: character, clips }
   }
 
   private rebuildActors(): void {
@@ -422,8 +452,8 @@ export class AnimatedSettlerLayer {
     if (!template) return
     for (const settler of this.selected) {
       const root = new THREE.Group()
-      const visual = createNormalisedVisual(template.visual, 0.58)
-      root.name = `aetheria-animated-settler-${settler.id}`
+      const visual = createNormalisedVisual(template.visual, 0.88)
+      root.name = `aetheria-animated-${settler.id}`
       root.add(visual)
       const mixer = new THREE.AnimationMixer(visual)
       const actor: AnimatedSettlerActor = {
@@ -434,7 +464,9 @@ export class AnimatedSettlerLayer {
         actions: addActions(mixer, template.clips),
         activeAction: undefined,
       }
-      transitionTo(actor, 'idle')
+      if (template.clips.size > 0) {
+        transitionTo(actor, 'idle')
+      }
       this.actors.push(actor)
       this.group.add(root)
     }
@@ -452,7 +484,8 @@ export class AnimatedSettlerLayer {
 
 export const __animatedActorTestables = {
   animatedActorLimit,
-  faunaMotionPose,
   faunaClipFor,
+  faunaMotionPose,
   settlerMotionPose,
 }
+

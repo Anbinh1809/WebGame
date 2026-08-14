@@ -56,18 +56,7 @@ function eachMaterial(material: THREE.Material | THREE.Material[], callback: (it
 
 /** A small, quality-aware cap keeps the real model from becoming a tile-count cost. */
 export function treeModelInstanceLimit(quality: EffectiveQuality, assetLimit: number): number {
-  // Broad-canopy production meshes retain far more leaf geometry than the
-  // compact fallback. Their cap is deliberately a visual LOD, not a texture
-  // quality switch: one on Low, two on Medium, four on High.
-  if (assetLimit <= 4) {
-    const target = quality === 'low' ? 1 : quality === 'medium' ? 2 : 4
-    return Math.max(0, Math.min(assetLimit, target))
-  }
-  if (assetLimit <= 8) {
-    const target = quality === 'low' ? 1 : quality === 'medium' ? 4 : 8
-    return Math.max(0, Math.min(assetLimit, target))
-  }
-  const target = quality === 'low' ? 4 : quality === 'medium' ? 12 : quality === 'high' ? 24 : 36
+  const target = quality === 'low' ? 32 : quality === 'medium' ? 64 : quality === 'high' ? 128 : 256
   return Math.max(0, Math.min(assetLimit, target))
 }
 

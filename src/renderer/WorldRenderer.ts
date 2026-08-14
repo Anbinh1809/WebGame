@@ -24,6 +24,10 @@ import { SettlerLayer } from './SettlerLayer'
 import type { SettlerPlacement } from './SettlerLayer'
 import { AnimatedFaunaLayer, AnimatedSettlerLayer } from './AnimatedActorLayers'
 import { AmbientLifeLayer } from './AmbientLifeLayer'
+import { SettlementModelLayer } from './SettlementModelLayer'
+import { ShipLayer } from './ShipLayer'
+import { AvatarController } from './AvatarController'
+import type { AvatarCameraPerspective, AvatarState } from './AvatarController'
 import { isReducedMotion } from './MotionPreference'
 import type { MotionPreference } from './MotionPreference'
 import {
@@ -56,7 +60,7 @@ import {
   resolveGraphicsQuality,
   waterSegmentsFor,
 } from './quality'
-import type { EffectiveQuality, GraphicsQualityComponent, GraphicsQualityOverrides, QualityProfile } from './quality'
+import type { EffectiveQuality, FpsLimit, GraphicsQualityComponent, GraphicsQualityOverrides, QualityProfile } from './quality'
 
 const TILE_SCALE = 0.72
 const MAX_SETTLERS = 180
@@ -605,6 +609,10 @@ export class WorldRenderer {
   private readonly animatedFaunaLayer = new AnimatedFaunaLayer(TILE_SCALE)
   private readonly animatedSettlerLayer = new AnimatedSettlerLayer(TILE_SCALE)
   private readonly ambientLifeLayer = new AmbientLifeLayer(TILE_SCALE)
+  private readonly settlementModelLayer = new SettlementModelLayer()
+  private readonly shipLayer = new ShipLayer(TILE_SCALE)
+  private readonly avatarController = new AvatarController(TILE_SCALE)
+  private fpsLimit: FpsLimit = 'auto'
   /** Two vertices per drop make weather legible as rain streaks while retaining one draw call. */
   private readonly rainPositions = new Float32Array(MAX_RAIN_DROPS * 6)
   private terrainGroup!: THREE.Group
@@ -1182,8 +1190,29 @@ export class WorldRenderer {
     }
   }
 
+  public setFpsLimit(limit: FpsLimit): void {
+    this.fpsLimit = limit
+  }
+
+  public setAvatarMode(active: boolean): void {
+    if (active) {
+      this.avatarController.enter(this.world)
+    } else {
+      this.avatarController.exit()
+    }
+  }
+
+  public toggleAvatarPerspective(): AvatarCameraPerspective {
+    return this.avatarController.togglePerspective()
+  }
+
+  public getAvatarState(): AvatarState {
+    return this.avatarController.getState()
+  }
+
   public dispose(): void {
     this.isDisposed = true
+    this.avatarController.dispose()
     this.artLoadRevision += 1
     this.clearEvolutionArt()
     this.renderer.setAnimationLoop(null)
@@ -1196,6 +1225,8 @@ export class WorldRenderer {
     this.detachCoastRockModelLayer()
     this.detachLanternModelLayer()
     this.detachStockpileModelLayer()
+    this.settlementModelLayer.dispose()
+    this.shipLayer.dispose()
     this.assetPackManager.dispose()
     this.disposeWorldObjects()
     this.previewMaterial.dispose()
@@ -1314,9 +1345,13 @@ export class WorldRenderer {
     }
     this.settlerLayer.attach(this.scene)
     this.animatedSettlerLayer.attach(this.scene)
+    this.settlementModelLayer.attach(this.scene)
+    this.shipLayer.attach(this.scene)
+    this.shipLayer.setWorld(world)
     this.sandDetails.castShadow = false
     this.faunaLayer.attach(this.scene)
     this.animatedFaunaLayer.attach(this.scene)
+    this.scene.add(this.avatarController.getRootGroup())
 
     this.rainGeometry.setAttribute('position', new THREE.BufferAttribute(this.rainPositions, 3))
     this.rain = new THREE.LineSegments(this.rainGeometry, this.rainMaterial)
@@ -1897,6 +1932,10 @@ export class WorldRenderer {
     let townHallCount = 0
     let lanternCount = 0
     const settlerPlacements: SettlerPlacement[] = []
+    const settlementTownHallMatrices: THREE.Matrix4[] = []
+    const settlementForgeMatrices: THREE.Matrix4[] = []
+    const settlementHouseMatrices: THREE.Matrix4[] = []
+    const settlementWorkshopMatrices: THREE.Matrix4[] = []
     const seed = seedToUint32(this.world.config.seed)
     const settings = qualitySettings(natureQuality)
     const stockpileModelLimit = this.stockpileModelLayer ? settlementPropModelInstanceLimit(natureQuality, this.stockpileModelLayer.maximumInstances) : 0
@@ -1927,6 +1966,7 @@ export class WorldRenderer {
         this.dummy.scale.set(0.72 + houseVariation * 0.24, 0.8 + houseVariation * 0.34, 0.74 + (1 - houseVariation) * 0.22)
         this.dummy.updateMatrix()
         this.houses.setMatrixAt(houseCount, this.dummy.matrix)
+        settlementHouseMatrices.push(this.dummy.matrix.clone())
 
         this.dummy.position.set(x, height + 0.33, z)
         this.dummy.rotation.set(0, angle + Math.PI / 4, 0)
@@ -1969,6 +2009,7 @@ export class WorldRenderer {
           this.dummy.scale.set(0.9 + index * 0.12, 0.9, 0.9 + (index % 2) * 0.12)
           this.dummy.updateMatrix()
           this.workshops.setMatrixAt(workshopCount, this.dummy.matrix)
+          settlementWorkshopMatrices.push(this.dummy.matrix.clone())
           workshopCount += 1
         }
 
@@ -1999,6 +2040,7 @@ export class WorldRenderer {
           this.dummy.scale.setScalar(0.9 + index * 0.12)
           this.dummy.updateMatrix()
           this.forges.setMatrixAt(forgeCount, this.dummy.matrix)
+          settlementForgeMatrices.push(this.dummy.matrix.clone())
           forgeCount += 1
         }
       }
@@ -2009,6 +2051,7 @@ export class WorldRenderer {
         this.dummy.scale.setScalar(0.92 + Math.min(0.26, village.population / 240))
         this.dummy.updateMatrix()
         this.townHalls.setMatrixAt(townHallCount, this.dummy.matrix)
+        settlementTownHallMatrices.push(this.dummy.matrix.clone())
         townHallCount += 1
       }
 
@@ -2045,7 +2088,7 @@ export class WorldRenderer {
           }
         }
       }
-      const visibleResidents = Math.min(village.population, settings.maxSettlers)
+      const visibleResidents = Math.min(6, Math.max(1, Math.floor(village.population / 4)))
       for (let index = 0; index < visibleResidents && settlerPlacements.length < MAX_SETTLERS; index += 1) {
         const tool = village.tools[(index + Math.floor(hash2d(localSeed, index, 79) * village.tools.length)) % village.tools.length] ?? 'stone-handaxe'
         const activity = this.simulation.activeStorm
@@ -2064,8 +2107,8 @@ export class WorldRenderer {
           anchorTileX: home.x,
           anchorTileZ: home.z,
           phase: hash2d(localSeed, index, 2) * Math.PI * 2,
-          radius: 0.2 + (index % 6) * 0.095,
-          scale: 0.9 + (index % 3) * 0.12,
+          radius: 0.35 + (index % 4) * 0.18,
+          scale: 0.85 + (index % 3) * 0.1,
           clothingColor: index % 2 === 0 ? 0x8eb5d1 : 0xb87858,
           skinColor: index % 3 === 0 ? 0xc98d65 : 0xf4d6a4,
           tool,
@@ -2073,6 +2116,13 @@ export class WorldRenderer {
         })
       }
     }
+
+    this.settlementModelLayer.setPlacements({
+      townHalls: settlementTownHallMatrices,
+      forges: settlementForgeMatrices,
+      houses: settlementHouseMatrices,
+      workshops: settlementWorkshopMatrices,
+    })
 
     this.stockpileModelLayer?.setMatrices(stockpileModelMatrices, stockpileModelLimit)
     this.lanternModelLayer?.setMatrices(lanternModelMatrices, lanternModelLimit)
@@ -2462,7 +2512,7 @@ export class WorldRenderer {
   }
 
   private shouldRenderAt(timestamp: number): boolean {
-    const interval = renderFrameIntervalMs(this.qualityProfile, this.graphicsQuality('scene'))
+    const interval = renderFrameIntervalMs(this.fpsLimit, this.qualityProfile, this.graphicsQuality('scene'))
     if (this.nextRenderAt === 0) {
       this.nextRenderAt = timestamp + interval
       return true
@@ -2573,7 +2623,10 @@ export class WorldRenderer {
     const actorMotionDelta = this.takeActorMotionDelta(timestamp)
     const environmentMotionDelta = this.takeEnvironmentMotionDelta(timestamp)
     this.updateSky(environmentMotionDelta ?? 0, reducedMotion, environmentMotionDelta !== undefined)
-    if (environmentMotionDelta !== undefined) this.ambientLifeLayer.update(this.elapsed, reducedMotion, Boolean(this.simulation.activeStorm))
+    if (environmentMotionDelta !== undefined) {
+      this.ambientLifeLayer.update(this.elapsed, reducedMotion, Boolean(this.simulation.activeStorm))
+      this.shipLayer.update(this.elapsed, reducedMotion)
+    }
     if (actorMotionDelta !== undefined) {
       this.faunaLayer.update(this.elapsed, reducedMotion)
       this.settlerLayer.update(this.elapsed, reducedMotion)
@@ -2589,6 +2642,7 @@ export class WorldRenderer {
       this.stockpileModelLayer?.animate(this.elapsed, reducedMotion)
     }
     this.updateActionPulse(reducedMotion)
+    this.avatarController.update(delta, this.world, this.camera)
     this.controls.update()
     this.scheduleShadowUpdate(timestamp)
     this.renderer.render(this.scene, this.camera)

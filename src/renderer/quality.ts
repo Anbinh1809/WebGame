@@ -95,25 +95,56 @@ export function capQualityForMobile(profile: EffectiveQuality, mobileViewport: b
   return mobileViewport && (profile === 'high' || profile === 'ultra') ? 'medium' : profile
 }
 
+export type FpsLimit = 'auto' | 'uncapped' | 'vsync' | '240' | '144' | '120' | '60' | '30'
+
+export const FPS_LIMIT_OPTIONS: readonly FpsLimit[] = [
+  'auto',
+  'uncapped',
+  'vsync',
+  '240',
+  '144',
+  '120',
+  '60',
+  '30',
+]
+
+export const FPS_LIMIT_LABELS: Record<FpsLimit, string> = {
+  auto: 'Tự động (Thích ứng theo máy & màn hình)',
+  uncapped: 'Không giới hạn (Tối đa phần cứng / PUBG, LMHT)',
+  vsync: 'Khớp màn hình (V-Sync)',
+  '240': '240 FPS (Esports 240Hz)',
+  '144': '144 FPS (Gaming 144Hz)',
+  '120': '120 FPS (Màn hình 120Hz)',
+  '60': '60 FPS (Tiêu chuẩn cân bằng)',
+  '30': '30 FPS (Tiết kiệm pin)',
+}
+
 /** Avoid visual quality oscillation while still responding to sustained FPS loss. */
 export function canApplyAutoQualityChange(timestamp: number, lastChangeAt: number): boolean {
   return timestamp - lastChangeAt >= AUTO_QUALITY_CHANGE_COOLDOWN_MS
 }
 
 /**
- * Limits manual profiles to a useful presentation rate instead of spending a
- * 120/144 Hz display refresh on simulation-side matrix writes. Auto remains
- * responsive at 60 FPS so its promotion logic can still observe headroom.
+ * Dynamic frame pacing supporting uncapped high-refresh monitors (144Hz/240Hz/360Hz)
+ * like competitive games (PUBG, League of Legends) or specific player-configured caps.
  */
 export function renderFrameIntervalMs(
-  profile: QualityProfile,
-  sceneQuality: EffectiveQuality,
+  fpsLimit: FpsLimit = 'auto',
+  profile: QualityProfile = 'auto',
+  sceneQuality: EffectiveQuality = 'high',
 ): number {
-  if (profile === 'auto') return 1000 / 60
+  if (fpsLimit === 'uncapped' || fpsLimit === 'vsync') return 0
+  if (fpsLimit === '240') return 1000 / 240
+  if (fpsLimit === '144') return 1000 / 144
+  if (fpsLimit === '120') return 1000 / 120
+  if (fpsLimit === '60') return 1000 / 60
+  if (fpsLimit === '30') return 1000 / 30
+
+  // 'auto': dynamic rate matching monitor and device capabilities
+  if (profile === 'auto') return 0
   if (sceneQuality === 'low') return 1000 / 30
-  if (sceneQuality === 'medium') return 1000 / 45
-  if (sceneQuality === 'ultra') return 1000 / 48
-  return 1000 / 60
+  if (sceneQuality === 'medium') return 1000 / 60
+  return 0
 }
 
 export function qualitySettings(profile: EffectiveQuality): QualitySettings {

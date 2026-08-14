@@ -25,6 +25,8 @@ describe('graphics settings', () => {
     )
 
     expect(markup).toContain('Tùy chỉnh đồ họa')
+    expect(markup).toContain('graphics-fps-limit')
+    expect(markup).toContain('Giới hạn khung hình (FPS)')
     expect(markup).toContain('graphics-shadows-quality')
     expect(markup).toContain('graphics-water-quality')
     expect(markup).toContain('Gói texture Poly Haven')

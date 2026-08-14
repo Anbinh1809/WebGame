@@ -39,10 +39,12 @@ describe('render quality profiles', () => {
     expect(qualityForProfileChange('high', 'auto', 'low')).toBe('high')
   })
 
-  it('gives expensive render work its own cadence', () => {
-    expect(renderFrameIntervalMs('auto', 'high')).toBeCloseTo(1000 / 60)
-    expect(renderFrameIntervalMs('high', 'medium')).toBeCloseTo(1000 / 45)
-    expect(renderFrameIntervalMs('ultra', 'ultra')).toBeCloseTo(1000 / 48)
+  it('gives expensive render work its own cadence and supports uncapped FPS', () => {
+    expect(renderFrameIntervalMs('uncapped')).toBe(0)
+    expect(renderFrameIntervalMs('vsync')).toBe(0)
+    expect(renderFrameIntervalMs('144')).toBeCloseTo(1000 / 144)
+    expect(renderFrameIntervalMs('60')).toBeCloseTo(1000 / 60)
+    expect(renderFrameIntervalMs('30')).toBeCloseTo(1000 / 30)
     expect(qualitySettings('medium').motionUpdateIntervalMs).toBeGreaterThan(qualitySettings('high').motionUpdateIntervalMs)
     expect(qualitySettings('medium').shadowUpdateIntervalMs).toBeGreaterThan(qualitySettings('high').shadowUpdateIntervalMs)
     expect(qualitySettings('high').shadowUpdateIntervalMs).toBeGreaterThan(qualitySettings('ultra').shadowUpdateIntervalMs)

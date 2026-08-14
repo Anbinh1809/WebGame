@@ -35,18 +35,24 @@ const SPECIES_CAPACITY: Record<FaunaSpecies, number> = {
   'hươu-rừng': 28,
   'lợn-rừng': 24,
   'sơn-dương': 24,
+  'sói-hoang': 24,
+  'cự-tượng': 16,
   'hồn-cát': 16,
   'thạch-thú': 16,
+  'mộc-quái': 16,
+  'dực-long': 12,
+  'lang-tộc': 16,
+  'dực-điểu': 12,
 }
 
 const LOCAL_FORWARD = new THREE.Vector3(0, 0, 1)
 const LOCAL_RIGHT = new THREE.Vector3(1, 0, 0)
 
 function faunaLimitsFor(quality: EffectiveQuality): FaunaLimits {
-  if (quality === 'low') return { animals: 6, monsters: 1 }
-  if (quality === 'medium') return { animals: 12, monsters: 3 }
-  if (quality === 'high') return { animals: 20, monsters: 6 }
-  return { animals: 28, monsters: 10 }
+  if (quality === 'low') return { animals: 6, monsters: 2 }
+  if (quality === 'medium') return { animals: 12, monsters: 4 }
+  if (quality === 'high') return { animals: 20, monsters: 8 }
+  return { animals: 28, monsters: 12 }
 }
 
 function creatureMaterial(species: FaunaSpecies): THREE.MeshStandardMaterial {
@@ -54,8 +60,14 @@ function creatureMaterial(species: FaunaSpecies): THREE.MeshStandardMaterial {
     case 'hươu-rừng': return new THREE.MeshStandardMaterial({ color: 0xa87545, flatShading: false, roughness: 0.82 })
     case 'lợn-rừng': return new THREE.MeshStandardMaterial({ color: 0x4e392e, flatShading: false, roughness: 0.88 })
     case 'sơn-dương': return new THREE.MeshStandardMaterial({ color: 0x8f8d7b, flatShading: false, roughness: 0.86 })
+    case 'sói-hoang': return new THREE.MeshStandardMaterial({ color: 0xd8e2ec, flatShading: false, roughness: 0.8 })
+    case 'cự-tượng': return new THREE.MeshStandardMaterial({ color: 0x6e7175, flatShading: false, roughness: 0.85 })
     case 'hồn-cát': return new THREE.MeshStandardMaterial({ color: 0xe7bd67, emissive: 0x6a3c10, emissiveIntensity: 0.8, transparent: true, opacity: 0.88, flatShading: false, roughness: 0.68, depthWrite: false })
     case 'thạch-thú': return new THREE.MeshStandardMaterial({ color: 0x58636a, emissive: 0x163539, emissiveIntensity: 0.46, flatShading: false, roughness: 0.74, metalness: 0.08 })
+    case 'mộc-quái': return new THREE.MeshStandardMaterial({ color: 0x2e5c38, emissive: 0x0f2b18, emissiveIntensity: 0.52, flatShading: false, roughness: 0.85 })
+    case 'dực-long': return new THREE.MeshStandardMaterial({ color: 0x4a7c9d, emissive: 0x1a3d54, emissiveIntensity: 0.62, flatShading: false, roughness: 0.65, metalness: 0.15 })
+    case 'lang-tộc': return new THREE.MeshStandardMaterial({ color: 0x3d271d, emissive: 0x5c1d0f, emissiveIntensity: 0.5, flatShading: false, roughness: 0.82 })
+    case 'dực-điểu': return new THREE.MeshStandardMaterial({ color: 0xc49a45, emissive: 0x45310d, emissiveIntensity: 0.45, flatShading: false, roughness: 0.72 })
   }
 }
 
@@ -171,8 +183,34 @@ function stoneBeastGeometry(): THREE.BufferGeometry {
   ])
 }
 
+function treantGeometry(): THREE.BufferGeometry {
+  return mergedCreature([
+    transformedPart(new THREE.CylinderGeometry(0.18, 0.26, 0.75, 8), [1, 1, 1], [0, 0.38, 0]),
+    transformedPart(new THREE.DodecahedronGeometry(0.24, 1), [1.2, 0.9, 1.1], [0, 0.72, 0]),
+    transformedPart(new THREE.ConeGeometry(0.08, 0.35, 6), [1, 1, 1], [-0.28, 0.45, 0.05], [0, 0, Math.PI / 3]),
+    transformedPart(new THREE.ConeGeometry(0.08, 0.35, 6), [1, 1, 1], [0.28, 0.45, 0.05], [0, 0, -Math.PI / 3]),
+    transformedPart(new THREE.DodecahedronGeometry(0.12, 1), [1, 0.5, 1.3], [-0.15, 0.08, 0.12]),
+    transformedPart(new THREE.DodecahedronGeometry(0.12, 1), [1, 0.5, 1.3], [0.15, 0.08, 0.12]),
+  ])
+}
+
+function wyvernGeometry(): THREE.BufferGeometry {
+  return mergedCreature([
+    transformedPart(new THREE.ConeGeometry(0.14, 0.72, 8), [1, 1, 1], [0, 0.4, 0], [-Math.PI / 3, 0, 0]),
+    transformedPart(new THREE.ConeGeometry(0.08, 0.28, 8), [1, 1, 1], [0, 0.62, 0.25], [Math.PI / 4, 0, 0]),
+    transformedPart(new THREE.BoxGeometry(0.85, 0.02, 0.32), [1, 1, 1], [0, 0.48, 0.05], [0.1, 0, 0]),
+    transformedPart(new THREE.ConeGeometry(0.05, 0.35, 6), [1, 1, 1], [0, 0.25, -0.38], [-Math.PI / 2.5, 0, 0]),
+  ])
+}
+
 function creatureGeometry(species: FaunaSpecies): THREE.BufferGeometry {
-  return species === 'hồn-cát' ? sandWraithGeometry() : stoneBeastGeometry()
+  switch (species) {
+    case 'hồn-cát': return sandWraithGeometry()
+    case 'thạch-thú': return stoneBeastGeometry()
+    case 'mộc-quái': return treantGeometry()
+    case 'dực-long': return wyvernGeometry()
+    default: return stoneBeastGeometry()
+  }
 }
 
 function createInstancedMesh<G extends THREE.BufferGeometry>(
@@ -191,8 +229,7 @@ function createInstancedMesh<G extends THREE.BufferGeometry>(
 }
 
 /**
- * Instanced wildlife with a compact two-bone terrain IK pose for every visible
- * quadruped. The visual rig does not touch deterministic world data or saves.
+ * Instanced wildlife layer. The procedural primitives are superseded by AnimatedFaunaLayer GLB models.
  */
 export class FaunaLayer {
   private readonly group = new THREE.Group()
@@ -224,6 +261,7 @@ export class FaunaLayer {
 
   public constructor(private readonly tileScale: number) {
     this.group.name = 'aetheria-instanced-fauna'
+    this.group.visible = false
     for (const species of FAUNA_SPECIES) {
       const material = creatureMaterial(species)
       const rig = quadrupedRigFor(species)

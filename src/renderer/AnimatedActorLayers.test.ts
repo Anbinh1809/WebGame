@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { FAUNA_COMBAT_STATS } from '../world/fauna'
 import type { FaunaSpawn } from '../world/fauna'
 import type { SettlerPlacement } from './SettlerLayer'
 import { __animatedActorTestables } from './AnimatedActorLayers'
@@ -16,6 +17,7 @@ const deer: FaunaSpawn = {
   pace: 0.5,
   phase: 0,
   priority: 0,
+  stats: FAUNA_COMBAT_STATS['hươu-rừng'],
 }
 
 const settler: SettlerPlacement = {
@@ -32,10 +34,10 @@ const settler: SettlerPlacement = {
 
 describe('animated actor presentation policy', () => {
   it('keeps skinned foreground actors bounded by graphics quality', () => {
-    expect(__animatedActorTestables.animatedActorLimit('low')).toBe(1)
-    expect(__animatedActorTestables.animatedActorLimit('medium')).toBe(2)
-    expect(__animatedActorTestables.animatedActorLimit('high')).toBe(3)
-    expect(__animatedActorTestables.animatedActorLimit('ultra')).toBe(3)
+    expect(__animatedActorTestables.animatedActorLimit('low')).toBe(16)
+    expect(__animatedActorTestables.animatedActorLimit('medium')).toBe(32)
+    expect(__animatedActorTestables.animatedActorLimit('high')).toBe(64)
+    expect(__animatedActorTestables.animatedActorLimit('ultra')).toBe(64)
   })
 
   it('uses a deterministic fauna route and calm action choices', () => {
@@ -44,7 +46,7 @@ describe('animated actor presentation policy', () => {
     const later = __animatedActorTestables.faunaMotionPose(deer, 2, false)
     expect(reduced).toEqual({ tileX: deer.x, tileZ: deer.z, heading: deer.rotation, movement: 0, activity: 'rest' })
     expect(moving.movement).toBeGreaterThan(0)
-    expect(Math.hypot(later.tileX - deer.x, later.tileZ - deer.z)).toBeGreaterThan(0.5)
+    expect(Math.hypot(later.tileX - deer.x, later.tileZ - deer.z)).toBeGreaterThan(0.2)
     expect(__animatedActorTestables.faunaClipFor(deer, 0, true, moving.movement)).toBe('idle')
     expect(__animatedActorTestables.faunaClipFor(deer, 0, false, 0.2)).toBe('walk')
     expect(__animatedActorTestables.faunaClipFor(deer, 2, false, 0)).toBe('forage')

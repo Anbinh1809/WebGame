@@ -30,8 +30,6 @@ export function PlayerAccountPanel({ className }: PlayerAccountPanelProps): JSX.
   const nameId = `${identifier}-name`
   const passwordId = `${identifier}-password`
   const confirmationId = `${identifier}-confirmation`
-  const privacyId = `${identifier}-privacy`
-  const panelClassName = ['player-account-panel', 'panel-surface', className].filter(Boolean).join(' ')
 
   const refreshSavedProfiles = (): void => {
     try {
@@ -90,129 +88,143 @@ export function PlayerAccountPanel({ className }: PlayerAccountPanelProps): JSX.
   }
 
   return (
-    <section className={panelClassName} aria-labelledby={headingId}>
-      <div className="panel-heading compact-heading">
+    <section className={`player-account-modern ${className || ''}`} aria-labelledby={headingId}>
+      {/* Title */}
+      <div className="section-title-box">
+        <span className="section-icon">👤</span>
         <div>
-          <span className="eyebrow">Hồ sơ tùy chọn</span>
-          <h2 id={headingId}>Người chơi</h2>
+          <h2 id={headingId} className="section-title">Hồ Sơ Người Chơi</h2>
+          <p className="section-subtitle">Lưu danh hiệu và tiến trình sáng thế cục bộ</p>
         </div>
       </div>
 
-      {session.status === 'unavailable' ? (
-        <p className="player-account-copy" role="status">{session.message} Game vẫn chơi được không cần đăng nhập.</p>
-      ) : null}
-
       {session.status === 'authenticated' ? (
-        <div className="player-account-signed-in">
-          <div className="profile-active-card">
-            <span className="profile-avatar-crest">👑</span>
-            <div>
-              <p className="player-account-copy">Đang chơi với <strong>{session.player.displayName}</strong>.</p>
-              <span className="badge-pill badge-era">Đấng Sáng Thế Hợp Lệ</span>
-            </div>
+        <div className="settings-card">
+          <div className="card-header">
+            <span className="card-icon">👑</span>
+            <span className="card-title">Tài Khoản Đang Hoạt Động</span>
           </div>
-          <button type="button" className="game-btn game-btn-danger" onClick={handleSignOut}>
-            Đăng xuất hồ sơ này
-          </button>
-        </div>
-      ) : null}
-
-      {session.status === 'anonymous' ? (
-        <>
-          <p className="player-account-copy">Tạo hồ sơ để giữ tên người chơi trong phiên trình duyệt này.</p>
-          
-          {savedProfiles.length > 0 ? (
-            <div className="quick-accounts-section">
-              <span className="eyebrow">Tài khoản đã có trên máy:</span>
-              <div className="quick-accounts-list">
-                {savedProfiles.map((acc) => (
-                  <button
-                    key={acc.id}
-                    type="button"
-                    className="quick-account-chip"
-                    onClick={() => handleSelectQuickAccount(acc.displayName)}
-                  >
-                    👤 {acc.displayName}
-                  </button>
-                ))}
+          <div className="card-body">
+            <div className="profile-active-card">
+              <div className="profile-badge-avatar">🛡️</div>
+              <div className="profile-info-details">
+                <span className="profile-name-text">{session.player.displayName}</span>
+                <span className="badge-pill badge-era">Đấng Sáng Thế Hợp Lệ</span>
               </div>
             </div>
-          ) : null}
-
-          <div className="player-account-switch" role="group" aria-label="Chọn thao tác hồ sơ">
-            <button
-              type="button"
-              className={`game-btn ${mode === 'register' ? 'game-btn-primary' : 'game-btn-secondary'}`}
-              aria-pressed={mode === 'register'}
-              onClick={() => changeMode('register')}
-            >
-              Đăng ký
-            </button>
-            <button
-              type="button"
-              className={`game-btn ${mode === 'sign-in' ? 'game-btn-primary' : 'game-btn-secondary'}`}
-              aria-pressed={mode === 'sign-in'}
-              onClick={() => changeMode('sign-in')}
-            >
-              Đăng nhập
+            <button type="button" className="game-btn game-btn-danger full-width-btn" onClick={handleSignOut}>
+              🚪 Đăng xuất hồ sơ này
             </button>
           </div>
+        </div>
+      ) : (
+        <div className="settings-card">
+          <div className="card-header">
+            <div className="segmented-switch full-width">
+              <button
+                type="button"
+                className={`segmented-btn ${mode === 'register' ? 'active' : ''}`}
+                onClick={() => changeMode('register')}
+              >
+                ✨ Đăng ký
+              </button>
+              <button
+                type="button"
+                className={`segmented-btn ${mode === 'sign-in' ? 'active' : ''}`}
+                onClick={() => changeMode('sign-in')}
+              >
+                🔑 Đăng nhập
+              </button>
+            </div>
+          </div>
 
-          <form className="player-account-form" onSubmit={handleSubmit}>
-            <label className="field-label" htmlFor={nameId}>
-              Tên người chơi
-              <input
-                id={nameId}
-                className="game-text-input"
-                value={displayName}
-                onChange={(event) => setDisplayName(event.target.value)}
-                autoComplete="username"
-                maxLength={32}
-                placeholder="VD: Thần Ánh Sáng..."
-                required
-              />
-            </label>
-            <label className="field-label" htmlFor={passwordId}>
-              Mật khẩu (Tối thiểu 10 ký tự)
-              <input
-                id={passwordId}
-                className="game-text-input"
-                type="password"
-                value={password}
-                onChange={(event) => setPassword(event.target.value)}
-                autoComplete={mode === 'register' ? 'new-password' : 'current-password'}
-                minLength={mode === 'register' ? 10 : undefined}
-                maxLength={128}
-                required
-              />
-            </label>
-            {mode === 'register' ? (
-              <label className="field-label" htmlFor={confirmationId}>
-                Nhập lại mật khẩu
-                <input
-                  id={confirmationId}
-                  className="game-text-input"
-                  type="password"
-                  value={confirmation}
-                  onChange={(event) => setConfirmation(event.target.value)}
-                  autoComplete="new-password"
-                  minLength={10}
-                  maxLength={128}
-                  required
-                />
-              </label>
+          <div className="card-body">
+            {savedProfiles.length > 0 && mode === 'sign-in' ? (
+              <div className="quick-accounts-box">
+                <span className="field-subtext">Tài khoản đã lưu trên máy:</span>
+                <div className="quick-accounts-chips">
+                  {savedProfiles.map((acc) => (
+                    <button
+                      key={acc.id}
+                      type="button"
+                      className="quick-chip-btn"
+                      onClick={() => handleSelectQuickAccount(acc.displayName)}
+                    >
+                      👤 {acc.displayName}
+                    </button>
+                  ))}
+                </div>
+              </div>
             ) : null}
-            <button type="submit" className="game-btn game-btn-primary full-width" disabled={isSubmitting}>
-              {isSubmitting ? 'Đang xử lý…' : mode === 'register' ? '✦ Tạo hồ sơ cục bộ' : '▶ Đăng nhập'}
-            </button>
-          </form>
-        </>
-      ) : null}
 
-      <p id={privacyId} className="player-account-privacy">
-        Mật khẩu không được lưu nguyên văn; trình duyệt chỉ lưu mã kiểm tra có muối trên thiết bị này. Hồ sơ không đồng bộ save, không gửi dữ liệu lên mạng và không mở gói 8K trả phí.
-      </p>
-      <p className="player-account-feedback" role="status" aria-live="polite" aria-atomic="true">{feedback}</p>
+            <form className="player-form-body" onSubmit={handleSubmit}>
+              <div className="field-group">
+                <label className="field-label" htmlFor={nameId}>
+                  <span>Tên người chơi</span>
+                  <input
+                    id={nameId}
+                    className="game-text-input"
+                    value={displayName}
+                    onChange={(event) => setDisplayName(event.target.value)}
+                    autoComplete="username"
+                    maxLength={32}
+                    placeholder="VD: Thần Ánh Sáng..."
+                    required
+                  />
+                </label>
+              </div>
+
+              <div className="field-group">
+                <label className="field-label" htmlFor={passwordId}>
+                  <span>Mật khẩu (Tối thiểu 10 ký tự)</span>
+                  <input
+                    id={passwordId}
+                    className="game-text-input"
+                    type="password"
+                    value={password}
+                    onChange={(event) => setPassword(event.target.value)}
+                    autoComplete={mode === 'register' ? 'new-password' : 'current-password'}
+                    minLength={mode === 'register' ? 10 : undefined}
+                    maxLength={128}
+                    placeholder="••••••••••"
+                    required
+                  />
+                </label>
+              </div>
+
+              {mode === 'register' ? (
+                <div className="field-group">
+                  <label className="field-label" htmlFor={confirmationId}>
+                    <span>Xác nhận mật khẩu</span>
+                    <input
+                      id={confirmationId}
+                      className="game-text-input"
+                      type="password"
+                      value={confirmation}
+                      onChange={(event) => setConfirmation(event.target.value)}
+                      autoComplete="new-password"
+                      minLength={10}
+                      maxLength={128}
+                      placeholder="••••••••••"
+                      required
+                    />
+                  </label>
+                </div>
+              ) : null}
+
+              {feedback && (
+                <div className="feedback-banner" role="status">
+                  {feedback}
+                </div>
+              )}
+
+              <button type="submit" className="game-btn game-btn-primary full-width-btn" disabled={isSubmitting}>
+                {isSubmitting ? 'Đang xử lý…' : mode === 'register' ? '✦ Tạo hồ sơ cục bộ' : '▶ Đăng nhập'}
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
     </section>
   )
 }

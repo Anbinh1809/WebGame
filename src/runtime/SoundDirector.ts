@@ -38,6 +38,7 @@ const AMBIENT_PLAYLIST = [
   GAME_PACK_AUDIO.ambientTheme,
   GAME_PACK_AUDIO.ambientPeaceful,
   GAME_PACK_AUDIO.ambientExplore,
+  GAME_PACK_AUDIO.ambientMystic,
 ]
 
 export class SoundDirector {

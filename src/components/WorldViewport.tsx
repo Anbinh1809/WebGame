@@ -4,10 +4,12 @@ import { WorldRenderer } from '../renderer/WorldRenderer'
 import type { HoveredTile, RenderStats } from '../renderer/WorldRenderer'
 import type { SimulationState } from '../simulation/types'
 import type { HeatmapMode, ToolId, World } from '../world/types'
-import type { GraphicsQualityOverrides, QualityProfile } from '../renderer/quality'
+import type { FpsLimit, GraphicsQualityOverrides, QualityProfile } from '../renderer/quality'
 import type { MotionPreference } from '../renderer/MotionPreference'
 import type { AssetPackQuality } from '../assets/types'
 import type { AssetPackEntitlements, GameEdition } from '../renderer/AssetPackManager'
+
+import type { AvatarCameraPerspective, AvatarState } from '../renderer/AvatarController'
 
 interface WorldViewportProps {
   world: World
@@ -16,11 +18,16 @@ interface WorldViewportProps {
   heatmap: HeatmapMode
   photoSignal: number
   quality: QualityProfile
+  fpsLimit?: FpsLimit | undefined
   motionPreference: MotionPreference
   graphicsOverrides: GraphicsQualityOverrides
   assetPackQuality: AssetPackQuality
   assetPackEntitlements: AssetPackEntitlements
   edition: GameEdition
+  avatarMode?: boolean
+  avatarPerspectiveSignal?: number
+  onAvatarPerspectiveChange?: (perspective: AvatarCameraPerspective) => void
+  onAvatarStateUpdate?: (state: AvatarState) => void
   onTileHover: (tile: HoveredTile | undefined) => void
   onTileActivate: (tileIndex: number) => void
   onStats: (stats: RenderStats) => void
@@ -35,11 +42,16 @@ export const WorldViewport = memo(function WorldViewport({
   heatmap,
   photoSignal,
   quality,
+  fpsLimit = 'auto',
   motionPreference,
   graphicsOverrides,
   assetPackQuality,
   assetPackEntitlements,
   edition,
+  avatarMode = false,
+  avatarPerspectiveSignal = 0,
+  onAvatarPerspectiveChange,
+  onAvatarStateUpdate,
   onTileHover,
   onTileActivate,
   onStats,
@@ -131,6 +143,31 @@ export const WorldViewport = memo(function WorldViewport({
   useEffect(() => {
     rendererRef.current?.setAssetPackEntitlements(assetPackEntitlements)
   }, [assetPackEntitlements])
+
+  useEffect(() => {
+    rendererRef.current?.setFpsLimit(fpsLimit ?? 'auto')
+  }, [fpsLimit])
+
+  useEffect(() => {
+    rendererRef.current?.setAvatarMode(Boolean(avatarMode))
+  }, [avatarMode])
+
+  useEffect(() => {
+    if (avatarPerspectiveSignal === 0) return
+    const nextPerspective = rendererRef.current?.toggleAvatarPerspective()
+    if (nextPerspective && onAvatarPerspectiveChange) {
+      onAvatarPerspectiveChange(nextPerspective)
+    }
+  }, [avatarPerspectiveSignal, onAvatarPerspectiveChange])
+
+  useEffect(() => {
+    if (!avatarMode || !onAvatarStateUpdate) return undefined
+    const interval = window.setInterval(() => {
+      const state = rendererRef.current?.getAvatarState()
+      if (state) onAvatarStateUpdate(state)
+    }, 100)
+    return () => window.clearInterval(interval)
+  }, [avatarMode, onAvatarStateUpdate])
 
   useEffect(() => {
     if (photoSignal === 0) return

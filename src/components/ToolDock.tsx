@@ -9,6 +9,10 @@ interface ToolDockProps {
   canUndo: boolean
   canRedo: boolean
   onGlobalStorm: () => void
+  isAvatarMode?: boolean
+  onToggleAvatarMode?: () => void
+  onOpenCivTree?: () => void
+  onOpenRankedArena?: () => void
 }
 
 const TOOL_OPTIONS: Array<{ id: ToolId; key: string; symbol: string; label: string; hint: string }> = [
@@ -22,7 +26,19 @@ const TOOL_OPTIONS: Array<{ id: ToolId; key: string; symbol: string; label: stri
   { id: 'storm', key: '8', symbol: 'ϟ', label: 'Mưa lớn', hint: 'Gọi một đợt thiên tai' },
 ]
 
-export function ToolDock({ activeTool, onToolChange, onUndo, onRedo, canUndo, canRedo, onGlobalStorm }: ToolDockProps): JSX.Element {
+export function ToolDock({
+  activeTool,
+  onToolChange,
+  onUndo,
+  onRedo,
+  canUndo,
+  canRedo,
+  onGlobalStorm,
+  isAvatarMode = false,
+  onToggleAvatarMode,
+  onOpenCivTree,
+  onOpenRankedArena,
+}: ToolDockProps): JSX.Element {
   return (
     <section className="tool-dock panel-surface" aria-labelledby="tools-heading">
       <div className="panel-heading compact-heading">
@@ -39,6 +55,46 @@ export function ToolDock({ activeTool, onToolChange, onUndo, onRedo, canUndo, ca
           </button>
         </div>
       </div>
+
+      {/* Special Epic Modes Bar */}
+      <div className="special-modes-bar" role="group" aria-label="Tính năng nâng cao">
+        {onToggleAvatarMode && (
+          <button
+            type="button"
+            className={`special-mode-btn avatar-mode-btn ${isAvatarMode ? 'active' : ''}`}
+            onClick={onToggleAvatarMode}
+            title="Hóa thân người thường đi lại ngắm cảnh quan (Phím V)"
+          >
+            <span>👑 {isAvatarMode ? 'Về Trời' : 'Hạ Phàm'}</span>
+            <kbd>V</kbd>
+          </button>
+        )}
+
+        {onOpenCivTree && (
+          <button
+            type="button"
+            className="special-mode-btn civ-tree-btn"
+            onClick={onOpenCivTree}
+            title="Mở Cây Tiến Hóa Phân Nhánh Lục Địa (Phím C)"
+          >
+            <span>🔮 Nhánh Văn Minh</span>
+            <kbd>C</kbd>
+          </button>
+        )}
+
+        {onOpenRankedArena && (
+          <button
+            type="button"
+            className="special-mode-btn ranked-arena-btn"
+            onClick={onOpenRankedArena}
+            title="Mở Đấu Trường Xếp Hạng Lục Địa (Phím R)"
+          >
+            <span>⚔️ Xếp Hạng Lục Địa</span>
+            <kbd>R</kbd>
+          </button>
+        )}
+      </div>
+
       <div className="tool-grid" role="toolbar" aria-label="Các quyền năng trên bản đồ">
         {TOOL_OPTIONS.map((tool) => (
           <button

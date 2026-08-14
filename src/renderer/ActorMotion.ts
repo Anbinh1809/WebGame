@@ -36,8 +36,8 @@ export function faunaMotionPose(
   const forwardZ = Math.cos(spawn.rotation)
   const sideX = -forwardZ
   const sideZ = forwardX
-  const alongDistance = fleeing ? 1.08 : 0.74
-  const acrossDistance = fleeing ? 0.42 : 0.28
+  const alongDistance = fleeing ? 0.45 : 0.28
+  const acrossDistance = fleeing ? 0.22 : 0.12
   const along = Math.sin(travel) * alongDistance
   const across = Math.sin(travel * 0.61 + spawn.phase) * acrossDistance
   const alongVelocity = Math.cos(travel) * alongDistance * travelRate

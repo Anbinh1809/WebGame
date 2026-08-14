@@ -11,6 +11,7 @@ interface GamePauseMenuProps {
   onOpenWorldControls: () => void
   onOpenProfile: () => void
   onOpenTutorial: () => void
+  onOpenDiagnostics?: () => void
   worldSeed: string
   tick: number
   villageName?: string | undefined
@@ -26,6 +27,7 @@ export function GamePauseMenu({
   onOpenWorldControls,
   onOpenProfile,
   onOpenTutorial,
+  onOpenDiagnostics,
   worldSeed,
   tick,
   villageName = 'Làng Khởi Đầu',
@@ -112,6 +114,18 @@ export function GamePauseMenu({
             <span className="game-btn-icon">👤</span>
             <span className="game-btn-text">Hồ sơ Đấng Sáng Tạo</span>
           </button>
+
+          {onOpenDiagnostics ? (
+            <button
+              type="button"
+              className="game-btn game-btn-secondary"
+              onClick={onOpenDiagnostics}
+            >
+              <span className="game-btn-icon">🛠</span>
+              <span className="game-btn-text">Nhật ký chẩn đoán & Telemetry</span>
+              <span className="game-btn-hint">[F2 / ~]</span>
+            </button>
+          ) : null}
 
           <button
             type="button"

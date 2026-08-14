@@ -61,9 +61,9 @@ function createInstancedMesh<G extends THREE.BufferGeometry>(
  */
 export class SettlerLayer {
   private readonly group = new THREE.Group()
-  private readonly bodyMaterial = new THREE.MeshStandardMaterial({ vertexColors: true, flatShading: false, roughness: 0.74 })
-  private readonly skinMaterial = new THREE.MeshStandardMaterial({ vertexColors: true, flatShading: false, roughness: 0.78 })
-  private readonly toolMaterial = new THREE.MeshStandardMaterial({ vertexColors: true, flatShading: false, roughness: 0.58, metalness: 0.22 })
+  private readonly bodyMaterial = new THREE.MeshStandardMaterial({ color: 0x8eb5d1, flatShading: false, roughness: 0.74 })
+  private readonly skinMaterial = new THREE.MeshStandardMaterial({ color: 0xf4d6a4, flatShading: false, roughness: 0.78 })
+  private readonly toolMaterial = new THREE.MeshStandardMaterial({ color: 0x8a9299, flatShading: false, roughness: 0.58, metalness: 0.22 })
   private readonly torsoGeometry = new THREE.CapsuleGeometry(0.055, 0.13, 4, 12)
   private readonly headGeometry = new THREE.SphereGeometry(0.065, 14, 10)
   private readonly limbGeometry = new THREE.CylinderGeometry(1, 1, 1, 10)
@@ -99,6 +99,7 @@ export class SettlerLayer {
 
   public constructor(private readonly tileScale: number, private readonly capacity = 180) {
     this.group.name = 'aetheria-instanced-settlers'
+    this.group.visible = false
     this.torsoGeometry.translate(0, 0.29, 0)
     this.bodies = createInstancedMesh(this.torsoGeometry, this.bodyMaterial, capacity)
     this.heads = createInstancedMesh(this.headGeometry, this.skinMaterial, capacity)

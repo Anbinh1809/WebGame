@@ -8,3 +8,12 @@ test-results/
 .asset-cache/
 desktop-packs/
 .codegraph/
+.env
+.env.local
+
+# Large binary assets (downloaded separately via tools/sketchfab-importer.mjs)
+public/assets/models/
+public/assets/audio/
+public/assets/polyhaven/
+public/assets/vfx/
+public/assets/animation/

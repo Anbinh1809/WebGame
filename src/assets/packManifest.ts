@@ -1,7 +1,7 @@
 export interface GamePackModelEntry {
   id: string
   name: string
-  category: 'nature' | 'props' | 'characters'
+  category: 'nature' | 'props' | 'characters' | 'settlements' | 'ships'
   path: string
   scale: number
 }
@@ -44,7 +44,35 @@ export const GAME_PACK_MODELS: Record<string, GamePackModelEntry> = {
     scale: 0.6,
   },
 
-  // Fantasy Props
+  // Fantasy Props & Settlements
+  'prop-castle': {
+    id: 'prop-castle',
+    name: 'Đại Lâu Đài Trung Cổ',
+    category: 'settlements',
+    path: '/assets/models/settlements/medieval_castle_1k.glb',
+    scale: 0.35,
+  },
+  'prop-blacksmith': {
+    id: 'prop-blacksmith',
+    name: 'Lò Rèn Kim Khí',
+    category: 'settlements',
+    path: '/assets/models/settlements/blacksmith_1k.glb',
+    scale: 0.4,
+  },
+  'prop-village': {
+    id: 'prop-village',
+    name: 'Thôn Làng Trung Cổ',
+    category: 'settlements',
+    path: '/assets/models/settlements/modular_village_1k.glb',
+    scale: 0.35,
+  },
+  'ship-galleon': {
+    id: 'ship-galleon',
+    name: 'Chiến Thuyền Vượt Đại Dương',
+    category: 'ships',
+    path: '/assets/models/ships/galleon_1k.glb',
+    scale: 0.4,
+  },
   'prop-anvil': {
     id: 'prop-anvil',
     name: 'Đe Rèn Kim Khí',
@@ -82,6 +110,27 @@ export const GAME_PACK_MODELS: Record<string, GamePackModelEntry> = {
   },
 
   // Characters & Equipment
+  'char-archangel': {
+    id: 'char-archangel',
+    name: 'Hóa Thân Thần Linh',
+    category: 'characters',
+    path: '/assets/models/characters/archangel.glb',
+    scale: 0.55,
+  },
+  'char-wizard': {
+    id: 'char-wizard',
+    name: 'Đại Pháp Sư',
+    category: 'characters',
+    path: '/assets/models/characters/wizard_1k.glb',
+    scale: 0.5,
+  },
+  'char-knight': {
+    id: 'char-knight',
+    name: 'Nữ Hiệp Sĩ',
+    category: 'characters',
+    path: '/assets/models/characters/female_knight.glb',
+    scale: 0.5,
+  },
   'char-axe': {
     id: 'char-axe',
     name: 'Rìu Đốn Gỗ',
@@ -106,7 +155,10 @@ export const GAME_PACK_MODELS: Record<string, GamePackModelEntry> = {
 }
 
 export const GAME_PACK_AUDIO = {
-  ambientTheme: '/assets/pack/audio/ambient_theme.ogg',
-  ambientExplore: '/assets/pack/audio/ambient_explore.ogg',
-  ambientPeaceful: '/assets/pack/audio/ambient_peaceful.ogg',
+  ambientTheme: '/assets/audio/music/Ambient 1.wav',
+  ambientExplore: '/assets/audio/music/Ambient 2.wav',
+  ambientPeaceful: '/assets/audio/music/Ambient 3.wav',
+  ambientMystic: '/assets/audio/music/Ambient 4.wav',
+  battleAction1: '/assets/audio/music/Action 1 (Loop).wav',
+  battleAction2: '/assets/audio/music/Action 2 (Loop).wav',
 }

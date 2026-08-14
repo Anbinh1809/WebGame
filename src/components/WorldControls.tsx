@@ -38,70 +38,170 @@ export function WorldControls({
   }
 
   return (
-    <section className="world-controls panel-surface" aria-labelledby="world-heading">
-      <div className="panel-heading">
-        <div>
-          <span className="eyebrow">Khởi tạo</span>
-          <h2 id="world-heading">Mầm thế giới</h2>
+    <section className="world-controls-modern" aria-labelledby="world-heading">
+      {/* Title Header */}
+      <div className="section-title-box">
+        <span className="section-icon">🌍</span>
+        <div style={{ flex: 1 }}>
+          <h2 id="world-heading" className="section-title">Khởi Tạo Thế Giới</h2>
+          <p className="section-subtitle">Tùy biến mầm số, khí hậu và tài nguyên lục địa</p>
         </div>
-        <span className="seed-chip" title="Seed của thế giới đang quan sát">{activeSeed}</span>
+        <span className="slider-badge" title="Seed đang quan sát">{activeSeed}</span>
       </div>
+
       <form
         onSubmit={(event) => {
           event.preventDefault()
           onGenerate()
         }}
       >
-        <label className="field-label" htmlFor="world-seed">Seed</label>
-        <div className="seed-row">
-          <input id="world-seed" value={draft.seed} onChange={updateText} maxLength={64} spellCheck="false" />
-          <button type="button" className="icon-button" onClick={onCopySeed} aria-label="Sao chép seed của thế giới hiện tại">⧉</button>
+        {/* Card 1: Seed & Map Generation */}
+        <div className="settings-card">
+          <div className="card-header">
+            <span className="card-icon">🎲</span>
+            <span className="card-title">Mầm Thế Giới (Seed)</span>
+          </div>
+          <div className="card-body">
+            <div className="seed-input-group">
+              <input
+                id="world-seed"
+                className="game-text-input"
+                value={draft.seed}
+                onChange={updateText}
+                maxLength={64}
+                spellCheck="false"
+                placeholder="Nhập seed tùy ý..."
+              />
+              <button
+                type="button"
+                className="game-btn-icon"
+                onClick={onCopySeed}
+                title="Sao chép seed hiện tại"
+                aria-label="Sao chép seed"
+              >
+                📋
+              </button>
+            </div>
+
+            <div className="two-col-grid">
+              <div className="field-group">
+                <label className="field-label" htmlFor="world-size">
+                  <span>Kích thước bản đồ</span>
+                  <select
+                    id="world-size"
+                    className="game-select"
+                    value={draft.size}
+                    onChange={(event) => onDraftChange({ ...draft, size: Number(event.target.value) })}
+                  >
+                    {WORLD_SIZES.map((size) => (
+                      <option key={size} value={size}>{size} × {size} ô</option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+
+              <div className="field-group">
+                <label className="field-label" htmlFor="world-climate">
+                  <span>Khí hậu</span>
+                  <select
+                    id="world-climate"
+                    className="game-select"
+                    value={draft.climate}
+                    onChange={(event) => onDraftChange({ ...draft, climate: event.target.value as WorldConfig['climate'] })}
+                  >
+                    <option value="ôn hòa">Ôn hòa 🌤️</option>
+                    <option value="ấm">Ấm áp ☀️</option>
+                    <option value="lạnh">Hàn đới ❄️</option>
+                  </select>
+                </label>
+              </div>
+            </div>
+          </div>
         </div>
 
-        <div className="field-grid">
-          <label className="field-label" htmlFor="world-size">
-            Kích thước
-            <select
-              id="world-size"
-              value={draft.size}
-              onChange={(event) => onDraftChange({ ...draft, size: Number(event.target.value) })}
-            >
-              {WORLD_SIZES.map((size) => <option key={size} value={size}>{size} × {size}</option>)}
-            </select>
-          </label>
-          <label className="field-label" htmlFor="world-climate">
-            Khí hậu
-            <select
-              id="world-climate"
-              value={draft.climate}
-              onChange={(event) => onDraftChange({ ...draft, climate: event.target.value as WorldConfig['climate'] })}
-            >
-              <option value="ôn hòa">Ôn hòa</option>
-              <option value="ấm">Ấm</option>
-              <option value="lạnh">Lạnh</option>
-            </select>
-          </label>
+        {/* Card 2: Environmental Ratios */}
+        <div className="settings-card">
+          <div className="card-header">
+            <span className="card-icon">💧</span>
+            <span className="card-title">Địa Hình & Tài Nguyên</span>
+          </div>
+          <div className="card-body">
+            <div className="slider-row">
+              <div className="slider-info">
+                <span>Tỉ lệ Nước & Biển</span>
+                <span className="slider-badge">{Math.round(draft.water * 100)}%</span>
+              </div>
+              <input
+                id="world-water"
+                type="range"
+                className="game-slider"
+                min="0.2"
+                max="0.82"
+                step="0.02"
+                value={draft.water}
+                onChange={updateNumber('water')}
+              />
+            </div>
+
+            <div className="slider-row">
+              <div className="slider-info">
+                <span>Độ trù phú Tài nguyên</span>
+                <span className="slider-badge">{Math.round(draft.resources * 100)}%</span>
+              </div>
+              <input
+                id="world-resources"
+                type="range"
+                className="game-slider"
+                min="0.2"
+                max="1"
+                step="0.02"
+                value={draft.resources}
+                onChange={updateNumber('resources')}
+              />
+            </div>
+
+            {/* Primary Action Buttons */}
+            <div className="primary-actions-row">
+              <button type="submit" className="game-btn game-btn-primary flex-1">
+                ⚡ Tái tạo thế giới
+              </button>
+              <button type="button" className="game-btn game-btn-secondary flex-1" onClick={onRandomWorld}>
+                ✨ Thế giới ngẫu nhiên
+              </button>
+            </div>
+          </div>
         </div>
 
-        <label className="range-field" htmlFor="world-water">
-          <span><span>Nước</span><output>{Math.round(draft.water * 100)}%</output></span>
-          <input id="world-water" type="range" min="0.2" max="0.82" step="0.02" value={draft.water} onChange={updateNumber('water')} />
-        </label>
-        <label className="range-field" htmlFor="world-resources">
-          <span><span>Tài nguyên</span><output>{Math.round(draft.resources * 100)}%</output></span>
-          <input id="world-resources" type="range" min="0.2" max="1" step="0.02" value={draft.resources} onChange={updateNumber('resources')} />
-        </label>
-
-        <div className="form-actions">
-          <button type="submit" className="primary-button">Tái tạo</button>
-          <button type="button" className="secondary-button" onClick={onRandomWorld}>Thế giới mới</button>
-        </div>
-        <div className="save-actions" role="group" aria-label="Lưu và nạp thế giới cục bộ">
-          <button type="button" className="secondary-button" onClick={onSave}>Lưu</button>
-          <button type="button" className="secondary-button" onClick={onLoad}>Nạp</button>
-          <button type="button" className="secondary-button" onClick={onReset}>Đặt lại</button>
-          <button type="button" className="secondary-button" onClick={onExport}>Xuất JSON</button>
-          <button type="button" className="secondary-button" onClick={onImport}>Nhập JSON</button>
+        {/* Card 3: Storage & Files */}
+        <div className="settings-card">
+          <div className="card-header">
+            <span className="card-icon">💾</span>
+            <span className="card-title">Lưu Trữ & Xuất Nhập</span>
+          </div>
+          <div className="card-body">
+            <div className="action-buttons-grid">
+              <button type="button" className="quick-action-btn" onClick={onSave}>
+                <span>💾</span>
+                <span>Lưu nhanh</span>
+              </button>
+              <button type="button" className="quick-action-btn" onClick={onLoad}>
+                <span>📂</span>
+                <span>Nạp file</span>
+              </button>
+              <button type="button" className="quick-action-btn" onClick={onReset}>
+                <span>🔄</span>
+                <span>Đặt lại</span>
+              </button>
+              <button type="button" className="quick-action-btn" onClick={onExport}>
+                <span>📤</span>
+                <span>Xuất JSON</span>
+              </button>
+              <button type="button" className="quick-action-btn" onClick={onImport}>
+                <span>📥</span>
+                <span>Nhập JSON</span>
+              </button>
+            </div>
+          </div>
         </div>
       </form>
     </section>

@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import type { ChangeEvent, JSX } from 'react'
 import type { AssetPackQuality } from '../assets/types'
 import { MOTION_PREFERENCE_LABELS } from '../renderer/MotionPreference'
@@ -5,12 +6,15 @@ import type { MotionPreference } from '../renderer/MotionPreference'
 import type { DesktopPackAvailability } from '../assets/desktopPackManifest'
 import { ASSET_PACK_LABELS, DESKTOP_TEXTURE_PACKS } from '../runtime/edition'
 import {
+  FPS_LIMIT_LABELS,
+  FPS_LIMIT_OPTIONS,
   GRAPHICS_COMPONENT_LABELS,
   GRAPHICS_QUALITY_COMPONENTS,
   QUALITY_LABELS,
 } from '../renderer/quality'
 import type {
   EffectiveQuality,
+  FpsLimit,
   GraphicsQualityComponent,
   GraphicsQualityOverride,
   GraphicsQualityOverrides,
@@ -19,6 +23,7 @@ import type {
 
 interface GraphicsSettingsProps {
   quality: QualityProfile
+  fpsLimit?: FpsLimit | undefined
   motionPreference: MotionPreference
   soundEnabled: boolean
   masterVolume?: number
@@ -32,6 +37,7 @@ interface GraphicsSettingsProps {
   isCheckingDesktopPacks?: boolean
   isCheckingCinemaEntitlement?: boolean
   onQualityChange: (quality: QualityProfile) => void
+  onFpsLimitChange?: (limit: FpsLimit) => void
   onMotionPreferenceChange: (preference: MotionPreference) => void
   onSoundEnabledChange: (enabled: boolean) => void
   onMasterVolumeChange?: (volume: number) => void
@@ -45,7 +51,7 @@ interface GraphicsSettingsProps {
 const EFFECTIVE_QUALITY_OPTIONS: readonly EffectiveQuality[] = ['low', 'medium', 'high', 'ultra']
 
 const OVERRIDE_LABELS: Record<GraphicsQualityOverride, string> = {
-  inherit: 'Theo cấu hình chung',
+  inherit: 'Mặc định',
   low: 'Thấp',
   medium: 'Trung bình',
   high: 'Cao',
@@ -76,18 +82,26 @@ function GraphicsOverrideSelect({
 }): JSX.Element {
   const id = `graphics-${component}-quality`
   return (
-    <label className="field-label" htmlFor={id}>
-      <span>{GRAPHICS_COMPONENT_LABELS[component]}</span>
-      <select id={id} value={value} onChange={(event) => onChange(component, event.target.value as GraphicsQualityOverride)}>
+    <div className="override-select-row">
+      <label htmlFor={id} className="override-label">{GRAPHICS_COMPONENT_LABELS[component]}</label>
+      <select
+        id={id}
+        className="game-select-compact"
+        value={value}
+        onChange={(event) => onChange(component, event.target.value as GraphicsQualityOverride)}
+      >
         <option value="inherit">{OVERRIDE_LABELS.inherit}</option>
-        {EFFECTIVE_QUALITY_OPTIONS.map((profile) => <option key={profile} value={profile}>{OVERRIDE_LABELS[profile]}</option>)}
+        {EFFECTIVE_QUALITY_OPTIONS.map((profile) => (
+          <option key={profile} value={profile}>{OVERRIDE_LABELS[profile]}</option>
+        ))}
       </select>
-    </label>
+    </div>
   )
 }
 
 export function GraphicsSettings({
   quality,
+  fpsLimit = 'auto',
   motionPreference,
   soundEnabled,
   masterVolume = 1.0,
@@ -101,6 +115,7 @@ export function GraphicsSettings({
   isCheckingDesktopPacks = false,
   isCheckingCinemaEntitlement = false,
   onQualityChange,
+  onFpsLimitChange,
   onMotionPreferenceChange,
   onSoundEnabledChange,
   onMasterVolumeChange,
@@ -110,6 +125,8 @@ export function GraphicsSettings({
   onOverridesChange,
   onAssetPackQualityChange,
 }: GraphicsSettingsProps): JSX.Element {
+  const [showAdvanced, setShowAdvanced] = useState(false)
+
   const updateOverride = (component: GraphicsQualityComponent, value: GraphicsQualityOverride): void => {
     onOverridesChange({ ...overrides, [component]: value })
   }
@@ -126,111 +143,214 @@ export function GraphicsSettings({
 
   const texturePackAccessLabel = (pack: AssetPackQuality): string => {
     if (pack === 'web-1k') return ''
-    if (pack === 'cinema-8k' && !cinema8kEntitled) return isCheckingCinemaEntitlement ? ' · đang xác minh quyền mua' : ' · cần mua'
-    if (!desktopPackAvailability[pack]) return isCheckingDesktopPacks ? ' · đang kiểm tra cục bộ' : ' · chưa tải về'
-    return ' · đã cài đặt'
+    if (pack === 'cinema-8k' && !cinema8kEntitled) return isCheckingCinemaEntitlement ? ' · đang kiểm tra' : ' · cần mua'
+    if (!desktopPackAvailability[pack]) return isCheckingDesktopPacks ? ' · đang tải' : ' · chưa tải'
+    return ' · đã cài'
   }
 
   return (
-    <section className="graphics-settings panel-surface" aria-labelledby="graphics-settings-heading">
-      <div className="panel-heading">
+    <section className="graphics-settings-modern panel-surface" aria-labelledby="graphics-settings-heading">
+      {/* Header */}
+      <div className="section-title-box">
+        <span className="section-icon">⚙️</span>
         <div>
-          <span className="eyebrow">Đồ họa 3D & Âm thanh</span>
-          <h2 id="graphics-settings-heading">Tùy chỉnh đồ họa & âm thanh</h2>
+          <h2 id="graphics-settings-heading" className="section-title">Tùy chỉnh đồ họa & âm thanh</h2>
+          <p className="section-subtitle">Hiệu năng hiển thị và âm thanh thế giới sống động</p>
         </div>
       </div>
 
-      <p className="graphics-settings-intro">Chọn mức tổng thể, rồi chỉ nâng phần cần thiết. Gói texture độc lập với độ phân giải màn hình.</p>
+      {/* Card 1: Performance & Display */}
+      <div className="settings-card">
+        <div className="card-header">
+          <span className="card-icon">🖥️</span>
+          <span className="card-title">Hiệu Năng & Khung Hình</span>
+        </div>
 
-      <label className="field-label" htmlFor="graphics-global-quality">
-        <span>Chất lượng tổng thể</span>
-        <select id="graphics-global-quality" value={quality} onChange={(event) => onQualityChange(event.target.value as QualityProfile)}>
-          {(Object.keys(QUALITY_LABELS) as QualityProfile[]).map((profile) => <option key={profile} value={profile}>{QUALITY_LABELS[profile]}</option>)}
-        </select>
-      </label>
-
-      <fieldset className="graphics-experience-controls">
-        <legend>Âm thanh & Trải nghiệm</legend>
-        <label className="field-label" htmlFor="graphics-motion-preference">
-          <span>Chuyển động</span>
-          <select id="graphics-motion-preference" value={motionPreference} onChange={(event) => onMotionPreferenceChange(event.target.value as MotionPreference)}>
-            {(Object.keys(MOTION_PREFERENCE_LABELS) as MotionPreference[]).map((preference) => <option key={preference} value={preference}>{MOTION_PREFERENCE_LABELS[preference]}</option>)}
-          </select>
-        </label>
-        <label className="toggle-field">
-          <input type="checkbox" checked={soundEnabled} onChange={(event) => onSoundEnabledChange(event.target.checked)} />
-          <span>Bật toàn bộ âm thanh & nhạc nền không gian</span>
-        </label>
-
-        {soundEnabled ? (
-          <div className="audio-sliders-container" style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', marginTop: '0.5rem' }}>
-            <label className="field-label" htmlFor="audio-master-volume">
-              <span>Âm lượng tổng: <strong>{Math.round(masterVolume * 100)}%</strong></span>
-              <input
-                id="audio-master-volume"
-                type="range"
-                min="0"
-                max="100"
-                step="5"
-                value={Math.round(masterVolume * 100)}
-                onChange={(e) => onMasterVolumeChange?.(Number(e.target.value) / 100)}
-              />
-            </label>
-
-            <label className="field-label" htmlFor="audio-music-volume">
-              <span>Nhạc nền (BGM): <strong>{Math.round(musicVolume * 100)}%</strong></span>
-              <input
-                id="audio-music-volume"
-                type="range"
-                min="0"
-                max="100"
-                step="5"
-                value={Math.round(musicVolume * 100)}
-                onChange={(e) => onMusicVolumeChange?.(Number(e.target.value) / 100)}
-              />
-            </label>
-
-            <label className="field-label" htmlFor="audio-sfx-volume">
-              <span>Hiệu ứng thao tác (SFX): <strong>{Math.round(sfxVolume * 100)}%</strong></span>
-              <input
-                id="audio-sfx-volume"
-                type="range"
-                min="0"
-                max="100"
-                step="5"
-                value={Math.round(sfxVolume * 100)}
-                onChange={(e) => onSfxVolumeChange?.(Number(e.target.value) / 100)}
-              />
+        <div className="card-body">
+          <div className="field-group">
+            <label className="field-label" htmlFor="graphics-global-quality">
+              <span>Chất lượng tổng thể</span>
+              <select
+                id="graphics-global-quality"
+                className="game-select"
+                value={quality}
+                onChange={(event) => onQualityChange(event.target.value as QualityProfile)}
+              >
+                {(Object.keys(QUALITY_LABELS) as QualityProfile[]).map((profile) => (
+                  <option key={profile} value={profile}>{QUALITY_LABELS[profile]}</option>
+                ))}
+              </select>
             </label>
           </div>
-        ) : null}
 
-        <button type="button" className="secondary-button" style={{ marginTop: '0.5rem' }} onClick={onOpenTutorial}>Xem lại hướng dẫn chơi</button>
-      </fieldset>
+          <div className="field-group">
+            <label className="field-label" htmlFor="graphics-fps-limit">
+              <span>Giới hạn khung hình (FPS)</span>
+              <select
+                id="graphics-fps-limit"
+                className="game-select"
+                value={fpsLimit}
+                onChange={(event) => onFpsLimitChange?.(event.target.value as FpsLimit)}
+              >
+                {FPS_LIMIT_OPTIONS.map((limit) => (
+                  <option key={limit} value={limit}>
+                    {FPS_LIMIT_LABELS[limit]}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
 
-      {desktopEdition ? (
-        <label className="field-label graphics-texture-pack" htmlFor="graphics-texture-pack">
-          <span>Gói texture Poly Haven</span>
-          <select id="graphics-texture-pack" value={assetPackQuality} onChange={updateTexturePack}>
-            {DESKTOP_TEXTURE_PACKS.map((pack) => <option key={pack} value={pack} disabled={!canSelectTexturePack(pack)}>{ASSET_PACK_LABELS[pack]} · {TEXTURE_PACK_DESCRIPTIONS[pack]}{texturePackAccessLabel(pack)}</option>)}
-          </select>
-        </label>
-      ) : (
-        <p className="graphics-settings-note">Bản web chỉ dùng gói 1K để tải nhanh; không tải, mở hoặc nạp sẵn gói 2K, 4K hay 8K.</p>
-      )}
+          <div className="field-group">
+            <label className="field-label" htmlFor="graphics-motion-preference">
+              <span>Chuyển động & Hiệu ứng</span>
+              <select
+                id="graphics-motion-preference"
+                className="game-select"
+                value={motionPreference}
+                onChange={(event) => onMotionPreferenceChange(event.target.value as MotionPreference)}
+              >
+                {(Object.keys(MOTION_PREFERENCE_LABELS) as MotionPreference[]).map((preference) => (
+                  <option key={preference} value={preference}>{MOTION_PREFERENCE_LABELS[preference]}</option>
+                ))}
+              </select>
+            </label>
+          </div>
 
-      <fieldset className="graphics-component-grid">
-        <legend>Ghi đè theo hạng mục</legend>
-        {GRAPHICS_QUALITY_COMPONENTS.map((component) => (
-          <GraphicsOverrideSelect key={component} component={component} value={overrides[component]} onChange={updateOverride} />
-        ))}
-      </fieldset>
+          {desktopEdition && (
+            <div className="field-group">
+              <label className="field-label" htmlFor="graphics-texture-pack">
+                <span>Gói texture Poly Haven</span>
+                <select
+                  id="graphics-texture-pack"
+                  className="game-select"
+                  value={assetPackQuality}
+                  onChange={updateTexturePack}
+                >
+                  {DESKTOP_TEXTURE_PACKS.map((pack) => (
+                    <option key={pack} value={pack} disabled={!canSelectTexturePack(pack)}>
+                      {ASSET_PACK_LABELS[pack]} · {TEXTURE_PACK_DESCRIPTIONS[pack]}{texturePackAccessLabel(pack)}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </div>
+          )}
+        </div>
+      </div>
 
-      {desktopEdition ? (
-        <p className="graphics-settings-note">2K/4K chỉ mở khi bản cài đặt phát hiện manifest gói đã tải cục bộ. Aetheria Cinema 8K cần quyền mua được xác minh, gói 8K cục bộ và GPU hỗ trợ texture 8192 px; nếu thiếu điều kiện, game giữ 4K/2K/1K mà không làm dừng mô phỏng.</p>
-      ) : (
-        <p className="graphics-settings-note">Các lựa chọn kết xuất theo từng hạng mục không tải thêm texture desktop: Bản web vẫn giữ nguồn asset 1K, hoặc dùng bản dự phòng 512 px khi GPU/WebGL yếu.</p>
-      )}
+      {/* Card 2: Audio & Immersion */}
+      <div className="settings-card">
+        <div className="card-header">
+          <span className="card-icon">🔊</span>
+          <span className="card-title">Âm Thanh Không Gian</span>
+        </div>
+
+        <div className="card-body">
+          <label className="modern-toggle-row">
+            <span>Bật âm thanh & nhạc nền</span>
+            <input
+              type="checkbox"
+              className="game-checkbox"
+              checked={soundEnabled}
+              onChange={(event) => onSoundEnabledChange(event.target.checked)}
+            />
+          </label>
+
+          {soundEnabled ? (
+            <div className="audio-sliders-grid">
+              <div className="slider-row">
+                <div className="slider-info">
+                  <span>Âm lượng tổng</span>
+                  <span className="slider-badge">{Math.round(masterVolume * 100)}%</span>
+                </div>
+                <input
+                  id="audio-master-volume"
+                  type="range"
+                  className="game-slider"
+                  min="0"
+                  max="100"
+                  step="5"
+                  value={Math.round(masterVolume * 100)}
+                  onChange={(e) => onMasterVolumeChange?.(Number(e.target.value) / 100)}
+                />
+              </div>
+
+              <div className="slider-row">
+                <div className="slider-info">
+                  <span>Nhạc nền (BGM)</span>
+                  <span className="slider-badge">{Math.round(musicVolume * 100)}%</span>
+                </div>
+                <input
+                  id="audio-music-volume"
+                  type="range"
+                  className="game-slider"
+                  min="0"
+                  max="100"
+                  step="5"
+                  value={Math.round(musicVolume * 100)}
+                  onChange={(e) => onMusicVolumeChange?.(Number(e.target.value) / 100)}
+                />
+              </div>
+
+              <div className="slider-row">
+                <div className="slider-info">
+                  <span>Hiệu ứng (SFX)</span>
+                  <span className="slider-badge">{Math.round(sfxVolume * 100)}%</span>
+                </div>
+                <input
+                  id="audio-sfx-volume"
+                  type="range"
+                  className="game-slider"
+                  min="0"
+                  max="100"
+                  step="5"
+                  value={Math.round(sfxVolume * 100)}
+                  onChange={(e) => onSfxVolumeChange?.(Number(e.target.value) / 100)}
+                />
+              </div>
+            </div>
+          ) : null}
+
+          <button
+            type="button"
+            className="secondary-button full-width-btn"
+            style={{ marginTop: '0.75rem' }}
+            onClick={onOpenTutorial}
+          >
+            📖 Xem lại hướng dẫn chơi
+          </button>
+        </div>
+      </div>
+
+      {/* Card 3: Advanced Overrides */}
+      <div className="settings-card">
+        <button
+          type="button"
+          className="card-header card-accordion-toggle"
+          onClick={() => setShowAdvanced(!showAdvanced)}
+          aria-expanded={showAdvanced}
+        >
+          <div className="card-title-group">
+            <span className="card-icon">🛠️</span>
+            <span className="card-title">Tùy Chỉnh Nâng Cao</span>
+          </div>
+          <span className="accordion-arrow">{showAdvanced ? '▲' : '▼'}</span>
+        </button>
+
+        <div className="card-body accordion-content" style={{ display: showAdvanced ? 'flex' : 'none' }}>
+          <div className="overrides-list">
+            {GRAPHICS_QUALITY_COMPONENTS.map((component) => (
+              <GraphicsOverrideSelect
+                key={component}
+                component={component}
+                value={overrides[component]}
+                onChange={updateOverride}
+              />
+            ))}
+          </div>
+        </div>
+      </div>
     </section>
   )
 }

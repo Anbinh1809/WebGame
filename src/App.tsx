@@ -1,6 +1,5 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { ChangeEvent, JSX } from 'react'
-import { appPath } from './routes'
 import { usePlayerAuth } from './auth/usePlayerAuth'
 import { GameDrawer } from './components/GameDrawer'
 import { GameErrorBoundary } from './components/GameErrorBoundary'
@@ -8,7 +7,6 @@ import { GamePauseMenu } from './components/GamePauseMenu'
 import { FullscreenButton } from './components/FullscreenButton'
 import { GraphicsSettings } from './components/GraphicsSettings'
 import { TutorialOverlay } from './components/TutorialOverlay'
-import { isInteractiveShortcutTarget } from './components/keyboard'
 import { PlayerAccountPanel } from './components/PlayerAccountPanel'
 import { SimulationPanel } from './components/SimulationPanel'
 import { ToolDock } from './components/ToolDock'
@@ -16,16 +14,28 @@ import { WorldControls } from './components/WorldControls'
 import { applyMapToolAction, developPrimaryVillageToolAction, resolveCouncilAction, submitPrimaryVillageKnowledgeAction, triggerGlobalStormAction } from './game/actions'
 import { createGameState, recreateWorld, redoGameChange, undoGameChange } from './game/session'
 import { SaveSlotManagerModal } from './components/SaveSlotManagerModal'
+import { CivilizationTreeModal } from './components/CivilizationTreeModal'
+import { ContinentalRankedModal } from './components/ContinentalRankedModal'
+import { AvatarHudOverlay } from './components/AvatarHudOverlay'
+import type { SpecializationBranchId } from './simulation/specialization'
+import type { AvatarCameraPerspective, AvatarState } from './renderer/AvatarController'
 import { UpdateNotificationBanner } from './components/UpdateNotificationBanner'
+import { DiagnosticConsole } from './components/DiagnosticConsole'
+import { ToastContainer } from './components/ToastContainer'
+import { gameToast } from './runtime/toast'
+import { gameLogger } from './runtime/logger'
+import { aetheriaDb } from './game/db'
+import { useGameLoop } from './game/useGameLoop'
+import { useGameAudio } from './game/useGameAudio'
+import { useGameShortcuts } from './game/useGameShortcuts'
 import { getScenarioById } from './world/scenarios'
-import { decodeSave, loadFromLocalStorage, MAX_SAVE_BYTES, serializeSave, loadGameFromSlot, saveGameToSlot } from './game/save'
+import { decodeSave, loadFromLocalStorage, MAX_SAVE_BYTES, serializeSave, loadGameFromSlot } from './game/save'
 import type { HoveredTile, RenderStats } from './renderer/WorldRenderer'
-import { createGraphicsQualityOverrides, QUALITY_LABELS } from './renderer/quality'
-import type { GraphicsQualityOverrides, QualityProfile } from './renderer/quality'
+import { createGraphicsQualityOverrides, FPS_LIMIT_LABELS, FPS_LIMIT_OPTIONS, QUALITY_LABELS } from './renderer/quality'
+import type { FpsLimit, GraphicsQualityOverrides, QualityProfile } from './renderer/quality'
 import type { MotionPreference } from './renderer/MotionPreference'
-import { SoundDirector } from './runtime/SoundDirector'
 import type { SoundCue } from './runtime/SoundDirector'
-import { advanceSimulation, setSimulationSpeed, toggleSimulationPause } from './simulation/engine'
+import { setSimulationSpeed, toggleSimulationPause } from './simulation/engine'
 import type { SimulationSpeed } from './simulation/types'
 import { DEFAULT_WORLD_CONFIG, TERRAIN_TOOL_LABELS } from './world/types'
 import type { HeatmapMode, ToolId, WorldConfig } from './world/types'
@@ -59,12 +69,25 @@ const EMPTY_DESKTOP_PACK_AVAILABILITY: DesktopPackAvailability = {
 
 const PREFERENCE_KEYS = {
   motion: 'aetheria-motion-preference-v1',
+  fpsLimit: 'aetheria-fps-limit-v1',
   sound: 'aetheria-sound-enabled-v1',
   masterVolume: 'aetheria-master-volume-v1',
   musicVolume: 'aetheria-music-volume-v1',
   sfxVolume: 'aetheria-sfx-volume-v1',
   tutorial: 'aetheria-tutorial-seen-v1',
 } as const
+
+function readFpsLimitPreference(): FpsLimit {
+  try {
+    const raw = window.localStorage.getItem(PREFERENCE_KEYS.fpsLimit)
+    if (raw && FPS_LIMIT_OPTIONS.includes(raw as FpsLimit)) {
+      return raw as FpsLimit
+    }
+    return 'auto'
+  } catch {
+    return 'auto'
+  }
+}
 
 function readVolumePreference(key: string, fallback: number): number {
   try {
@@ -168,6 +191,7 @@ export default function App(): JSX.Element {
   const [tool, setTool] = useState<ToolId>('raise')
   const [heatmap, setHeatmap] = useState<HeatmapMode>('địa hình')
   const [quality, setQuality] = useState<QualityProfile>('auto')
+  const [fpsLimit, setFpsLimit] = useState<FpsLimit>(readFpsLimitPreference)
   const [graphicsOverrides, setGraphicsOverrides] = useState<GraphicsQualityOverrides>(() => createGraphicsQualityOverrides())
   const [motionPreference, setMotionPreference] = useState<MotionPreference>(readMotionPreference)
   const [soundEnabled, setSoundEnabled] = useState(readSoundEnabled)
@@ -175,8 +199,31 @@ export default function App(): JSX.Element {
   const [musicVolume, setMusicVolume] = useState(() => readVolumePreference(PREFERENCE_KEYS.musicVolume, 0.55))
   const [sfxVolume, setSfxVolume] = useState(() => readVolumePreference(PREFERENCE_KEYS.sfxVolume, 0.85))
   const [tutorialOpen, setTutorialOpen] = useState(() => !hasSeenTutorial())
+  const [leftDrawerTab, setLeftDrawerTab] = useState<'world' | 'graphics' | 'account'>('world')
   const [pauseMenuOpen, setPauseMenuOpen] = useState(false)
   const [isSaveManagerOpen, setIsSaveManagerOpen] = useState(false)
+  const [isDiagnosticsOpen, setIsDiagnosticsOpen] = useState(false)
+  const [isCivTreeOpen, setIsCivTreeOpen] = useState(false)
+  const [isRankedArenaOpen, setIsRankedArenaOpen] = useState(false)
+  const [isAvatarMode, setIsAvatarMode] = useState(false)
+  const [avatarPerspective, setAvatarPerspective] = useState<AvatarCameraPerspective>('third-person')
+  const [avatarPerspectiveSignal, setAvatarPerspectiveSignal] = useState(0)
+  const [avatarState, setAvatarState] = useState<AvatarState | null>(null)
+  const [unlockedPerks, setUnlockedPerks] = useState<string[]>(() => {
+    try {
+      const raw = window.localStorage.getItem('aetheria-unlocked-perks-v1')
+      return raw ? JSON.parse(raw) : []
+    } catch {
+      return []
+    }
+  })
+  const [chosenBranch, setChosenBranch] = useState<SpecializationBranchId | undefined>(() => {
+    try {
+      return (window.localStorage.getItem('aetheria-chosen-branch-v1') as SpecializationBranchId) || undefined
+    } catch {
+      return undefined
+    }
+  })
   const [assetPackQuality, setAssetPackQuality] = useState<AssetPackQuality>('web-1k')
   const [desktopPackAvailability, setDesktopPackAvailability] = useState<DesktopPackAvailability>(EMPTY_DESKTOP_PACK_AVAILABILITY)
   const [isCheckingDesktopPacks, setIsCheckingDesktopPacks] = useState(IS_DESKTOP_EDITION)
@@ -208,7 +255,6 @@ export default function App(): JSX.Element {
   const playerProfileToggleRef = useRef<HTMLButtonElement>(null)
   const openDrawerRef = useRef<DrawerSide>(null)
   const drawerTriggerRef = useRef<DrawerTrigger | null>(null)
-  const soundDirectorRef = useRef<SoundDirector | null>(null)
 
   useEffect(() => {
     gameRef.current = game
@@ -219,61 +265,49 @@ export default function App(): JSX.Element {
   }, [openDrawer])
 
   useEffect(() => {
-    const director = new SoundDirector()
-    soundDirectorRef.current = director
-    return () => {
-      soundDirectorRef.current = null
-      director.dispose()
-    }
-  }, [])
+    gameLogger.initGlobalErrorHandlers()
+    gameLogger.info('lifecycle', 'Aetheria game session initialized', {
+      seed: game.session.world.config.seed,
+      edition: GAME_EDITION,
+    })
+  }, [game.session.world.config.seed])
+
+  // Centralized Audio Coordinator
+  const { playSound } = useGameAudio({
+    soundEnabled,
+    masterVolume,
+    musicVolume,
+    sfxVolume,
+    isStormActive: Boolean(game.session.simulation.activeStorm),
+    isPaused: pauseMenuOpen,
+  })
+
+  // Fixed-step Simulation Accumulator Loop
+  useGameLoop({
+    game,
+    setGame,
+    isPaused: pauseMenuOpen,
+  })
 
   useEffect(() => {
-    soundDirectorRef.current?.setEnabled(soundEnabled)
     writePreference(PREFERENCE_KEYS.sound, String(soundEnabled))
   }, [soundEnabled])
 
   useEffect(() => {
-    soundDirectorRef.current?.setMasterVolume(masterVolume)
     writePreference(PREFERENCE_KEYS.masterVolume, String(masterVolume))
   }, [masterVolume])
 
   useEffect(() => {
-    soundDirectorRef.current?.setMusicVolume(musicVolume)
     writePreference(PREFERENCE_KEYS.musicVolume, String(musicVolume))
   }, [musicVolume])
 
   useEffect(() => {
-    soundDirectorRef.current?.setSfxVolume(sfxVolume)
     writePreference(PREFERENCE_KEYS.sfxVolume, String(sfxVolume))
   }, [sfxVolume])
 
   useEffect(() => {
-    if (pauseMenuOpen || document.hidden) {
-      soundDirectorRef.current?.pauseAmbient()
-    } else if (soundEnabled) {
-      soundDirectorRef.current?.resumeAmbient()
-    }
-  }, [pauseMenuOpen, soundEnabled])
-
-  useEffect(() => {
-    const handleVisibilityChange = (): void => {
-      if (document.hidden) {
-        soundDirectorRef.current?.pauseAmbient()
-      } else if (!pauseMenuOpen && soundEnabled) {
-        soundDirectorRef.current?.resumeAmbient()
-      }
-    }
-    document.addEventListener('visibilitychange', handleVisibilityChange)
-    return () => document.removeEventListener('visibilitychange', handleVisibilityChange)
-  }, [pauseMenuOpen, soundEnabled])
-
-  useEffect(() => {
     writePreference(PREFERENCE_KEYS.motion, motionPreference)
   }, [motionPreference])
-
-  useEffect(() => {
-    soundDirectorRef.current?.setStormActive(Boolean(game.session.simulation.activeStorm))
-  }, [game.session.simulation.activeStorm])
 
   useEffect(() => {
     if (!IS_DESKTOP_EDITION) return undefined
@@ -321,55 +355,6 @@ export default function App(): JSX.Element {
     return () => window.clearTimeout(timeout)
   }, [notice])
 
-  useEffect(() => {
-    let frameId = 0
-    let previousTime = performance.now()
-    let accumulator = 0
-    const advance = (timestamp: number): void => {
-      const elapsed = Math.min((timestamp - previousTime) / 1000, 0.25)
-      previousTime = timestamp
-      const current = gameRef.current
-      if (
-        !document.hidden &&
-        !pauseMenuOpen &&
-        !current.session.simulation.paused &&
-        current.session.simulation.speed > 0
-      ) {
-        accumulator += elapsed * current.session.simulation.speed
-        const ticks = Math.min(12, Math.floor(accumulator))
-        if (ticks > 0) {
-          accumulator -= ticks
-          setGame((active) => ({
-            ...active,
-            session: {
-              ...active.session,
-              simulation: advanceSimulation(active.session.simulation, active.session.world, ticks),
-            },
-          }))
-        }
-      } else {
-        accumulator = 0
-      }
-      frameId = window.requestAnimationFrame(advance)
-    }
-    frameId = window.requestAnimationFrame(advance)
-    return () => window.cancelAnimationFrame(frameId)
-  }, [pauseMenuOpen])
-
-  const playSound = useCallback((cue: SoundCue): void => {
-    const director = soundDirectorRef.current
-    if (!director) return
-    void director.unlock().then(() => {
-      director.play(cue)
-      if (cue === 'storm') {
-        director.setStormActive(true)
-      }
-      if (director.isEnabled() && !pauseMenuOpen) {
-        director.startAmbient()
-      }
-    })
-  }, [pauseMenuOpen])
-
   const closeDrawer = useCallback((side?: Exclude<DrawerSide, null>): void => {
     const closing = side ?? openDrawerRef.current
     if (closing === 'left') {
@@ -391,14 +376,23 @@ export default function App(): JSX.Element {
     })
   }, [playSound])
 
+  const notifyUser = useCallback((message: string, type: 'info' | 'success' | 'warning' | 'error' = 'info', cue?: SoundCue): void => {
+    setNotice(message)
+    if (type === 'success') gameToast.success(message)
+    else if (type === 'warning') gameToast.warn(message)
+    else if (type === 'error') gameToast.error(message)
+    else gameToast.info(message)
+    if (cue) playSound(cue)
+  }, [playSound])
+
   const recreate = useCallback((config: WorldConfig, message: string): void => {
     setGame((current) => recreateWorld(current, config, message))
     setDraft(config)
     setSelectedTileIndex(undefined)
     setHoveredTile(undefined)
-    setNotice(message)
-    playSound('godPowerCast')
-  }, [playSound])
+    notifyUser(message, 'info', 'godPowerCast')
+    gameLogger.info('world', 'World recreated', { seed: config.seed, size: config.size })
+  }, [notifyUser])
 
   const handleGenerate = useCallback((): void => {
     recreate(draft, `Đã tái tạo thế giới từ seed “${draft.seed.trim() || 'aetheria-bình-minh'}”.`)
@@ -412,11 +406,10 @@ export default function App(): JSX.Element {
   const handleCopySeed = useCallback((): void => {
     void navigator.clipboard.writeText(gameRef.current.session.world.config.seed)
       .then(() => {
-        setNotice('Đã sao chép seed. Bạn có thể chia sẻ liên kết hoặc tái tạo đúng thế giới này.')
-        playSound('notification')
+        notifyUser('Đã sao chép seed. Bạn có thể chia sẻ liên kết hoặc tái tạo đúng thế giới này.', 'success', 'notification')
       })
-      .catch(() => setNotice('Không thể truy cập clipboard; seed hiện tại vẫn hiển thị trong Mầm thế giới.'))
-  }, [playSound])
+      .catch(() => notifyUser('Không thể truy cập clipboard; seed hiện tại vẫn hiển thị trong Mầm thế giới.', 'warning'))
+  }, [notifyUser])
 
   const dismissTutorial = useCallback((): void => {
     writePreference(PREFERENCE_KEYS.tutorial, 'true')
@@ -432,85 +425,86 @@ export default function App(): JSX.Element {
   const handleTileActivate = useCallback((tileIndex: number): void => {
     setSelectedTileIndex(tileIndex)
     if (tool === 'storm') {
-      setNotice('Mưa lớn là tác động toàn cầu; hãy dùng nút “Gọi mưa toàn cõi” trong thanh công cụ.')
-      playSound('warning')
+      notifyUser('Mưa lớn là tác động toàn cầu; hãy dùng nút “Gọi mưa toàn cõi” trong thanh công cụ.', 'warning', 'warning')
       return
     }
     playSound('godPowerCast')
     setGame((current) => {
       const result = applyMapToolAction(current, tool, tileIndex)
-      setNotice(result.notice)
+      notifyUser(result.notice, 'info')
       return result.game
     })
-  }, [playSound, tool])
+  }, [notifyUser, playSound, tool])
 
   const handleGlobalStorm = useCallback((): void => {
     playSound('storm')
     setGame((current) => triggerGlobalStormAction(current))
-    setNotice('Mưa lớn đang ảnh hưởng toàn bộ Aetheria trong 18 nhịp mô phỏng.')
-  }, [playSound])
+    notifyUser('Mưa lớn đang ảnh hưởng toàn bộ Aetheria trong 18 nhịp mô phỏng.', 'warning')
+    gameLogger.warn('simulation', 'Global storm triggered by player')
+  }, [notifyUser, playSound])
 
   const handleCouncilDecision = useCallback((choice: 'stockpile' | 'raise-ward'): void => {
     setGame((current) => {
       const next = resolveCouncilAction(current, choice)
       if (next === current) {
-        setNotice('Quyết định này không còn hiệu lực.')
-        playSound('warning')
+        notifyUser('Quyết định này không còn hiệu lực.', 'warning', 'warning')
         return current
       }
-      playSound('success')
-      setNotice(choice === 'stockpile' ? 'Dân làng niêm phong một phần kho lương để tăng sức hồi phục.' : 'Dân làng gia cố nơi trú ẩn, đổi bằng lương thực và niềm vui.')
+      const msg = choice === 'stockpile'
+        ? 'Dân làng niêm phong một phần kho lương để tăng sức hồi phục.'
+        : 'Dân làng gia cố nơi trú ẩn, đổi bằng lương thực và niềm vui.'
+      notifyUser(msg, 'success', 'success')
       return next
     })
-  }, [playSound])
+  }, [notifyUser])
 
   const handleDevelopVillageTool = useCallback((): void => {
     setGame((current) => {
       const result = developPrimaryVillageToolAction(current)
-      setNotice(result.notice)
-      if (result.game !== current) playSound('eraAdvance')
-      else playSound('warning')
+      if (result.game !== current) {
+        notifyUser(result.notice, 'success', 'eraAdvance')
+      } else {
+        notifyUser(result.notice, 'warning', 'warning')
+      }
       return result.game
     })
-  }, [playSound])
+  }, [notifyUser])
 
   const handleSubmitVillageKnowledge = useCallback((proposal: string): void => {
     setGame((current) => {
       const result = submitPrimaryVillageKnowledgeAction(current, proposal)
-      setNotice(result.notice)
-      if (result.game !== current) playSound('success')
-      else playSound('warning')
+      if (result.game !== current) {
+        notifyUser(result.notice, 'success', 'success')
+      } else {
+        notifyUser(result.notice, 'warning', 'warning')
+      }
       return result.game
     })
-  }, [playSound])
+  }, [notifyUser])
 
   const handleUndo = useCallback((): void => {
     setGame((current) => {
       const next = undoGameChange(current)
       if (next === current) {
-        setNotice('Chưa có thao tác nào để hoàn tác.')
-        playSound('warning')
+        notifyUser('Chưa có thao tác nào để hoàn tác.', 'warning', 'warning')
         return current
       }
-      playSound('buttonClick')
-      setNotice(`Đã hoàn tác: ${current.undoStack.at(-1)?.label ?? 'thao tác gần nhất'}.`)
+      notifyUser(`Đã hoàn tác: ${current.undoStack.at(-1)?.label ?? 'thao tác gần nhất'}.`, 'info', 'buttonClick')
       return next
     })
-  }, [playSound])
+  }, [notifyUser])
 
   const handleRedo = useCallback((): void => {
     setGame((current) => {
       const next = redoGameChange(current)
       if (next === current) {
-        setNotice('Chưa có thao tác nào để làm lại.')
-        playSound('warning')
+        notifyUser('Chưa có thao tác nào để làm lại.', 'warning', 'warning')
         return current
       }
-      playSound('buttonClick')
-      setNotice(`Đã làm lại: ${current.redoStack[0]?.label ?? 'thao tác gần nhất'}.`)
+      notifyUser(`Đã làm lại: ${current.redoStack[0]?.label ?? 'thao tác gần nhất'}.`, 'info', 'buttonClick')
       return next
     })
-  }, [playSound])
+  }, [notifyUser])
 
   const handlePauseToggle = useCallback((): void => {
     setGame((current) => {
@@ -530,24 +524,24 @@ export default function App(): JSX.Element {
 
   const handleAssetPackQualityChange = useCallback((pack: AssetPackQuality): void => {
     if (!IS_DESKTOP_EDITION) {
-      setNotice('Bản web chỉ dùng gói texture 1K.')
+      notifyUser('Bản web chỉ dùng gói texture 1K.', 'warning')
       return
     }
     if (pack === 'cinema-8k' && !cinema8kEntitled) {
-      setNotice(isCheckingCinemaEntitlement
+      notifyUser(isCheckingCinemaEntitlement
         ? 'Đang xác minh quyền Aetheria Cinema 8K cho bản cài đặt này.'
-        : 'Aetheria Cinema 8K là gói trả phí; quyền mua phải được dịch vụ desktop xác minh trước khi mở gói.')
+        : 'Aetheria Cinema 8K là gói trả phí; quyền mua phải được dịch vụ desktop xác minh trước khi mở gói.', 'warning')
       return
     }
     if (pack !== 'web-1k' && !desktopPackAvailability[pack]) {
-      setNotice(isCheckingDesktopPacks
+      notifyUser(isCheckingDesktopPacks
         ? `Đang kiểm tra gói ${ASSET_PACK_LABELS[pack]} cục bộ.`
-        : `Gói ${ASSET_PACK_LABELS[pack]} chưa được tải vào bản cài đặt này. Hãy cài gói rồi khởi động lại game.`)
+        : `Gói ${ASSET_PACK_LABELS[pack]} chưa được tải vào bản cài đặt này. Hãy cài gói rồi khởi động lại game.`, 'warning')
       return
     }
     setAssetPackQuality(pack)
-    playSound('success')
-  }, [cinema8kEntitled, desktopPackAvailability, isCheckingCinemaEntitlement, isCheckingDesktopPacks, playSound])
+    notifyUser(`Đã chuyển sang gói texture ${ASSET_PACK_LABELS[pack]}.`, 'success', 'success')
+  }, [cinema8kEntitled, desktopPackAvailability, isCheckingCinemaEntitlement, isCheckingDesktopPacks, notifyUser])
 
   const handleQualityChange = useCallback((next: QualityProfile): void => {
     setQuality(next)
@@ -556,80 +550,135 @@ export default function App(): JSX.Element {
     if (IS_DESKTOP_EDITION && matchingPack) handleAssetPackQualityChange(matchingPack)
   }, [handleAssetPackQualityChange, playSound])
 
+  const handleFpsLimitChange = useCallback((limit: FpsLimit): void => {
+    setFpsLimit(limit)
+    writePreference(PREFERENCE_KEYS.fpsLimit, limit)
+    playSound('buttonClick')
+    notifyUser(`Đã chỉnh tốc độ khung hình: ${FPS_LIMIT_LABELS[limit]}`, 'success', 'notification')
+  }, [notifyUser, playSound])
+
+  const handleToggleAvatarMode = useCallback((): void => {
+    setIsAvatarMode((prev) => {
+      const next = !prev
+      if (next) {
+        playSound('godPowerCast')
+        notifyUser('Đã giáng trần hóa thân! Dùng WASD để đi lại, V đổi góc nhìn, ESC về trời.', 'success', 'notification')
+      } else {
+        playSound('menuClose')
+        notifyUser('Đã trở lại góc nhìn Thượng đế bao quát lục địa.', 'info', 'notification')
+      }
+      return next
+    })
+  }, [notifyUser, playSound])
+
+  const handleSelectCivBranch = useCallback((branchId: SpecializationBranchId): void => {
+    setChosenBranch(branchId)
+    try {
+      window.localStorage.setItem('aetheria-chosen-branch-v1', branchId)
+    } catch {
+      // ignore
+    }
+    notifyUser(`Đã chọn định hướng phát triển văn minh: ${branchId.toUpperCase()}`, 'success', 'notification')
+    playSound('godPowerCast')
+  }, [notifyUser, playSound])
+
+  const handleUnlockPerk = useCallback((perkId: string, cost: number): void => {
+    const primary = gameRef.current.session.simulation.villages[0]
+    if (!primary || primary.research < cost) {
+      notifyUser('Chưa đủ điểm nghiên cứu để kích hoạt công nghệ này!', 'warning', 'warning')
+      return
+    }
+
+    primary.research -= cost
+    const nextPerks = [...unlockedPerks, perkId]
+    setUnlockedPerks(nextPerks)
+    try {
+      window.localStorage.setItem('aetheria-unlocked-perks-v1', JSON.stringify(nextPerks))
+    } catch {
+      // ignore
+    }
+
+    playSound('success')
+    notifyUser('Kích hoạt công nghệ thành công! Binh chủng và sức mạnh mới đã sẵn sàng.', 'success', 'success')
+  }, [notifyUser, playSound, unlockedPerks])
+
+  const handleRankedReward = useCallback((food: number, research: number): void => {
+    const primary = gameRef.current.session.simulation.villages[0]
+    if (primary) {
+      primary.food += food
+      primary.research += research
+    }
+    playSound('success')
+    notifyUser(`Chiến lợi phẩm viễn chinh: +${food} Lương thực, +${research} Điểm nghiên cứu!`, 'success', 'success')
+  }, [notifyUser, playSound])
+
   const handlePhotoReady = useCallback((dataUrl: string): void => {
     const seed = safeFileSegment(gameRef.current.session.world.config.seed)
     triggerDownload(dataUrl, `aetheria-${seed}-tick-${gameRef.current.session.simulation.tick}.png`)
-    setNotice('Ảnh PNG sắc nét của thế giới đã được tải xuống.')
-    playSound('notification')
-  }, [playSound])
+    notifyUser('Ảnh PNG sắc nét của thế giới đã được tải xuống.', 'success', 'notification')
+  }, [notifyUser])
 
-  const handleSave = useCallback((): void => {
+  const handleSave = useCallback(async (): Promise<void> => {
     try {
       const village = gameRef.current.session.simulation.villages[0]
       const villageName = village?.name || 'Làng Khởi Đầu'
-      const savedMeta = saveGameToSlot(
+      const savedMeta = await aetheriaDb.saveGame(
         gameRef.current,
         `${villageName} (${gameRef.current.session.world.config.seed})`,
       )
-      setNotice(`Đã lưu nhanh vào bản lưu "${savedMeta.worldName}" thành công!`)
-      playSound('success')
+      notifyUser(`Đã lưu nhanh vào bản lưu "${savedMeta.worldName}" thành công!`, 'success', 'success')
+      gameLogger.info('save', 'Game quicksaved successfully', { slotId: savedMeta.slotId, days: savedMeta.days })
     } catch {
-      setNotice('Không thể lưu cục bộ; hãy dùng Xuất JSON để giữ một bản sao.')
-      playSound('warning')
+      notifyUser('Không thể lưu cục bộ; hãy dùng Xuất JSON để giữ một bản sao.', 'warning', 'warning')
+      gameLogger.error('save', 'Failed to quicksave game')
     }
-  }, [playSound])
+  }, [notifyUser])
 
-  const handleLoadSlotWorld = useCallback((slotId: string): void => {
-    const result = loadGameFromSlot(slotId)
+  const handleLoadSlotWorld = useCallback(async (slotId: string): Promise<void> => {
+    const result = await aetheriaDb.loadGame(slotId)
     if (!result.ok) {
-      setNotice(result.reason)
-      playSound('warning')
+      notifyUser(result.reason, 'warning', 'warning')
       return
     }
     setGame(result.game)
     setDraft(result.game.session.world.config)
     setSelectedTileIndex(undefined)
     setHoveredTile(undefined)
-    setNotice('Đã nạp thế giới từ bản lưu.')
-    playSound('success')
-  }, [playSound])
+    notifyUser('Đã nạp thế giới từ bản lưu.', 'success', 'success')
+    gameLogger.info('save', 'Loaded save slot', { slotId })
+  }, [notifyUser])
 
   const hydrateGame = useCallback((raw: string): void => {
     const result = decodeSave(raw)
     if (!result.ok) {
-      setNotice(result.reason)
-      playSound('warning')
+      notifyUser(result.reason, 'warning', 'warning')
       return
     }
     setGame(result.game)
     setDraft(result.game.session.world.config)
     setSelectedTileIndex(undefined)
     setHoveredTile(undefined)
-    setNotice('Đã nạp bản lưu hợp lệ.')
-    playSound('success')
-  }, [playSound])
+    notifyUser('Đã nạp bản lưu hợp lệ.', 'success', 'success')
+  }, [notifyUser])
 
   const handleLoad = useCallback((): void => {
     const result = loadFromLocalStorage()
     if (!result.ok) {
-      setNotice(result.reason)
-      playSound('warning')
+      notifyUser(result.reason, 'warning', 'warning')
       return
     }
     setGame(result.game)
     setDraft(result.game.session.world.config)
-    setNotice('Đã nạp bản lưu cục bộ.')
-    playSound('success')
-  }, [playSound])
+    notifyUser('Đã nạp bản lưu cục bộ.', 'success', 'success')
+  }, [notifyUser])
 
   const handleExport = useCallback((): void => {
     const blob = new Blob([serializeSave(gameRef.current)], { type: 'application/json' })
     const url = URL.createObjectURL(blob)
     triggerDownload(url, `aetheria-${safeFileSegment(gameRef.current.session.world.config.seed)}.json`)
     window.setTimeout(() => URL.revokeObjectURL(url), 1000)
-    setNotice('Đã xuất bản lưu JSON cục bộ.')
-    playSound('notification')
-  }, [playSound])
+    notifyUser('Đã xuất bản lưu JSON cục bộ.', 'success', 'notification')
+  }, [notifyUser])
 
   const handleImportFile = useCallback((event: ChangeEvent<HTMLInputElement>): void => {
     const file = event.target.files?.[0]
@@ -638,8 +687,7 @@ export default function App(): JSX.Element {
     activeImportRef.current = null
     if (!file) return
     if (file.size > MAX_SAVE_BYTES) {
-      setNotice('Tệp JSON quá lớn để nạp an toàn. Hãy chọn bản xuất Aetheria dưới 2.5 MB.')
-      playSound('warning')
+      notifyUser('Tệp JSON quá lớn để nạp an toàn. Hãy chọn bản xuất Aetheria dưới 2.5 MB.', 'warning', 'warning')
       return
     }
     const reader = new FileReader()
@@ -647,39 +695,39 @@ export default function App(): JSX.Element {
     reader.onload = () => {
       if (activeImportRef.current === reader) activeImportRef.current = null
       if (typeof reader.result === 'string') hydrateGame(reader.result)
-      else setNotice('Không thể đọc tệp JSON đã chọn.')
+      else notifyUser('Không thể đọc tệp JSON đã chọn.', 'warning')
     }
     reader.onerror = () => {
       if (activeImportRef.current === reader) activeImportRef.current = null
-      if (reader.error?.name !== 'AbortError') setNotice('Không thể đọc tệp JSON đã chọn.')
+      if (reader.error?.name !== 'AbortError') notifyUser('Không thể đọc tệp JSON đã chọn.', 'warning')
     }
     reader.onabort = () => {
       if (activeImportRef.current === reader) activeImportRef.current = null
     }
     reader.readAsText(file)
-  }, [hydrateGame, playSound])
+  }, [hydrateGame, notifyUser])
 
   const toggleFullscreen = useCallback((): void => {
     playSound('buttonClick')
     if (fullscreenFallback) {
       setFullscreenFallback(false)
-      setNotice('Đã thoát chế độ toàn màn hình dự phòng.')
+      notifyUser('Đã thoát chế độ toàn màn hình dự phòng.', 'info')
       return
     }
     if (!document.fullscreenEnabled) {
       setFullscreenFallback((value) => !value)
-      setNotice('Trình duyệt không hỗ trợ API toàn màn hình; đã dùng chế độ toàn màn hình của game.')
+      notifyUser('Trình duyệt không hỗ trợ API toàn màn hình; đã dùng chế độ toàn màn hình của game.', 'info')
       return
     }
     if (document.fullscreenElement) {
-      void document.exitFullscreen().catch(() => setNotice('Không thể thoát chế độ toàn màn hình.'))
+      void document.exitFullscreen().catch(() => notifyUser('Không thể thoát chế độ toàn màn hình.', 'warning'))
     } else {
       void document.documentElement.requestFullscreen().catch(() => {
         setFullscreenFallback(true)
-        setNotice('Trình duyệt chặn API toàn màn hình; game vẫn dùng lớp phủ toàn màn hình.')
+        notifyUser('Trình duyệt chặn API toàn màn hình; game vẫn dùng lớp phủ toàn màn hình.', 'info')
       })
     }
-  }, [fullscreenFallback, playSound])
+  }, [fullscreenFallback, notifyUser, playSound])
 
   useEffect(() => {
     const onFullscreenChange = (): void => {
@@ -699,72 +747,25 @@ export default function App(): JSX.Element {
     })
   }, [playSound])
 
-  useEffect(() => {
-    const handler = (event: KeyboardEvent): void => {
-      if (event.key === 'Escape') {
-        event.preventDefault()
-        if (tutorialOpen) {
-          dismissTutorial()
-          return
-        }
-        if (openDrawer) {
-          closeDrawer(openDrawer)
-          return
-        }
-        togglePauseMenu()
-        return
-      }
-
-      if (isInteractiveShortcutTarget(event.target)) return
-
-      if (event.key === ' ' && !pauseMenuOpen) {
-        event.preventDefault()
-        handlePauseToggle()
-        return
-      }
-
-      if (event.key.toLowerCase() === 'f' && !event.ctrlKey && !event.metaKey && !event.altKey) {
-        event.preventDefault()
-        toggleFullscreen()
-        return
-      }
-
-      if (event.key.toLowerCase() === 'z' && (event.ctrlKey || event.metaKey)) {
-        event.preventDefault()
-        if (event.shiftKey) handleRedo()
-        else handleUndo()
-        return
-      }
-
-      if (event.key.toLowerCase() === 'y' && (event.ctrlKey || event.metaKey)) {
-        event.preventDefault()
-        handleRedo()
-        return
-      }
-
-      const numeric = Number(event.key)
-      const tools: ToolId[] = ['raise', 'lower', 'water', 'forest', 'fertile', 'barren', 'settler', 'storm']
-      if (numeric >= 1 && numeric <= tools.length) {
-        const nextTool = tools[numeric - 1]
-        if (nextTool) handleToolSelect(nextTool)
-      }
-    }
-
-    window.addEventListener('keydown', handler)
-    return () => window.removeEventListener('keydown', handler)
-  }, [
-    closeDrawer,
-    dismissTutorial,
-    handlePauseToggle,
-    handleRedo,
-    handleToolSelect,
-    handleUndo,
+  // Centralized Shortcuts Engine with Diagnostic Console Trigger (F2 / ~)
+  useGameShortcuts({
+    tutorialOpen,
     openDrawer,
     pauseMenuOpen,
-    toggleFullscreen,
-    togglePauseMenu,
-    tutorialOpen,
-  ])
+    isAvatarMode,
+    onDismissTutorial: dismissTutorial,
+    onCloseDrawer: () => closeDrawer(),
+    onTogglePauseMenu: togglePauseMenu,
+    onToggleFullscreen: toggleFullscreen,
+    onPauseToggle: handlePauseToggle,
+    onUndo: handleUndo,
+    onRedo: handleRedo,
+    onToolSelect: handleToolSelect,
+    onToggleDiagnosticConsole: () => setIsDiagnosticsOpen((v) => !v),
+    onToggleAvatarMode: handleToggleAvatarMode,
+    onToggleCivTree: () => setIsCivTreeOpen((v) => !v),
+    onToggleRankedArena: () => setIsRankedArenaOpen((v) => !v),
+  })
 
   const { session } = game
   const primaryVillage = session.simulation.villages[0]
@@ -798,17 +799,22 @@ export default function App(): JSX.Element {
               tool={tool}
               heatmap={heatmap}
               quality={quality}
+              fpsLimit={fpsLimit}
               motionPreference={motionPreference}
               graphicsOverrides={graphicsOverrides}
               assetPackQuality={assetPackQuality}
               assetPackEntitlements={assetPackEntitlements}
               edition={GAME_EDITION}
               photoSignal={photoSignal}
+              avatarMode={isAvatarMode}
+              avatarPerspectiveSignal={avatarPerspectiveSignal}
+              onAvatarPerspectiveChange={setAvatarPerspective}
+              onAvatarStateUpdate={setAvatarState}
               onTileHover={setHoveredTile}
               onTileActivate={handleTileActivate}
               onStats={setRenderStats}
               onPhotoReady={handlePhotoReady}
-              onPhotoError={setNotice}
+              onPhotoError={(err) => notifyUser(err, 'warning')}
             />
           </Suspense>
         </GameErrorBoundary>
@@ -865,13 +871,15 @@ export default function App(): JSX.Element {
             </div>
 
             <div className="hud-top-right">
-              <a
-                href={appPath('/')}
+              <button
+                type="button"
                 className="web-demo-indicator-badge"
-                title="Bản chơi thử Web 1K. Nhấn để về cổng giới thiệu hoặc xem bản Desktop 2K/4K/8K"
+                onClick={() => setIsDiagnosticsOpen(true)}
+                title="Bảng điều khiển chẩn đoán & telemetry lỗi (Phím tắt: F2 hoặc ~)"
+                aria-label="Mở bảng chẩn đoán lỗi"
               >
-                🎮 WEB DEMO
-              </a>
+                🛠 LOGS [F2]
+              </button>
               <span className="performance-badge" title="Chỉ số hiệu năng">{renderStats.fps || '—'} FPS</span>
               <span className="asset-pack-badge" title={renderStats.assetPackReason}>{assetPackLabel}</span>
               <label className="quality-select" htmlFor="quality-profile">
@@ -932,45 +940,90 @@ export default function App(): JSX.Element {
 
           {/* Left Drawer */}
           {openDrawer === 'left' ? (
-            <GameDrawer id="world-controls-drawer" label="Điều khiển thế giới" side="left" onClose={() => closeDrawer('left')}>
-              <WorldControls
-                draft={draft}
-                activeSeed={session.world.config.seed}
-                onDraftChange={setDraft}
-                onGenerate={handleGenerate}
-                onRandomWorld={handleRandomWorld}
-                onCopySeed={handleCopySeed}
-                onSave={handleSave}
-                onLoad={handleLoad}
-                onReset={() => recreate(session.world.config, 'Đã đặt lại thế giới hiện tại; bạn có thể hoàn tác thao tác này.')}
-                onExport={handleExport}
-                onImport={() => importRef.current?.click()}
-              />
-              <GraphicsSettings
-                quality={quality}
-                motionPreference={motionPreference}
-                soundEnabled={soundEnabled}
-                masterVolume={masterVolume}
-                musicVolume={musicVolume}
-                sfxVolume={sfxVolume}
-                overrides={graphicsOverrides}
-                assetPackQuality={assetPackQuality}
-                desktopEdition={IS_DESKTOP_EDITION}
-                desktopPackAvailability={desktopPackAvailability}
-                cinema8kEntitled={cinema8kEntitled}
-                isCheckingDesktopPacks={isCheckingDesktopPacks}
-                isCheckingCinemaEntitlement={isCheckingCinemaEntitlement}
-                onQualityChange={handleQualityChange}
-                onMotionPreferenceChange={setMotionPreference}
-                onSoundEnabledChange={setSoundEnabled}
-                onMasterVolumeChange={setMasterVolume}
-                onMusicVolumeChange={setMusicVolume}
-                onSfxVolumeChange={setSfxVolume}
-                onOpenTutorial={() => setTutorialOpen(true)}
-                onOverridesChange={setGraphicsOverrides}
-                onAssetPackQualityChange={handleAssetPackQualityChange}
-              />
-              <PlayerAccountPanel />
+            <GameDrawer id="world-controls-drawer" label="Bảng điều khiển & Tùy chỉnh" side="left" onClose={() => closeDrawer('left')}>
+              <div className="drawer-tab-nav" role="tablist" aria-label="Danh mục điều khiển">
+                <button
+                  type="button"
+                  role="tab"
+                  className={`drawer-tab-item ${leftDrawerTab === 'world' ? 'active' : ''}`}
+                  aria-selected={leftDrawerTab === 'world'}
+                  onClick={() => setLeftDrawerTab('world')}
+                >
+                  <span className="tab-icon">🌍</span>
+                  <span className="tab-text">Thế Giới</span>
+                </button>
+                <button
+                  type="button"
+                  role="tab"
+                  className={`drawer-tab-item ${leftDrawerTab === 'graphics' ? 'active' : ''}`}
+                  aria-selected={leftDrawerTab === 'graphics'}
+                  onClick={() => setLeftDrawerTab('graphics')}
+                >
+                  <span className="tab-icon">⚙️</span>
+                  <span className="tab-text">Đồ Họa</span>
+                </button>
+                <button
+                  type="button"
+                  role="tab"
+                  className={`drawer-tab-item ${leftDrawerTab === 'account' ? 'active' : ''}`}
+                  aria-selected={leftDrawerTab === 'account'}
+                  onClick={() => setLeftDrawerTab('account')}
+                >
+                  <span className="tab-icon">👤</span>
+                  <span className="tab-text">Hồ Sơ</span>
+                </button>
+              </div>
+
+              <div className="drawer-tab-content">
+                {leftDrawerTab === 'world' && (
+                  <WorldControls
+                    draft={draft}
+                    activeSeed={session.world.config.seed}
+                    onDraftChange={setDraft}
+                    onGenerate={handleGenerate}
+                    onRandomWorld={handleRandomWorld}
+                    onCopySeed={handleCopySeed}
+                    onSave={handleSave}
+                    onLoad={handleLoad}
+                    onReset={() => recreate(session.world.config, 'Đã đặt lại thế giới hiện tại; bạn có thể hoàn tác thao tác này.')}
+                    onExport={handleExport}
+                    onImport={() => importRef.current?.click()}
+                  />
+                )}
+
+                {leftDrawerTab === 'graphics' && (
+                  <GraphicsSettings
+                    quality={quality}
+                    fpsLimit={fpsLimit}
+                    motionPreference={motionPreference}
+                    soundEnabled={soundEnabled}
+                    masterVolume={masterVolume}
+                    musicVolume={musicVolume}
+                    sfxVolume={sfxVolume}
+                    overrides={graphicsOverrides}
+                    assetPackQuality={assetPackQuality}
+                    desktopEdition={IS_DESKTOP_EDITION}
+                    desktopPackAvailability={desktopPackAvailability}
+                    cinema8kEntitled={cinema8kEntitled}
+                    isCheckingDesktopPacks={isCheckingDesktopPacks}
+                    isCheckingCinemaEntitlement={isCheckingCinemaEntitlement}
+                    onQualityChange={handleQualityChange}
+                    onFpsLimitChange={handleFpsLimitChange}
+                    onMotionPreferenceChange={setMotionPreference}
+                    onSoundEnabledChange={setSoundEnabled}
+                    onMasterVolumeChange={setMasterVolume}
+                    onMusicVolumeChange={setMusicVolume}
+                    onSfxVolumeChange={setSfxVolume}
+                    onOpenTutorial={() => setTutorialOpen(true)}
+                    onOverridesChange={setGraphicsOverrides}
+                    onAssetPackQualityChange={handleAssetPackQualityChange}
+                  />
+                )}
+
+                {leftDrawerTab === 'account' && (
+                  <PlayerAccountPanel />
+                )}
+              </div>
             </GameDrawer>
           ) : null}
 
@@ -1013,13 +1066,61 @@ export default function App(): JSX.Element {
               canUndo={game.undoStack.length > 0}
               canRedo={game.redoStack.length > 0}
               onGlobalStorm={handleGlobalStorm}
+              isAvatarMode={isAvatarMode}
+              onToggleAvatarMode={handleToggleAvatarMode}
+              onOpenCivTree={() => setIsCivTreeOpen(true)}
+              onOpenRankedArena={() => setIsRankedArenaOpen(true)}
             />
           </div>
         </div>
+
+        {/* Avatar Incarnation Mode Fullscreen HUD */}
+        {isAvatarMode && (
+          <AvatarHudOverlay
+            perspective={avatarPerspective}
+            stamina={avatarState?.stamina ?? 100}
+            maxStamina={avatarState?.maxStamina ?? 100}
+            onTogglePerspective={() => setAvatarPerspectiveSignal((s) => s + 1)}
+            onExitAvatar={handleToggleAvatarMode}
+          />
+        )}
       </section>
+
+      {/* Civilization Specialization Evolution Tree Modal */}
+      {isCivTreeOpen && (
+        <CivilizationTreeModal
+          simulation={session.simulation}
+          unlockedPerks={unlockedPerks}
+          chosenBranch={chosenBranch}
+          onSelectBranch={handleSelectCivBranch}
+          onUnlockPerk={handleUnlockPerk}
+          onClose={() => setIsCivTreeOpen(false)}
+        />
+      )}
+
+      {/* Continental Ranked Global Arena Modal */}
+      {isRankedArenaOpen && (
+        <ContinentalRankedModal
+          world={session.world}
+          simulation={session.simulation}
+          unlockedPerks={unlockedPerks}
+          chosenBranch={chosenBranch}
+          onRewardReceived={handleRankedReward}
+          onClose={() => setIsRankedArenaOpen(false)}
+        />
+      )}
 
       {/* Auto-Update Banner */}
       <UpdateNotificationBanner />
+
+      {/* Modern Floating Toast Notifications */}
+      <ToastContainer />
+
+      {/* Diagnostic & Telemetry Console Modal (F2 / ~) */}
+      <DiagnosticConsole
+        isOpen={isDiagnosticsOpen}
+        onClose={() => setIsDiagnosticsOpen(false)}
+      />
 
       {/* In-Game Pause Menu */}
       <GamePauseMenu
@@ -1045,6 +1146,10 @@ export default function App(): JSX.Element {
         onOpenTutorial={() => {
           setPauseMenuOpen(false)
           setTutorialOpen(true)
+        }}
+        onOpenDiagnostics={() => {
+          setPauseMenuOpen(false)
+          setIsDiagnosticsOpen(true)
         }}
         worldSeed={session.world.config.seed}
         tick={session.simulation.tick}

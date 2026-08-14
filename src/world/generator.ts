@@ -98,9 +98,15 @@ function createTile(config: WorldConfig, seed: number, x: number, z: number): Ti
 }
 
 function normalizeElevation(tiles: Tile[], config: WorldConfig, seed: number): Tile[] {
-  const rawHeights = tiles.map((tile) => tile.height)
-  const minimum = Math.min(...rawHeights)
-  const maximum = Math.max(...rawHeights)
+  let minimum = Number.POSITIVE_INFINITY
+  let maximum = Number.NEGATIVE_INFINITY
+
+  for (let i = 0; i < tiles.length; i += 1) {
+    const h = tiles[i]!.height
+    if (h < minimum) minimum = h
+    if (h > maximum) maximum = h
+  }
+
   const range = Math.max(maximum - minimum, 0.001)
   const waterLevel = getWaterLevel(config)
 
