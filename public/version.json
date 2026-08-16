@@ -1,7 +1,7 @@
 {
-  "version": "0.1.6",
-  "buildTime": "2026-08-14T23:50:00.000Z",
+  "version": "0.1.7",
+  "buildTime": "2026-08-16T12:00:00.000Z",
   "channel": "stable",
   "mandatory": false,
-  "notes": "Bản cập nhật v0.1.6: Đại tu toàn diện đồ họa 3D High-Fantasy (Lâu đài, Tàu chiến, Thôn làng, Sinh vật thần thoại), tích hợp Sketchfab API tự động, thiết kế lại Drawer 3 Tab tinh gọn, loại bỏ chói lóa dropdown."
+  "notes": "Bản cập nhật v0.1.7: 15 Biomes đa dạng & Shader Bầu Trời Khí Quyển (Cực quang, Milky Way, Nhật nguyệt); Radar Minimap thời gian thực; Mở rộng bản đồ khởi đầu & thung lũng màu mỡ; Chuẩn hóa tỷ lệ kích thước thực tế (Con người, Cây đại thụ, Muông thú & Quái vật); Tối ưu hóa triệt để hiệu năng 60+ FPS."
 }

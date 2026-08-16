@@ -10,6 +10,8 @@ export interface SpecializationPerk {
   harvestBonus: number
   researchBonus: number
   stormDefenseBonus: number
+  dnaBonus?: number
+  biomassBonus?: number
   uniqueUnit: string
 }
 
@@ -27,189 +29,213 @@ export interface SpecializationBranch {
 export const SPECIALIZATION_BRANCHES: readonly SpecializationBranch[] = [
   {
     id: 'arcane',
-    name: 'Huyền Thuật & Tự Nhiên',
-    tagline: 'Sức mạnh cổ xưa của rừng già & linh thú',
-    icon: '🔮',
+    name: 'Huyền Thuật & Sinh Hóa Tự Nhiên',
+    tagline: 'Quang hợp, màng tế bào & tái sinh mô sinh học',
+    icon: '🧬',
     accentColor: '#a855f7',
-    description: 'Tôn vinh sự hòa hợp với đất trời, triệu hồi linh thú và điều khiển các luồng mana tự nhiên bảo vệ lục địa.',
+    description: 'Khai mở tiềm năng trao đổi chất, hấp thu năng lượng hóa thạch và ánh sáng, phát triển màng bao bọc và khả năng tự tái sinh mô thần kỳ.',
     prerequisiteEra: 'Nông Nghiệp',
     perks: [
       {
         id: 'beast-communion',
-        label: 'Giao Tiếp Linh Thú',
+        label: 'Màng Bán Thấm & Ty Thể ATP',
         tier: 1,
-        description: 'Thuần hóa muông thú quanh làng, tăng lương thực và lực lượng canh gác.',
+        description: 'Tối ưu hóa phản ứng sinh hóa, gia tăng sinh khối tự nhiên và đẩy nhanh tích lũy năng lượng sống.',
         researchCost: 40,
         militaryBonus: 15,
         harvestBonus: 0.08,
         researchBonus: 0.04,
         stormDefenseBonus: 0.05,
+        dnaBonus: 12,
+        biomassBonus: 25,
         uniqueUnit: 'Kỵ Sĩ Hươu Thần',
       },
       {
         id: 'druid-sanctuary',
-        label: 'Thánh Địa Rừng Thiêng',
+        label: 'Quang Hợp Lục Diệp Cổ Đại',
         tier: 2,
-        description: 'Dựng bảo hộ ma pháp giúp chống chọi thiên tai và hồi sinh thảm thực vật.',
+        description: 'Thảm thực vật tạo oxy dồi dào, dựng màn chắn sinh thái bảo vệ sinh vật trước biến đổi khí hậu.',
         researchCost: 90,
         militaryBonus: 28,
         harvestBonus: 0.14,
         researchBonus: 0.09,
         stormDefenseBonus: 0.18,
-        uniqueUnit: 'Trưởng Lão Druid',
+        dnaBonus: 28,
+        biomassBonus: 60,
+        uniqueUnit: 'Trưởng Lão Druid Tự Nhiên',
       },
       {
         id: 'mana-surge',
-        label: 'Bộc Phát Mana Sáng Thế',
+        label: 'Đột Biến Tái Sinh Bất Tử',
         tier: 3,
-        description: 'Triệu hồi sấm sét ma thuật và linh lực vô biên hỗ trợ chiến trận.',
+        description: 'Gen Telomere kéo dài vô hạn, kích hoạt luồng sinh lực Aether hồi phục toàn diện hệ sinh thái.',
         researchCost: 160,
         militaryBonus: 50,
         harvestBonus: 0.22,
         researchBonus: 0.18,
         stormDefenseBonus: 0.30,
-        uniqueUnit: 'Đại Pháp Sư Tự Nhiên',
+        dnaBonus: 65,
+        biomassBonus: 140,
+        uniqueUnit: 'Đại Pháp Sư Tự Nhiên & Mộc Tinh Thần',
       },
     ],
   },
   {
     id: 'forge',
-    name: 'Cơ Khí & Luyện Kim Hỏa Sơn',
-    tagline: 'Đe búa rền vang, giáp sắt & hỏa tiễn',
-    icon: '⚙️',
+    name: 'Cấu Trúc Hình Thái & Giáp Sinh Học',
+    tagline: 'Khung xương cứng, vỏ kitin & cơ khí titan',
+    icon: '🛡️',
     accentColor: '#f97316',
-    description: 'Chinh phục lòng đất, khai quặng luyện kim, chế tạo máy móc tự động và trang bị vũ khí sắt thép tối tân.',
+    description: 'Tiến hóa bộ xương trong chịu lực, lớp vỏ giáp kitin dày đặc, móng vuốt sắc nhọn và hợp nhất cơ khí sinh học.',
     prerequisiteEra: 'Thời Kim Khí',
     perks: [
       {
         id: 'heavy-foundry',
-        label: 'Lò Luyện Kim Cao Áp',
+        label: 'Khung Xương & Giáp Vảy Kitin',
         tier: 1,
-        description: 'Đúc vũ khí và giáp sắt bền chắc cho toàn bộ quân đoàn.',
+        description: 'Hình thành xương sống và lớp vảy bảo vệ các cơ quan nội tạng trước kẻ săn mồi.',
         researchCost: 45,
         militaryBonus: 20,
         harvestBonus: 0.04,
         researchBonus: 0.08,
         stormDefenseBonus: 0.08,
+        dnaBonus: 15,
+        biomassBonus: 20,
         uniqueUnit: 'Vệ Binh Thiết Giáp',
       },
       {
         id: 'flame-turret',
-        label: 'Tháp Súng Phun Hỏa',
+        label: 'Tuyến Nọc Độc & Hỏa Khí Sinh Học',
         tier: 2,
-        description: 'Lắp đặt vũ khí hỏa lực tầm xa phòng thủ vững chắc trước quái vật và kẻ thù.',
+        description: 'Tế bào bài tiết axit và tuyến nhiệt phòng vệ cực mạnh trước bầy quái vật.',
         researchCost: 95,
         militaryBonus: 36,
         harvestBonus: 0.06,
         researchBonus: 0.12,
         stormDefenseBonus: 0.12,
-        uniqueUnit: 'Pháo Thủ Hỏa Khí',
+        dnaBonus: 32,
+        biomassBonus: 45,
+        uniqueUnit: 'Pháo Thủ Hỏa Khí Luyện Kim',
       },
       {
         id: 'steam-golem',
-        label: 'Người Đá Cơ Giới (Golem)',
+        label: 'Người Đá Titan & Hóa Thạch Cơ Giới',
         tier: 3,
-        description: 'Chế tạo cỗ máy chiến tranh khổng lồ nghiền nát mọi chướng ngại vật.',
+        description: 'Hợp nhất cấu trúc khoáng chất và cơ thể sống thành Cỗ máy Golem sinh học khổng lồ.',
         researchCost: 175,
         militaryBonus: 58,
         harvestBonus: 0.12,
         researchBonus: 0.20,
         stormDefenseBonus: 0.22,
-        uniqueUnit: 'Cỗ Máy Golem Bọc Thép',
+        dnaBonus: 70,
+        biomassBonus: 120,
+        uniqueUnit: 'Cỗ Máy Golem Bọc Thép Titan',
       },
     ],
   },
   {
     id: 'maritime',
-    name: 'Thủy Triều & Hàng Hải Viễn Dương',
-    tagline: 'Làm chủ đại dương, thương thuyền & hải quái',
-    icon: '⚓',
+    name: 'Thủy Sinh & Đại Dương Viễn Cổ',
+    tagline: 'Mang thở, vây bơi & hải quái biển sâu',
+    icon: '🌊',
     accentColor: '#0ea5e9',
-    description: 'Tận dụng sức mạnh biển khơi, mở rộng giao thương hàng hải và chế ngự các ngọn sóng cuồng nộ.',
+    description: 'Chinh phục đại dương từ rạn san hô cổ đại đến đáy biển sâu, thích nghi áp suất cao và điều khiển dòng hải lưu.',
     prerequisiteEra: 'Làng Gỗ',
     perks: [
       {
         id: 'coastal-fleet',
-        label: 'Hạm Đội Ven Bờ',
+        label: 'Mang Thở & Vây Thủy Động Học',
         tier: 1,
-        description: 'Mở rộng ngư trường đánh bắt và tuần tra phòng thủ hải phận.',
+        description: 'Cá cổ đại phát triển vây bơi cơ động, làm chủ hoàn toàn các rạn san hô và vùng nước nông.',
         researchCost: 35,
         militaryBonus: 14,
         harvestBonus: 0.12,
         researchBonus: 0.05,
         stormDefenseBonus: 0.06,
-        uniqueUnit: 'Thủy Thủ Lao Móc',
+        dnaBonus: 14,
+        biomassBonus: 30,
+        uniqueUnit: 'Đàn Cá Cổ Đại & Thủy Thủ Lao Móc',
       },
       {
         id: 'tidal-barrier',
-        label: 'Đê Kè Chắn Sóng Biển',
+        label: 'Phát Quang Sinh Học & Đê Kè Rạn San Hô',
         tier: 2,
-        description: 'Bảo vệ cư dân ven biển an toàn trước triều cường và giông bão lớn.',
+        description: 'Cơ quan phát sáng xua đuổi bóng tối biển sâu, rạn san hô vững chắc chống chọi triều cường.',
         researchCost: 85,
         militaryBonus: 26,
         harvestBonus: 0.18,
         researchBonus: 0.10,
         stormDefenseBonus: 0.24,
-        uniqueUnit: 'Tu Sĩ Hải Triều',
+        dnaBonus: 30,
+        biomassBonus: 70,
+        uniqueUnit: 'Tu Sĩ Hải Triều Biển Sâu',
       },
       {
         id: 'leviathan-pact',
-        label: 'Khế Ước Thủy Quái',
+        label: 'Khế Ước Thần Thú Leviathan',
         tier: 3,
-        description: 'Hiệp ước cổ xưa triệu hồi Thần Thú Biển Sâu chi viện các trận hải chiến.',
+        description: 'Đánh thức chúa tể đại dương cổ đại, thống trị toàn bộ hải lưu lục địa.',
         researchCost: 155,
         militaryBonus: 52,
         harvestBonus: 0.25,
         researchBonus: 0.16,
         stormDefenseBonus: 0.32,
+        dnaBonus: 68,
+        biomassBonus: 150,
         uniqueUnit: 'Thần Thú Leviathan Biển Sâu',
       },
     ],
   },
   {
     id: 'imperial',
-    name: 'Đế Chế & Thành Trì Quân Phiệt',
-    tagline: 'Kỷ luật thép, thành cao hào sâu & đại quân',
+    name: 'Tập Tính Thích Nghi & Đỉnh Cao Tiến Hóa',
+    tagline: 'Săn mồi bầy đàn, chế tác công cụ & nền văn minh',
     icon: '👑',
     accentColor: '#eab308',
-    description: 'Xây dựng đế chế hùng mạnh với kỷ luật quân ngũ nghiêm minh, thành trì đá kiên cố và quân số áp đảo.',
+    description: 'Từ động vật săn mồi bầy đàn, giữ nhiệt đẳng nhiệt đến vượn người chế tác công cụ, dựng xây nền văn minh vĩ đại.',
     prerequisiteEra: 'Thời Kim Khí',
     perks: [
       {
         id: 'legion-discipline',
-        label: 'Kỷ Luật Quân Đoàn',
+        label: 'Săn Mồi Bầy Đàn & Giữ Nhiệt Đẳng Nhiệt',
         tier: 1,
-        description: 'Tổ chức đội ngũ quân sự bài bản, gia tăng sĩ khí và sức chiến đấu.',
+        description: 'Tổ chức phối hợp bầy đàn chính xác và lớp lông dày thích ứng với Kỷ Băng Hà giá lạnh.',
         researchCost: 45,
         militaryBonus: 22,
         harvestBonus: 0.05,
         researchBonus: 0.06,
         stormDefenseBonus: 0.06,
-        uniqueUnit: 'Lính Lê Dương Khiên Giáo',
+        dnaBonus: 18,
+        biomassBonus: 22,
+        uniqueUnit: 'Sói Tuyết Đầu Đàn & Thợ Săn Bộ Tộc',
       },
       {
         id: 'granite-citadel',
-        label: 'Thành Trì Đá Hoa Cương',
+        label: 'Chế Tác Công Cụ & Thành Trì Đá',
         tier: 2,
-        description: 'Tường thành kiên cố bất khả xâm phạm bảo vệ trung tâm lục địa.',
+        description: 'Đôi tay khéo léo chế tạo rìu đá, đắp thành lũy và phát triển ngôn ngữ giao tiếp xã hội.',
         researchCost: 100,
         militaryBonus: 38,
         harvestBonus: 0.08,
         researchBonus: 0.11,
         stormDefenseBonus: 0.20,
-        uniqueUnit: 'Kỵ Binh Thiết Giáp',
+        dnaBonus: 35,
+        biomassBonus: 50,
+        uniqueUnit: 'Kỵ Binh Thiết Giáp Lạc Việt',
       },
       {
         id: 'grand-imperium',
-        label: 'Đại Tướng Lục Địa & Kỳ Đài',
+        label: 'Siêu Trí Tuệ & Văn Minh Siêu Thể',
         tier: 3,
-        description: 'Thống nhất toàn cõi, xuất quân chinh phạt các lục địa đối thủ.',
+        description: 'Đỉnh cao tiến hóa: Khai mở trí tuệ vũ trụ, làm chủ quy luật sinh thái và khai sáng tương lai.',
         researchCost: 180,
         militaryBonus: 62,
         harvestBonus: 0.15,
         researchBonus: 0.22,
         stormDefenseBonus: 0.25,
-        uniqueUnit: 'Đại Tướng Thống Soái',
+        dnaBonus: 80,
+        biomassBonus: 160,
+        uniqueUnit: 'Đại Tướng Thống Soái Siêu Thể',
       },
     ],
   },
@@ -231,12 +257,16 @@ export function calculateSpecializationBonuses(unlockedPerkIds: readonly string[
   harvestBonus: number
   researchBonus: number
   stormDefenseBonus: number
+  dnaBonus: number
+  biomassBonus: number
   unlockedUnits: string[]
 } {
   let militaryBonus = 0
   let harvestBonus = 0
   let researchBonus = 0
   let stormDefenseBonus = 0
+  let dnaBonus = 0
+  let biomassBonus = 0
   const unlockedUnits: string[] = []
 
   for (const branch of SPECIALIZATION_BRANCHES) {
@@ -246,10 +276,13 @@ export function calculateSpecializationBonuses(unlockedPerkIds: readonly string[
         harvestBonus += perk.harvestBonus
         researchBonus += perk.researchBonus
         stormDefenseBonus += perk.stormDefenseBonus
+        dnaBonus += perk.dnaBonus ?? 0
+        biomassBonus += perk.biomassBonus ?? 0
         unlockedUnits.push(perk.uniqueUnit)
       }
     }
   }
 
-  return { militaryBonus, harvestBonus, researchBonus, stormDefenseBonus, unlockedUnits }
+  return { militaryBonus, harvestBonus, researchBonus, stormDefenseBonus, dnaBonus, biomassBonus, unlockedUnits }
 }
+

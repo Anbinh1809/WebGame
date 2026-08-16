@@ -4,7 +4,7 @@ import { createPrng } from '../world/prng'
 import type { World } from '../world/types'
 import type { EffectiveQuality } from './quality'
 
-const MAX_PARTICLES = 144
+const MAX_PARTICLES = 320
 
 interface AmbientParticle {
   baseX: number
@@ -12,27 +12,28 @@ interface AmbientParticle {
   baseZ: number
   phase: number
   rate: number
-  kind: 'bird' | 'firefly' | 'smoke'
+  kind: 'bird' | 'firefly' | 'smoke' | 'spore' | 'ember' | 'bubble' | 'snowflake' | 'petal' | 'butterfly' | 'magma_spark' | 'frost_sparkle'
 }
 
 export function ambientParticleCount(quality: EffectiveQuality): number {
-  if (quality === 'low') return 24
-  if (quality === 'medium') return 52
-  if (quality === 'high') return 92
+  if (quality === 'low') return 64
+  if (quality === 'medium') return 140
+  if (quality === 'high') return 220
   return MAX_PARTICLES
 }
 
 /**
- * A single Points draw-call for distant birds, fireflies and hearth smoke.
+ * A single Points draw-call for distant birds, fireflies, hearth smoke, forest spores,
+ * volcanic embers, marine bubbles, swirling snow crystals, cherry blossom petals, and butterflies.
  * It is presentation-only: all positions derive from the deterministic seed.
  */
 export class AmbientLifeLayer {
   private readonly geometry = new THREE.BufferGeometry()
   private readonly material = new THREE.PointsMaterial({
-    size: 0.075,
+    size: 0.092,
     vertexColors: true,
     transparent: true,
-    opacity: 0.82,
+    opacity: 0.88,
     depthWrite: false,
     sizeAttenuation: true,
   })
@@ -74,25 +75,49 @@ export class AmbientLifeLayer {
     const random = createPrng(`${world.config.seed}-ambient-life`)
     const particles: AmbientParticle[] = []
     for (let index = 0; index < MAX_PARTICLES; index += 1) {
-      const kind = index % 7 === 0 ? 'smoke' : index % 3 === 0 ? 'bird' : 'firefly'
+      const tileX = Math.floor(random.range(0, world.config.size - 1))
+      const tileZ = Math.floor(random.range(0, world.config.size - 1))
+      const tile = world.tiles[tileZ * world.config.size + tileX]
+      const biome = tile?.biome ?? 'đồng cỏ'
+
+      let kind: AmbientParticle['kind'] = 'firefly'
+      if (index % 10 === 0) kind = 'smoke'
+      else if (index % 7 === 0) kind = 'bird'
+      else if (biome === 'hoa anh đào') kind = 'petal'
+      else if (biome === 'núi lửa') kind = 'magma_spark'
+      else if (biome === 'sông băng') kind = 'frost_sparkle'
+      else if (biome === 'đồng cỏ' && index % 3 === 0) kind = 'butterfly'
+      else if (biome === 'rừng' || biome === 'rừng nhiệt đới') kind = 'spore'
+      else if (biome === 'núi' || biome === 'đồi' || biome === 'hẻm núi') kind = 'ember'
+      else if (biome === 'biển' || biome === 'bờ cát' || biome === 'san hô') kind = 'bubble'
+      else if (biome === 'tuyết') kind = 'snowflake'
+
       particles.push({
-        baseX: (random.range(0, world.config.size - 1) - half) * this.tileScale,
-        baseY: kind === 'bird' ? random.range(3.2, 5.3) : random.range(0.38, 1.25),
-        baseZ: (random.range(0, world.config.size - 1) - half) * this.tileScale,
+        baseX: (tileX - half) * this.tileScale,
+        baseY: kind === 'bird' ? random.range(3.5, 5.8) : (tile?.height ?? 0.2) + random.range(0.25, 1.35),
+        baseZ: (tileZ - half) * this.tileScale,
         phase: random.range(0, Math.PI * 2),
-        rate: random.range(0.28, 0.92),
+        rate: random.range(0.28, 0.95),
         kind,
       })
-      const color = kind === 'bird'
-        ? new THREE.Color(0xd8e6f0)
-        : kind === 'smoke'
-          ? new THREE.Color(0xb8bec4)
-          : new THREE.Color(0xf6d989)
+
+      let color = new THREE.Color(0xf6d989)
+      if (kind === 'bird') color = new THREE.Color(0xe2edf5)
+      else if (kind === 'smoke') color = new THREE.Color(0xb0b8c0)
+      else if (kind === 'spore') color = new THREE.Color(0x6ee7b7)
+      else if (kind === 'ember') color = new THREE.Color(0xf97316)
+      else if (kind === 'bubble') color = new THREE.Color(0x38bdf8)
+      else if (kind === 'snowflake') color = new THREE.Color(0xe0f2fe)
+      else if (kind === 'petal') color = random.next() > 0.4 ? new THREE.Color(0xf472b6) : new THREE.Color(0xfbcfe8)
+      else if (kind === 'butterfly') color = random.next() > 0.5 ? new THREE.Color(0x38bdf8) : new THREE.Color(0xfacc15)
+      else if (kind === 'magma_spark') color = new THREE.Color(0xff4500)
+      else if (kind === 'frost_sparkle') color = new THREE.Color(0xa5f3fc)
+
       color.toArray(this.colors, index * 3)
     }
     this.particles = particles
-    const color = this.geometry.getAttribute('color') as THREE.BufferAttribute
-    color.needsUpdate = true
+    const colorAttr = this.geometry.getAttribute('color') as THREE.BufferAttribute
+    colorAttr.needsUpdate = true
     this.update(0, true, false)
   }
 
@@ -126,6 +151,39 @@ export class AmbientLifeLayer {
         x += Math.sin(travel * speed) * 1.25
         z += Math.cos(travel * 0.73 * speed) * 0.82
         y += Math.sin(travel * 1.8) * 0.18
+      } else if (particle.kind === 'spore') {
+        x += Math.sin(travel * 0.85) * 0.22
+        z += Math.cos(travel * 0.65) * 0.22
+        y += Math.sin(travel * 1.4) * 0.15 + (travel % 1) * 0.05
+      } else if (particle.kind === 'ember') {
+        x += Math.sin(travel * 1.6) * 0.14
+        z += Math.cos(travel * 1.2) * 0.14
+        y += ((travel * 0.4) % 1.2)
+      } else if (particle.kind === 'bubble') {
+        x += Math.sin(travel * 0.9) * 0.1
+        z += Math.cos(travel * 0.9) * 0.1
+        y += ((travel * 0.25) % 0.6)
+      } else if (particle.kind === 'snowflake') {
+        x += Math.sin(travel * 1.1) * 0.28
+        z += Math.cos(travel * 0.8) * 0.28
+        y -= ((travel * 0.3) % 0.8)
+      } else if (particle.kind === 'petal') {
+        x += Math.sin(travel * 1.1) * 0.35 + ((travel * 0.1) % 0.5)
+        z += Math.cos(travel * 0.85) * 0.35 + ((travel * 0.15) % 0.5)
+        y += Math.sin(travel * 1.5) * 0.12 - ((travel * 0.25) % 0.8)
+      } else if (particle.kind === 'butterfly') {
+        x += Math.sin(travel * 2.2) * 0.28
+        z += Math.cos(travel * 1.8) * 0.28
+        y += Math.sin(travel * 3.4) * 0.15
+        if (stormActive) y = -20
+      } else if (particle.kind === 'magma_spark') {
+        x += Math.sin(travel * 2.4) * 0.16
+        z += Math.cos(travel * 1.9) * 0.16
+        y += ((travel * 0.6) % 1.5)
+      } else if (particle.kind === 'frost_sparkle') {
+        x += Math.sin(travel * 0.7) * 0.18
+        z += Math.cos(travel * 0.7) * 0.18
+        y += Math.sin(travel * 1.2) * 0.08
       } else if (particle.kind === 'firefly') {
         x += Math.sin(travel * 1.46) * 0.18
         z += Math.cos(travel * 1.13) * 0.18

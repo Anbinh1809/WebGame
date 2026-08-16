@@ -37,12 +37,21 @@ const SPECIES_CAPACITY: Record<FaunaSpecies, number> = {
   'sơn-dương': 24,
   'sói-hoang': 24,
   'cự-tượng': 16,
+  'lạc-đà': 20,
+  'gấu-bắc-cực': 16,
+  'cáo-tuyết': 24,
+  'báo-đốm': 20,
+  'cá-sấu': 18,
+  'thỏ-hoang': 32,
+  'rùa-cổ-đại': 16,
   'hồn-cát': 16,
   'thạch-thú': 16,
   'mộc-quái': 16,
   'dực-long': 12,
   'lang-tộc': 16,
   'dực-điểu': 12,
+  'bọ-cạp-vàng': 18,
+  'xà-vương': 10,
 }
 
 const LOCAL_FORWARD = new THREE.Vector3(0, 0, 1)
@@ -60,14 +69,23 @@ function creatureMaterial(species: FaunaSpecies): THREE.MeshStandardMaterial {
     case 'hươu-rừng': return new THREE.MeshStandardMaterial({ color: 0xa87545, flatShading: false, roughness: 0.82 })
     case 'lợn-rừng': return new THREE.MeshStandardMaterial({ color: 0x4e392e, flatShading: false, roughness: 0.88 })
     case 'sơn-dương': return new THREE.MeshStandardMaterial({ color: 0x8f8d7b, flatShading: false, roughness: 0.86 })
-    case 'sói-hoang': return new THREE.MeshStandardMaterial({ color: 0xd8e2ec, flatShading: false, roughness: 0.8 })
+    case 'sói-hoang': return new THREE.MeshStandardMaterial({ color: 0x7a8288, flatShading: false, roughness: 0.8 })
     case 'cự-tượng': return new THREE.MeshStandardMaterial({ color: 0x6e7175, flatShading: false, roughness: 0.85 })
+    case 'lạc-đà': return new THREE.MeshStandardMaterial({ color: 0xc29d5b, flatShading: false, roughness: 0.88 })
+    case 'gấu-bắc-cực': return new THREE.MeshStandardMaterial({ color: 0xf0f5f8, flatShading: false, roughness: 0.75 })
+    case 'cáo-tuyết': return new THREE.MeshStandardMaterial({ color: 0xdde8f0, flatShading: false, roughness: 0.78 })
+    case 'báo-đốm': return new THREE.MeshStandardMaterial({ color: 0xd49b38, flatShading: false, roughness: 0.82 })
+    case 'cá-sấu': return new THREE.MeshStandardMaterial({ color: 0x3a5438, flatShading: false, roughness: 0.85 })
+    case 'thỏ-hoang': return new THREE.MeshStandardMaterial({ color: 0xc8b69f, flatShading: false, roughness: 0.9 })
+    case 'rùa-cổ-đại': return new THREE.MeshStandardMaterial({ color: 0x506248, flatShading: false, roughness: 0.84 })
     case 'hồn-cát': return new THREE.MeshStandardMaterial({ color: 0xe7bd67, emissive: 0x6a3c10, emissiveIntensity: 0.8, transparent: true, opacity: 0.88, flatShading: false, roughness: 0.68, depthWrite: false })
     case 'thạch-thú': return new THREE.MeshStandardMaterial({ color: 0x58636a, emissive: 0x163539, emissiveIntensity: 0.46, flatShading: false, roughness: 0.74, metalness: 0.08 })
     case 'mộc-quái': return new THREE.MeshStandardMaterial({ color: 0x2e5c38, emissive: 0x0f2b18, emissiveIntensity: 0.52, flatShading: false, roughness: 0.85 })
     case 'dực-long': return new THREE.MeshStandardMaterial({ color: 0x4a7c9d, emissive: 0x1a3d54, emissiveIntensity: 0.62, flatShading: false, roughness: 0.65, metalness: 0.15 })
     case 'lang-tộc': return new THREE.MeshStandardMaterial({ color: 0x3d271d, emissive: 0x5c1d0f, emissiveIntensity: 0.5, flatShading: false, roughness: 0.82 })
     case 'dực-điểu': return new THREE.MeshStandardMaterial({ color: 0xc49a45, emissive: 0x45310d, emissiveIntensity: 0.45, flatShading: false, roughness: 0.72 })
+    case 'bọ-cạp-vàng': return new THREE.MeshStandardMaterial({ color: 0xe0a830, emissive: 0x5c3d0f, emissiveIntensity: 0.5, flatShading: false, roughness: 0.65 })
+    case 'xà-vương': return new THREE.MeshStandardMaterial({ color: 0x2088a8, emissive: 0x083a48, emissiveIntensity: 0.6, flatShading: false, roughness: 0.55, metalness: 0.2 })
   }
 }
 
@@ -152,11 +170,146 @@ function boarRig(): QuadrupedRig {
   }
 }
 
+function camelRig(): QuadrupedRig {
+  const bodyGeometry = mergedCreature([
+    transformedPart(new THREE.DodecahedronGeometry(0.26, 1), [0.85, 0.58, 1.25], [0, 0.28, -0.04]),
+    transformedPart(new THREE.ConeGeometry(0.12, 0.22, 8), [1, 1, 1], [0, 0.46, -0.05]), // Camel hump
+  ])
+  const headGeometry = mergedCreature([
+    transformedPart(new THREE.DodecahedronGeometry(0.13, 1), [0.75, 0.8, 0.95], [0, 0, 0]),
+    transformedPart(new THREE.ConeGeometry(0.06, 0.16, 8), [1, 0.6, 1], [0, -0.03, 0.12], [Math.PI / 2, 0, 0]),
+  ])
+  return {
+    bodyGeometry,
+    headGeometry,
+    legGeometry: new THREE.CylinderGeometry(1, 1, 1, 10),
+    headAnchor: new THREE.Vector3(0, 0.38, 0.32),
+    hips: [
+      new THREE.Vector3(-0.14, 0.28, -0.2),
+      new THREE.Vector3(0.14, 0.28, -0.2),
+      new THREE.Vector3(-0.14, 0.28, 0.18),
+      new THREE.Vector3(0.14, 0.28, 0.18),
+    ],
+    upperLegLength: 0.24,
+    lowerLegLength: 0.25,
+  }
+}
+
+function polarBearRig(): QuadrupedRig {
+  const bodyGeometry = mergedCreature([
+    transformedPart(new THREE.DodecahedronGeometry(0.32, 1), [1.1, 0.72, 1.3], [0, 0.32, -0.05]),
+  ])
+  const headGeometry = mergedCreature([
+    transformedPart(new THREE.DodecahedronGeometry(0.16, 1), [0.95, 0.75, 1], [0, 0, 0]),
+    transformedPart(new THREE.ConeGeometry(0.08, 0.16, 8), [1, 0.6, 1], [0, -0.02, 0.14], [Math.PI / 2, 0, 0]),
+    transformedPart(new THREE.SphereGeometry(0.04, 8, 8), [1, 1, 1], [-0.1, 0.14, -0.02]),
+    transformedPart(new THREE.SphereGeometry(0.04, 8, 8), [1, 1, 1], [0.1, 0.14, -0.02]),
+  ])
+  return {
+    bodyGeometry,
+    headGeometry,
+    legGeometry: new THREE.CylinderGeometry(1, 1, 1, 10),
+    headAnchor: new THREE.Vector3(0, 0.34, 0.34),
+    hips: [
+      new THREE.Vector3(-0.18, 0.3, -0.2),
+      new THREE.Vector3(0.18, 0.3, -0.2),
+      new THREE.Vector3(-0.18, 0.3, 0.18),
+      new THREE.Vector3(0.18, 0.3, 0.18),
+    ],
+    upperLegLength: 0.22,
+    lowerLegLength: 0.22,
+  }
+}
+
+function predatorRig(isFox = false): QuadrupedRig {
+  const scaleMul = isFox ? 0.75 : 1
+  const bodyGeometry = mergedCreature([
+    transformedPart(new THREE.DodecahedronGeometry(0.24 * scaleMul, 1), [0.8, 0.52, 1.2], [0, 0.26 * scaleMul, -0.03]),
+  ])
+  const headGeometry = mergedCreature([
+    transformedPart(new THREE.DodecahedronGeometry(0.13 * scaleMul, 1), [0.8, 0.7, 0.95], [0, 0, 0]),
+    transformedPart(new THREE.ConeGeometry(0.05 * scaleMul, 0.16 * scaleMul, 8), [1, 0.6, 1], [0, -0.02, 0.12 * scaleMul], [Math.PI / 2, 0, 0]),
+    transformedPart(new THREE.ConeGeometry(0.04 * scaleMul, 0.1 * scaleMul, 6), [1, 1, 1], [-0.07 * scaleMul, 0.13 * scaleMul, 0], [0, 0, -0.3]),
+    transformedPart(new THREE.ConeGeometry(0.04 * scaleMul, 0.1 * scaleMul, 6), [1, 1, 1], [0.07 * scaleMul, 0.13 * scaleMul, 0], [0, 0, 0.3]),
+  ])
+  return {
+    bodyGeometry,
+    headGeometry,
+    legGeometry: new THREE.CylinderGeometry(1, 1, 1, 10),
+    headAnchor: new THREE.Vector3(0, 0.32 * scaleMul, 0.28 * scaleMul),
+    hips: [
+      new THREE.Vector3(-0.13 * scaleMul, 0.26 * scaleMul, -0.16 * scaleMul),
+      new THREE.Vector3(0.13 * scaleMul, 0.26 * scaleMul, -0.16 * scaleMul),
+      new THREE.Vector3(-0.13 * scaleMul, 0.26 * scaleMul, 0.16 * scaleMul),
+      new THREE.Vector3(0.13 * scaleMul, 0.26 * scaleMul, 0.16 * scaleMul),
+    ],
+    upperLegLength: 0.19 * scaleMul,
+    lowerLegLength: 0.2 * scaleMul,
+  }
+}
+
+function bunnyRig(): QuadrupedRig {
+  const bodyGeometry = mergedCreature([
+    transformedPart(new THREE.DodecahedronGeometry(0.16, 1), [0.85, 0.75, 1.1], [0, 0.14, 0]),
+  ])
+  const headGeometry = mergedCreature([
+    transformedPart(new THREE.SphereGeometry(0.09, 10, 8), [1, 0.9, 1], [0, 0, 0]),
+    transformedPart(new THREE.CapsuleGeometry(0.02, 0.14, 4, 8), [1, 1, 1], [-0.04, 0.15, -0.02], [-0.2, 0, -0.15]),
+    transformedPart(new THREE.CapsuleGeometry(0.02, 0.14, 4, 8), [1, 1, 1], [0.04, 0.15, -0.02], [-0.2, 0, 0.15]),
+  ])
+  return {
+    bodyGeometry,
+    headGeometry,
+    legGeometry: new THREE.CylinderGeometry(1, 1, 1, 8),
+    headAnchor: new THREE.Vector3(0, 0.18, 0.14),
+    hips: [
+      new THREE.Vector3(-0.08, 0.14, -0.09),
+      new THREE.Vector3(0.08, 0.14, -0.09),
+      new THREE.Vector3(-0.08, 0.14, 0.09),
+      new THREE.Vector3(0.08, 0.14, 0.09),
+    ],
+    upperLegLength: 0.11,
+    lowerLegLength: 0.11,
+  }
+}
+
+function tortoiseRig(): QuadrupedRig {
+  const bodyGeometry = mergedCreature([
+    transformedPart(new THREE.SphereGeometry(0.24, 12, 10), [1.1, 0.6, 1.25], [0, 0.16, 0]),
+  ])
+  const headGeometry = mergedCreature([
+    transformedPart(new THREE.DodecahedronGeometry(0.09, 1), [0.8, 0.7, 1.1], [0, 0, 0]),
+  ])
+  return {
+    bodyGeometry,
+    headGeometry,
+    legGeometry: new THREE.CylinderGeometry(1, 1, 1, 8),
+    headAnchor: new THREE.Vector3(0, 0.14, 0.26),
+    hips: [
+      new THREE.Vector3(-0.16, 0.12, -0.14),
+      new THREE.Vector3(0.16, 0.12, -0.14),
+      new THREE.Vector3(-0.16, 0.12, 0.14),
+      new THREE.Vector3(0.16, 0.12, 0.14),
+    ],
+    upperLegLength: 0.1,
+    lowerLegLength: 0.1,
+  }
+}
+
 function quadrupedRigFor(species: FaunaSpecies): QuadrupedRig | undefined {
   switch (species) {
     case 'hươu-rừng': return hornedQuadrupedRig([0.72, 0.76, 0.82], 0.14)
     case 'lợn-rừng': return boarRig()
     case 'sơn-dương': return hornedQuadrupedRig([0.78, 0.84, 0.82], 0.23)
+    case 'sói-hoang': return predatorRig(false)
+    case 'lạc-đà': return camelRig()
+    case 'gấu-bắc-cực': return polarBearRig()
+    case 'cáo-tuyết': return predatorRig(true)
+    case 'báo-đốm': return predatorRig(false)
+    case 'cá-sấu': return boarRig()
+    case 'thỏ-hoang': return bunnyRig()
+    case 'rùa-cổ-đại': return tortoiseRig()
+    case 'cự-tượng': return polarBearRig()
     default: return undefined
   }
 }
@@ -203,12 +356,32 @@ function wyvernGeometry(): THREE.BufferGeometry {
   ])
 }
 
+function scorpionGeometry(): THREE.BufferGeometry {
+  return mergedCreature([
+    transformedPart(new THREE.DodecahedronGeometry(0.18, 1), [1, 0.5, 1.2], [0, 0.12, 0]),
+    transformedPart(new THREE.ConeGeometry(0.06, 0.24, 6), [1, 1, 1], [-0.14, 0.14, 0.18], [0.5, 0, -0.4]),
+    transformedPart(new THREE.ConeGeometry(0.06, 0.24, 6), [1, 1, 1], [0.14, 0.14, 0.18], [0.5, 0, 0.4]),
+    transformedPart(new THREE.TorusGeometry(0.18, 0.03, 6, 12, Math.PI * 0.9), [1, 1, 1], [0, 0.28, -0.16], [0, Math.PI / 2, 0]),
+    transformedPart(new THREE.ConeGeometry(0.04, 0.1, 6), [1, 1, 1], [0, 0.44, -0.06], [-0.8, 0, 0]),
+  ])
+}
+
+function serpentGeometry(): THREE.BufferGeometry {
+  return mergedCreature([
+    transformedPart(new THREE.CapsuleGeometry(0.1, 0.65, 4, 10), [1, 1, 1], [0, 0.16, 0], [Math.PI / 3, 0, 0]),
+    transformedPart(new THREE.DodecahedronGeometry(0.12, 1), [0.9, 0.7, 1.2], [0, 0.42, 0.18]),
+    transformedPart(new THREE.ConeGeometry(0.04, 0.18, 4), [1, 1, 1], [0, 0.54, 0.12], [0.3, 0, 0]),
+  ])
+}
+
 function creatureGeometry(species: FaunaSpecies): THREE.BufferGeometry {
   switch (species) {
     case 'hồn-cát': return sandWraithGeometry()
     case 'thạch-thú': return stoneBeastGeometry()
     case 'mộc-quái': return treantGeometry()
     case 'dực-long': return wyvernGeometry()
+    case 'bọ-cạp-vàng': return scorpionGeometry()
+    case 'xà-vương': return serpentGeometry()
     default: return stoneBeastGeometry()
   }
 }

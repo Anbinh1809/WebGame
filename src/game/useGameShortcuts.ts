@@ -19,6 +19,9 @@ interface UseGameShortcutsOptions {
   onToggleAvatarMode?: () => void
   onToggleCivTree?: () => void
   onToggleRankedArena?: () => void
+  onToggleEvolutionTree?: () => void
+  onToggleSketchfabExplorer?: () => void
+  onToggleArchipelago?: () => void
 }
 
 const TOOLS_BY_NUMBER: ToolId[] = [
@@ -49,6 +52,9 @@ export function useGameShortcuts({
   onToggleAvatarMode,
   onToggleCivTree,
   onToggleRankedArena,
+  onToggleEvolutionTree,
+  onToggleSketchfabExplorer,
+  onToggleArchipelago,
 }: UseGameShortcutsOptions): void {
   useEffect(() => {
     const handler = (event: KeyboardEvent): void => {
@@ -90,6 +96,24 @@ export function useGameShortcuts({
       if (event.key.toLowerCase() === 'v' && !event.ctrlKey && !event.metaKey && !event.altKey) {
         event.preventDefault()
         onToggleAvatarMode?.()
+        return
+      }
+
+      if (event.key.toLowerCase() === 'e' && !event.ctrlKey && !event.metaKey && !event.altKey) {
+        event.preventDefault()
+        onToggleEvolutionTree?.()
+        return
+      }
+
+      if (event.key.toLowerCase() === 's' && !event.ctrlKey && !event.metaKey && !event.altKey) {
+        event.preventDefault()
+        onToggleSketchfabExplorer?.()
+        return
+      }
+
+      if (event.key.toLowerCase() === 'a' && !event.ctrlKey && !event.metaKey && !event.altKey) {
+        event.preventDefault()
+        onToggleArchipelago?.()
         return
       }
 
@@ -150,5 +174,8 @@ export function useGameShortcuts({
     onToggleAvatarMode,
     onToggleCivTree,
     onToggleRankedArena,
+    onToggleEvolutionTree,
+    onToggleSketchfabExplorer,
+    onToggleArchipelago,
   ])
 }

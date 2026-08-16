@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { advanceSimulation, createSimulation, developVillageTool, isHabitableTile, MAX_ADVANCE_TICKS, recordGodToolUse, resolveCouncilDecision, spawnSettlersAt, submitVillageKnowledge, toggleSimulationPause, triggerStorm } from './engine'
 import { MAX_SIMULATION_TICK } from './types'
+import { VILLAGE_TOOL_DEFINITIONS } from './progression'
 import { generateWorld } from '../world/generator'
 import type { WorldConfig } from '../world/types'
 
@@ -131,7 +132,7 @@ describe('simulation engine', () => {
 
     const prepared = {
       ...initial,
-      villages: initial.villages.map((village) => ({ ...village, research: 999, food: 999 })),
+      villages: initial.villages.map((village) => ({ ...village, research: 9999, food: 9999 })),
     }
     const firstCraft = developVillageTool(prepared)
     expect(firstCraft.ok).toBe(true)
@@ -142,11 +143,15 @@ describe('simulation engine', () => {
 
     let progressed = firstCraft.simulation
     while (true) {
-      const next = developVillageTool(progressed)
+      const preparedNext = {
+        ...progressed,
+        villages: progressed.villages.map((village) => ({ ...village, research: 999, food: 999 })),
+      }
+      const next = developVillageTool(preparedNext)
       if (!next.ok) break
       progressed = next.simulation
     }
-    expect(progressed.villages[0]!.tools).toHaveLength(7)
+    expect(progressed.villages[0]!.tools).toHaveLength(VILLAGE_TOOL_DEFINITIONS.length)
     expect(progressed.villages[0]!.era).toBe('Thị Trấn')
   })
 

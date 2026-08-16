@@ -1,6 +1,6 @@
 import * as THREE from 'three'
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js'
-import type { World } from '../world/types'
+import type { Tile, World } from '../world/types'
 import { sampleTerrainPointAtScene } from './TerrainPose'
 
 export type AvatarCameraPerspective = 'third-person' | 'first-person'
@@ -59,7 +59,7 @@ export class AvatarController {
     this.avatarLight = new THREE.PointLight(0xffdf87, 2.5, 8, 1.2)
     this.avatarLight.position.set(0, 1.2, 0)
 
-    const haloGeo = new THREE.RingGeometry(0.3, 0.45, 32)
+    const haloGeo = new THREE.RingGeometry(0.18, 0.28, 32)
     haloGeo.rotateX(-Math.PI / 2)
     this.auraHalo = new THREE.Mesh(
       haloGeo,
@@ -72,7 +72,7 @@ export class AvatarController {
         blending: THREE.AdditiveBlending,
       }),
     )
-    this.auraHalo.position.set(0, 0.05, 0)
+    this.auraHalo.position.set(0, 0.03, 0)
 
     this.group.add(this.avatarMesh)
     this.group.add(this.avatarLight)
@@ -98,36 +98,24 @@ export class AvatarController {
     return this.perspective
   }
 
-  public getState(): AvatarState {
-    return {
-      active: this.active,
-      perspective: this.perspective,
-      x: this.position.x,
-      y: this.position.y,
-      z: this.position.z,
-      heading: this.heading,
-      pitch: this.pitch,
-      speed: this.speed,
-      stamina: this.stamina,
-      maxStamina: this.maxStamina,
+  public enter(world: World, tileIndexOrX?: number, maybeZ?: number): void {
+    let tile: Tile | undefined
+    if (tileIndexOrX !== undefined && maybeZ !== undefined) {
+      tile = world.tiles[maybeZ * world.config.size + tileIndexOrX]
+    } else if (tileIndexOrX !== undefined) {
+      tile = world.tiles[tileIndexOrX]
     }
-  }
-
-  public enter(world: World, initialX?: number, initialZ?: number): void {
+    tile = tile ?? world.tiles[Math.floor(world.tiles.length / 2)] ?? world.tiles[0]
+    if (!tile) return
     this.active = true
-    this.group.visible = true
-    this.perspective = 'third-person'
-    this.avatarMesh.visible = true
-
-    const spawnTileX = initialX ?? Math.floor(world.config.size / 2)
-    const spawnTileZ = initialZ ?? Math.floor(world.config.size / 2)
-    const spawnSceneX = (spawnTileX - world.config.size / 2 + 0.5) * this.tileScale
-    const spawnSceneZ = (spawnTileZ - world.config.size / 2 + 0.5) * this.tileScale
-
-    sampleTerrainPointAtScene(world, spawnSceneX, spawnSceneZ, this.tileScale, this.position, this.normalTarget)
-    this.group.position.copy(this.position)
+    this.position.set(tile.x * this.tileScale, Math.max(0.12, tile.height) + 0.1, tile.z * this.tileScale)
     this.velocity.set(0, 0, 0)
+    this.heading = 0
+    this.pitch = 0.15
     this.speed = 0
+    this.stamina = this.maxStamina
+    this.group.position.copy(this.position)
+    this.group.visible = true
   }
 
   public exit(): void {
@@ -170,113 +158,126 @@ export class AvatarController {
     }
   }
 
-  public handleKeyUp(code: string): boolean {
-    if (!this.active) return false
+  public handleKeyUp(code: string): void {
     switch (code) {
       case 'KeyW':
       case 'ArrowUp':
         this.keys.forward = false
-        return true
+        break
       case 'KeyS':
       case 'ArrowDown':
         this.keys.backward = false
-        return true
+        break
       case 'KeyA':
       case 'ArrowLeft':
         this.keys.left = false
-        return true
+        break
       case 'KeyD':
       case 'ArrowRight':
         this.keys.right = false
-        return true
+        break
       case 'ShiftLeft':
       case 'ShiftRight':
         this.keys.sprint = false
-        return true
+        break
       case 'Space':
         this.keys.jump = false
-        return true
-      default:
-        return false
+        break
     }
   }
 
   public handleMouseMove(movementX: number, movementY: number): void {
     if (!this.active) return
-    const sensitivity = 0.0032
+    const sensitivity = 0.0024
     this.heading -= movementX * sensitivity
     this.pitch -= movementY * sensitivity
-    this.pitch = Math.max(-Math.PI / 4, Math.min(Math.PI / 3, this.pitch))
+    this.pitch = Math.max(-0.45, Math.min(0.65, this.pitch))
   }
 
-  public update(delta: number, world: World, camera: THREE.PerspectiveCamera): void {
+  public getState(): AvatarState {
+    return {
+      active: this.active,
+      perspective: this.perspective,
+      x: this.position.x,
+      y: this.position.y,
+      z: this.position.z,
+      heading: this.heading,
+      pitch: this.pitch,
+      speed: this.speed,
+      stamina: this.stamina,
+      maxStamina: this.maxStamina,
+    }
+  }
+
+  public update(delta: number, world: World, camera: THREE.Camera): void {
     if (!this.active) return
 
-    const clampedDelta = Math.min(0.1, Math.max(0.001, delta))
+    const clampedDelta = Math.min(delta, 0.1)
 
-    // Handle Movement Input
-    let moveForward = 0
-    let moveSide = 0
-    if (this.keys.forward) moveForward += 1
-    if (this.keys.backward) moveForward -= 1
-    if (this.keys.right) moveSide += 1
-    if (this.keys.left) moveSide -= 1
-
-    const isMoving = moveForward !== 0 || moveSide !== 0
-    const isSprinting = this.keys.sprint && isMoving && this.stamina > 5
-
+    // Stamina logic
+    const isSprinting = this.keys.sprint && this.stamina > 5 && (this.keys.forward || this.keys.backward || this.keys.left || this.keys.right)
     if (isSprinting) {
-      this.stamina = Math.max(0, this.stamina - clampedDelta * 22)
+      this.stamina = Math.max(0, this.stamina - clampedDelta * 18)
     } else {
-      this.stamina = Math.min(this.maxStamina, this.stamina + clampedDelta * 14)
+      this.stamina = Math.min(this.maxStamina, this.stamina + clampedDelta * 12)
     }
 
-    const baseMoveSpeed = isSprinting ? 5.2 : 2.8
-    if (isMoving) {
-      const inputAngle = Math.atan2(moveSide, moveForward)
-      const targetAngle = this.heading + inputAngle
-      const targetVelX = Math.sin(targetAngle) * baseMoveSpeed
-      const targetVelZ = Math.cos(targetAngle) * baseMoveSpeed
+    const moveSpeed = isSprinting ? 5.8 : 3.2
 
-      this.velocity.x += (targetVelX - this.velocity.x) * 12 * clampedDelta
-      this.velocity.z += (targetVelZ - this.velocity.z) * 12 * clampedDelta
-      this.avatarMesh.rotation.y = targetAngle
+    // Direction vector
+    const moveDir = new THREE.Vector3()
+    if (this.keys.forward) moveDir.z += 1
+    if (this.keys.backward) moveDir.z -= 1
+    if (this.keys.left) moveDir.x -= 1
+    if (this.keys.right) moveDir.x += 1
+
+    if (moveDir.lengthSq() > 0.001) {
+      moveDir.normalize()
+      // Rotate by heading
+      const forwardX = Math.sin(this.heading)
+      const forwardZ = Math.cos(this.heading)
+      const rightX = Math.cos(this.heading)
+      const rightZ = -Math.sin(this.heading)
+
+      const targetVx = (forwardX * moveDir.z + rightX * moveDir.x) * moveSpeed
+      const targetVz = (forwardZ * moveDir.z + rightZ * moveDir.x) * moveSpeed
+
+      this.velocity.x = THREE.MathUtils.lerp(this.velocity.x, targetVx, clampedDelta * 10)
+      this.velocity.z = THREE.MathUtils.lerp(this.velocity.z, targetVz, clampedDelta * 10)
     } else {
-      this.velocity.x *= Math.max(0, 1 - 10 * clampedDelta)
-      this.velocity.z *= Math.max(0, 1 - 10 * clampedDelta)
+      this.velocity.x = THREE.MathUtils.lerp(this.velocity.x, 0, clampedDelta * 12)
+      this.velocity.z = THREE.MathUtils.lerp(this.velocity.z, 0, clampedDelta * 12)
     }
 
-    // Jump / Gravity
-    if (this.keys.jump && this.isGrounded) {
-      this.velocity.y = 4.2
+    // Gravity & Jump
+    if (!this.isGrounded) {
+      this.velocity.y -= 14.5 * clampedDelta
+    } else if (this.keys.jump) {
+      this.velocity.y = 4.8
       this.isGrounded = false
     }
 
-    if (!this.isGrounded) {
-      this.velocity.y -= 12 * clampedDelta
-    }
-
-    // Apply Position
+    // Apply movement
     this.position.x += this.velocity.x * clampedDelta
-    this.position.z += this.velocity.z * clampedDelta
     this.position.y += this.velocity.y * clampedDelta
+    this.position.z += this.velocity.z * clampedDelta
 
-    // Ground Snapping
+    // World terrain clamping
     const groundPoint = new THREE.Vector3()
-    sampleTerrainPointAtScene(world, this.position.x, this.position.z, this.tileScale, groundPoint, this.normalTarget)
+    sampleTerrainPointAtScene(world, this.tileScale, this.position.x, this.position.z, groundPoint, this.normalTarget)
+    const minHeight = Math.max(0.08, groundPoint.y)
 
-    if (this.position.y <= groundPoint.y + 0.02) {
-      this.position.y = groundPoint.y
+    if (this.position.y <= minHeight) {
+      this.position.y = minHeight
       this.velocity.y = 0
       this.isGrounded = true
+    } else {
+      this.isGrounded = false
     }
 
-    // World Boundary Clamp
-    const halfSize = (world.config.size * this.tileScale) / 2 - 0.5
-    this.position.x = Math.max(-halfSize, Math.min(halfSize, this.position.x))
-    this.position.z = Math.max(-halfSize, Math.min(halfSize, this.position.z))
-
+    // Update Avatar Group transform
     this.group.position.copy(this.position)
+    this.avatarMesh.rotation.y = this.heading
 
     this.speed = Math.hypot(this.velocity.x, this.velocity.z)
 
@@ -287,18 +288,18 @@ export class AvatarController {
 
     // Update Camera
     if (this.perspective === 'third-person') {
-      const dist = 2.8
-      const eyeHeight = 0.95
+      const dist = 1.6
+      const eyeHeight = 0.45
       this.cameraTarget.copy(this.position).add(new THREE.Vector3(0, eyeHeight, 0))
 
       const camX = this.position.x - Math.sin(this.heading) * Math.cos(this.pitch) * dist
-      const camY = this.position.y + eyeHeight + Math.sin(this.pitch) * dist + 0.3
+      const camY = this.position.y + eyeHeight + Math.sin(this.pitch) * dist + 0.15
       const camZ = this.position.z - Math.cos(this.heading) * Math.cos(this.pitch) * dist
 
-      camera.position.set(camX, Math.max(groundPoint.y + 0.3, camY), camZ)
+      camera.position.set(camX, Math.max(groundPoint.y + 0.15, camY), camZ)
       camera.lookAt(this.cameraTarget)
     } else {
-      const eyeHeight = 0.85
+      const eyeHeight = 0.40
       camera.position.set(this.position.x, this.position.y + eyeHeight, this.position.z)
       const lookX = this.position.x + Math.sin(this.heading) * Math.cos(this.pitch) * 10
       const lookY = this.position.y + eyeHeight - Math.sin(this.pitch) * 10
@@ -320,8 +321,8 @@ export class AvatarController {
     const avatarGroup = new THREE.Group()
 
     // Robe / Body
-    const robeGeo = new THREE.CylinderGeometry(0.12, 0.22, 0.7, 16)
-    robeGeo.translate(0, 0.38, 0)
+    const robeGeo = new THREE.CylinderGeometry(0.06, 0.11, 0.35, 16)
+    robeGeo.translate(0, 0.18, 0)
     const robeMat = new THREE.MeshStandardMaterial({
       color: 0xfdfbf7,
       emissive: 0x3d3014,
@@ -332,8 +333,8 @@ export class AvatarController {
     const robe = new THREE.Mesh(robeGeo, robeMat)
 
     // Head
-    const headGeo = new THREE.SphereGeometry(0.11, 16, 12)
-    headGeo.translate(0, 0.82, 0)
+    const headGeo = new THREE.SphereGeometry(0.055, 16, 12)
+    headGeo.translate(0, 0.40, 0)
     const headMat = new THREE.MeshStandardMaterial({
       color: 0xffe2b8,
       roughness: 0.8,
@@ -341,9 +342,9 @@ export class AvatarController {
     const head = new THREE.Mesh(headGeo, headMat)
 
     // Halo / Divine Crown
-    const crownGeo = new THREE.TorusGeometry(0.14, 0.02, 8, 24)
+    const crownGeo = new THREE.TorusGeometry(0.07, 0.012, 8, 24)
     crownGeo.rotateX(Math.PI / 2)
-    crownGeo.translate(0, 0.98, 0)
+    crownGeo.translate(0, 0.48, 0)
     const crownMat = new THREE.MeshStandardMaterial({
       color: 0xffdf87,
       emissive: 0xffca3a,
@@ -354,19 +355,20 @@ export class AvatarController {
     const crown = new THREE.Mesh(crownGeo, crownMat)
 
     // Staff of Creation
-    const staffGeo = new THREE.CylinderGeometry(0.018, 0.022, 1.1, 8)
-    staffGeo.translate(0.24, 0.55, 0.1)
-    const gemGeo = new THREE.DodecahedronGeometry(0.065, 1)
-    gemGeo.translate(0.24, 1.12, 0.1)
-    const staffMesh = new THREE.Mesh(
-      staffGeo,
-      new THREE.MeshStandardMaterial({ color: 0x8b5a2b, roughness: 0.7 }),
-    )
+    const staffGeo = new THREE.CylinderGeometry(0.009, 0.012, 0.55, 8)
+    staffGeo.translate(0.12, 0.28, 0.05)
+    const gemGeo = new THREE.DodecahedronGeometry(0.035, 1)
+    gemGeo.translate(0.12, 0.56, 0.05)
+    const staffMat = new THREE.MeshStandardMaterial({
+      color: 0x8c6239,
+      roughness: 0.7,
+    })
+    const staffMesh = new THREE.Mesh(staffGeo, staffMat)
     const gemMesh = new THREE.Mesh(
       gemGeo,
       new THREE.MeshStandardMaterial({
-        color: 0x5edeb5,
-        emissive: 0x22d3ee,
+        color: 0x38bdf8,
+        emissive: 0x0284c7,
         emissiveIntensity: 0.9,
         roughness: 0.1,
       }),

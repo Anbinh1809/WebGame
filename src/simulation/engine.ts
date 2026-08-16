@@ -3,7 +3,7 @@ import type { Tile, ToolId, VillageSite, World } from '../world/types'
 import { assessVillageKnowledge, villageKnowledgeDefinition, villageKnowledgeEffects } from './knowledge'
 import { nearestVillage, tileDistance } from './metrics'
 import { createWorldObjectives, refreshWorldObjectives } from './objectives'
-import { nextVillageTool, STARTING_VILLAGE_TOOLS, villageEraForTools, villageEraLabel, villageToolEffects } from './progression'
+import { nextVillageTool, STARTING_VILLAGE_TOOLS, villageEraForTools, villageEraLabel, villageEvolutionEpochForTools, villageToolEffects } from './progression'
 import { EMPTY_GOD_TOOL_USES, MAX_SIMULATION_TICK } from './types'
 import type {
   CouncilChoiceId,
@@ -204,6 +204,12 @@ function updateVillage(
     lastDecision = 'Đánh dấu một lối mòn giàu tài nguyên'
   }
 
+  const epoch = villageEvolutionEpochForTools(village.tools)
+  const biomass = clamp((village.biomass ?? 25) + harvest * 0.35 + (ecology.fertility + ecology.water + ecology.forest) * 0.18, 0, 99999)
+  const dnaPoints = clamp((village.dnaPoints ?? 12) + (food > population * 2 ? 0.22 : 0.08) + researchBonus * 2, 0, 99999)
+  const biodiversity = clamp(Math.round(ecology.forest * 38 + ecology.water * 32 + ecology.fertility * 30), 10, 100)
+  const adaptationRate = clamp(Math.round(resilience * 0.75 + village.military * 0.25), 1, 100)
+
   const updated: VillageSimulation = {
     ...village,
     population,
@@ -215,6 +221,11 @@ function updateVillage(
     territory,
     resilience,
     era: village.era,
+    epoch,
+    biomass,
+    dnaPoints,
+    biodiversity,
+    adaptationRate,
     lastDecision,
   }
 
@@ -250,6 +261,11 @@ function villageFromSite(site: VillageSite, index: number): VillageSimulation {
     territory: 3,
     resilience: 42,
     era: 'Thời Đồ Đá',
+    epoch: 'Kỷ Tiền Cambri (Đơn Bào)',
+    biomass: 30,
+    dnaPoints: 15,
+    biodiversity: 65,
+    adaptationRate: 45,
     tools: [...STARTING_VILLAGE_TOOLS],
     knowledge: [],
     lastDecision: 'Chọn nơi dựng lửa đầu tiên',
@@ -271,10 +287,13 @@ export function createSimulation(world: World): SimulationState {
     objectives: createWorldObjectives(world),
     godToolUses: { ...EMPTY_GOD_TOOL_USES },
   }
+  const isPristine = world.villages.length === 0
   return appendEvent(state, {
-    kind: 'first-dawn',
-    title: 'Bình minh đầu tiên',
-    detail: 'Một cộng đồng nhỏ bắt đầu viết lịch sử của Aetheria.',
+    kind: isPristine ? 'pristine-dawn' : 'first-dawn',
+    title: isPristine ? 'Thiên Nhiên Nguyên Sinh' : 'Bình minh đầu tiên',
+    detail: isPristine
+      ? 'Aetheria thức giấc trong vẻ đẹp hoang sơ tuyệt mỹ. Hãy thả cư dân và quái thú để bắt đầu kiến tạo thế giới.'
+      : 'Một cộng đồng nhỏ bắt đầu viết lịch sử của Aetheria.',
     tone: 'good',
   })
 }

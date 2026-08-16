@@ -8,8 +8,8 @@ import type { FpsLimit, GraphicsQualityOverrides, QualityProfile } from '../rend
 import type { MotionPreference } from '../renderer/MotionPreference'
 import type { AssetPackQuality } from '../assets/types'
 import type { AssetPackEntitlements, GameEdition } from '../renderer/AssetPackManager'
-
 import type { AvatarCameraPerspective, AvatarState } from '../renderer/AvatarController'
+import type { SpawnedSketchfabEntity } from '../renderer/SketchfabModelLayer'
 
 interface WorldViewportProps {
   world: World
@@ -24,6 +24,9 @@ interface WorldViewportProps {
   assetPackQuality: AssetPackQuality
   assetPackEntitlements: AssetPackEntitlements
   edition: GameEdition
+  sketchfabEntities?: SpawnedSketchfabEntity[]
+  evolutionMutationSignal?: { x: number; y: number; z: number; colorHex?: number; token: number }
+  focusTileSignal?: { tileIndex: number; token: number } | undefined
   avatarMode?: boolean
   avatarPerspectiveSignal?: number
   onAvatarPerspectiveChange?: (perspective: AvatarCameraPerspective) => void
@@ -48,6 +51,9 @@ export const WorldViewport = memo(function WorldViewport({
   assetPackQuality,
   assetPackEntitlements,
   edition,
+  sketchfabEntities = [],
+  evolutionMutationSignal,
+  focusTileSignal,
   avatarMode = false,
   avatarPerspectiveSignal = 0,
   onAvatarPerspectiveChange,
@@ -147,6 +153,25 @@ export const WorldViewport = memo(function WorldViewport({
   useEffect(() => {
     rendererRef.current?.setFpsLimit(fpsLimit ?? 'auto')
   }, [fpsLimit])
+
+  useEffect(() => {
+    rendererRef.current?.setSketchfabEntities(sketchfabEntities)
+  }, [sketchfabEntities])
+
+  useEffect(() => {
+    if (!evolutionMutationSignal || evolutionMutationSignal.token === 0) return
+    rendererRef.current?.triggerEvolutionMutation(
+      evolutionMutationSignal.x,
+      evolutionMutationSignal.y,
+      evolutionMutationSignal.z,
+      evolutionMutationSignal.colorHex,
+    )
+  }, [evolutionMutationSignal])
+
+  useEffect(() => {
+    if (!focusTileSignal || focusTileSignal.token === 0) return
+    rendererRef.current?.focusTile(focusTileSignal.tileIndex)
+  }, [focusTileSignal])
 
   useEffect(() => {
     rendererRef.current?.setAvatarMode(Boolean(avatarMode))

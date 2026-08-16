@@ -5,8 +5,8 @@ export interface VersionInfo {
   notes?: string
 }
 
-export const CURRENT_CLIENT_VERSION = '0.1.6'
-export const CURRENT_BUILD_TIME = '2026-08-14T19:00:00.000Z'
+export const CURRENT_CLIENT_VERSION = '0.1.7'
+export const CURRENT_BUILD_TIME = '2026-08-16T12:00:00.000Z'
 
 export type UpdateCallback = (newVersion: VersionInfo) => void
 

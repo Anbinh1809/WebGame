@@ -9,6 +9,7 @@ import { GraphicsSettings } from './components/GraphicsSettings'
 import { TutorialOverlay } from './components/TutorialOverlay'
 import { PlayerAccountPanel } from './components/PlayerAccountPanel'
 import { SimulationPanel } from './components/SimulationPanel'
+import { Minimap } from './components/Minimap'
 import { ToolDock } from './components/ToolDock'
 import { WorldControls } from './components/WorldControls'
 import { applyMapToolAction, developPrimaryVillageToolAction, resolveCouncilAction, submitPrimaryVillageKnowledgeAction, triggerGlobalStormAction } from './game/actions'
@@ -16,6 +17,11 @@ import { createGameState, recreateWorld, redoGameChange, undoGameChange } from '
 import { SaveSlotManagerModal } from './components/SaveSlotManagerModal'
 import { CivilizationTreeModal } from './components/CivilizationTreeModal'
 import { ContinentalRankedModal } from './components/ContinentalRankedModal'
+import { EvolutionTreeModal } from './components/EvolutionTreeModal'
+import { SketchfabExplorerModal } from './components/SketchfabExplorerModal'
+import { IslandArchipelagoModal } from './components/IslandArchipelagoModal'
+import { islandArchipelagoManager } from './game/islandManager'
+import type { SpawnedSketchfabEntity } from './renderer/SketchfabModelLayer'
 import { AvatarHudOverlay } from './components/AvatarHudOverlay'
 import type { SpecializationBranchId } from './simulation/specialization'
 import type { AvatarCameraPerspective, AvatarState } from './renderer/AvatarController'
@@ -205,6 +211,11 @@ export default function App(): JSX.Element {
   const [isDiagnosticsOpen, setIsDiagnosticsOpen] = useState(false)
   const [isCivTreeOpen, setIsCivTreeOpen] = useState(false)
   const [isRankedArenaOpen, setIsRankedArenaOpen] = useState(false)
+  const [isEvolutionTreeOpen, setIsEvolutionTreeOpen] = useState(false)
+  const [isSketchfabExplorerOpen, setIsSketchfabExplorerOpen] = useState(false)
+  const [isArchipelagoOpen, setIsArchipelagoOpen] = useState(false)
+  const [activeIsland, setActiveIsland] = useState(() => islandArchipelagoManager.getActiveIsland())
+  const [evolutionMutationSignal, setEvolutionMutationSignal] = useState<{ x: number; y: number; z: number; colorHex?: number; token: number }>({ x: 0, y: 0, z: 0, token: 0 })
   const [isAvatarMode, setIsAvatarMode] = useState(false)
   const [avatarPerspective, setAvatarPerspective] = useState<AvatarCameraPerspective>('third-person')
   const [avatarPerspectiveSignal, setAvatarPerspectiveSignal] = useState(0)
@@ -231,6 +242,12 @@ export default function App(): JSX.Element {
   const [isCheckingCinemaEntitlement, setIsCheckingCinemaEntitlement] = useState(IS_DESKTOP_EDITION)
   const [hoveredTile, setHoveredTile] = useState<HoveredTile | undefined>(undefined)
   const [selectedTileIndex, setSelectedTileIndex] = useState<number | undefined>(undefined)
+  const [focusTileSignal, setFocusTileSignal] = useState<{ tileIndex: number; token: number } | undefined>(undefined)
+
+  const handleMinimapSelectTile = useCallback((tileIndex: number) => {
+    setSelectedTileIndex(tileIndex)
+    setFocusTileSignal((prev) => ({ tileIndex, token: (prev?.token ?? 0) + 1 }))
+  }, [])
   const [renderStats, setRenderStats] = useState<RenderStats>({
     fps: 0,
     drawCalls: 0,
@@ -618,6 +635,75 @@ export default function App(): JSX.Element {
     notifyUser('Ảnh PNG sắc nét của thế giới đã được tải xuống.', 'success', 'notification')
   }, [notifyUser])
 
+  const handleUnlockEvolutionNode = useCallback((nodeId: string): void => {
+    const result = islandArchipelagoManager.unlockActiveIslandEvolutionNode(nodeId)
+    if (result.success) {
+      setActiveIsland({ ...islandArchipelagoManager.getActiveIsland() })
+      playSound('godPowerCast')
+      notifyUser('Đột biến tiến hóa thành công! Chỉ số sinh vật đã được nâng cấp.', 'success', 'notification')
+      setEvolutionMutationSignal({
+        x: (Math.random() - 0.5) * 8,
+        y: 1,
+        z: (Math.random() - 0.5) * 8,
+        colorHex: 0xa855f7,
+        token: Date.now(),
+      })
+    } else {
+      notifyUser(result.error || 'Không thể mở khóa nút tiến hóa.', 'warning', 'warning')
+    }
+  }, [notifyUser, playSound])
+
+  const handleSwitchIsland = useCallback((islandId: string): void => {
+    try {
+      const switched = islandArchipelagoManager.switchIsland(islandId)
+      setActiveIsland({ ...switched })
+      setGame((current) => ({
+        ...current,
+        session: {
+          ...current.session,
+          world: switched.world,
+          simulation: switched.simulation,
+        },
+      }))
+      setDraft(switched.config)
+      playSound('godPowerCast')
+      notifyUser(`Đã chuyển đến không gian 3D của: ${switched.name}`, 'success', 'notification')
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Lỗi chuyển đảo'
+      notifyUser(msg, 'warning')
+    }
+  }, [notifyUser, playSound])
+
+  const handleCreateIsland = useCallback((name: string, config: WorldConfig): void => {
+    const newIsland = islandArchipelagoManager.createIsland(name, config)
+    setActiveIsland({ ...newIsland })
+    setGame((current) => ({
+      ...current,
+      session: {
+        ...current.session,
+        world: newIsland.world,
+        simulation: newIsland.simulation,
+      },
+    }))
+    setDraft(newIsland.config)
+    playSound('godPowerCast')
+    notifyUser(`Đã kiến tạo thành công ${name} với nhánh tiến hóa riêng biệt!`, 'success', 'notification')
+  }, [notifyUser, playSound])
+
+  const handleSpawnSketchfabEntity = useCallback((entity: SpawnedSketchfabEntity): void => {
+    islandArchipelagoManager.addActiveIslandSketchfabEntity(entity)
+    setActiveIsland({ ...islandArchipelagoManager.getActiveIsland() })
+    playSound('godPowerCast')
+    notifyUser(`Đã triệu hồi mô hình 3D [${entity.name}] lên đảo!`, 'success', 'notification')
+    setEvolutionMutationSignal({
+      x: entity.x,
+      y: 1,
+      z: entity.z,
+      colorHex: 0x06b6d4,
+      token: Date.now(),
+    })
+  }, [notifyUser, playSound])
+
   const handleSave = useCallback(async (): Promise<void> => {
     try {
       const village = gameRef.current.session.simulation.villages[0]
@@ -765,6 +851,9 @@ export default function App(): JSX.Element {
     onToggleAvatarMode: handleToggleAvatarMode,
     onToggleCivTree: () => setIsCivTreeOpen((v) => !v),
     onToggleRankedArena: () => setIsRankedArenaOpen((v) => !v),
+    onToggleEvolutionTree: () => setIsEvolutionTreeOpen((v) => !v),
+    onToggleSketchfabExplorer: () => setIsSketchfabExplorerOpen((v) => !v),
+    onToggleArchipelago: () => setIsArchipelagoOpen((v) => !v),
   })
 
   const { session } = game
@@ -805,6 +894,9 @@ export default function App(): JSX.Element {
               assetPackQuality={assetPackQuality}
               assetPackEntitlements={assetPackEntitlements}
               edition={GAME_EDITION}
+              sketchfabEntities={activeIsland.spawnedSketchfabEntities}
+              evolutionMutationSignal={evolutionMutationSignal}
+              focusTileSignal={focusTileSignal}
               photoSignal={photoSignal}
               avatarMode={isAvatarMode}
               avatarPerspectiveSignal={avatarPerspectiveSignal}
@@ -1046,6 +1138,14 @@ export default function App(): JSX.Element {
             </GameDrawer>
           ) : null}
 
+          {/* Real-time Minimap & Navigation Radar */}
+          <Minimap
+            world={session.world}
+            simulation={session.simulation}
+            hoveredTile={hoveredTile}
+            onSelectTile={handleMinimapSelectTile}
+          />
+
           {/* Map Instructions & Readout */}
           <div className="map-instructions">
             <strong>{tool === 'settler' ? 'Thả cư dân' : tool === 'storm' ? 'Mưa lớn toàn cõi' : TERRAIN_TOOL_LABELS[tool]}</strong>
@@ -1070,6 +1170,9 @@ export default function App(): JSX.Element {
               onToggleAvatarMode={handleToggleAvatarMode}
               onOpenCivTree={() => setIsCivTreeOpen(true)}
               onOpenRankedArena={() => setIsRankedArenaOpen(true)}
+              onOpenEvolutionTree={() => setIsEvolutionTreeOpen(true)}
+              onOpenSketchfabExplorer={() => setIsSketchfabExplorerOpen(true)}
+              onOpenArchipelago={() => setIsArchipelagoOpen(true)}
             />
           </div>
         </div>
@@ -1107,6 +1210,37 @@ export default function App(): JSX.Element {
           chosenBranch={chosenBranch}
           onRewardReceived={handleRankedReward}
           onClose={() => setIsRankedArenaOpen(false)}
+        />
+      )}
+
+      {/* Unique Branching Evolution Tree (0.5% duplicate calibration) Modal */}
+      {isEvolutionTreeOpen && (
+        <EvolutionTreeModal
+          isOpen={isEvolutionTreeOpen}
+          profile={activeIsland.evolution}
+          onClose={() => setIsEvolutionTreeOpen(false)}
+          onUnlockNode={handleUnlockEvolutionNode}
+        />
+      )}
+
+      {/* Sketchfab 3D Models & Asset Pipeline Explorer Modal */}
+      {isSketchfabExplorerOpen && (
+        <SketchfabExplorerModal
+          isOpen={isSketchfabExplorerOpen}
+          onClose={() => setIsSketchfabExplorerOpen(false)}
+          onSpawnModel={handleSpawnSketchfabEntity}
+        />
+      )}
+
+      {/* Player Archipelago & Independent Islands Realm Modal */}
+      {isArchipelagoOpen && (
+        <IslandArchipelagoModal
+          isOpen={isArchipelagoOpen}
+          islands={islandArchipelagoManager.getAllIslands()}
+          activeIslandId={activeIsland.id}
+          onClose={() => setIsArchipelagoOpen(false)}
+          onSwitchIsland={handleSwitchIsland}
+          onCreateIsland={handleCreateIsland}
         />
       )}
 

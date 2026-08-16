@@ -106,6 +106,42 @@ export const STARTER_SCENARIOS: readonly MapScenario[] = [
     },
     initialBlessing: 'Nhiệt lượng kim khí tăng tốc độ đúc rèn',
   },
+  {
+    id: 'sakura-sanctuary',
+    name: 'Thánh Địa Thần Mộc',
+    tagline: 'Rừng hoa anh đào huyền ảo & linh khí dồi dào',
+    description: 'Vương quốc ẩn giấu giữa những hàng thần mộc nở hoa rực rỡ quanh năm. Đất đai màu mỡ và sinh khí hưng thịnh thu hút muôn loài chim muông.',
+    difficulty: 'dễ',
+    difficultyLabel: 'Bình Yên & Thơ Mộng',
+    icon: '🌸',
+    accentColor: '#f472b6',
+    config: {
+      seed: 'aetheria-thanh-dia-than-moc',
+      size: 48,
+      climate: 'ôn hòa',
+      water: 0.55,
+      resources: 0.85,
+    },
+    initialBlessing: 'Linh khí thần mộc gia tăng hạnh phúc & tri thức (+30%)',
+  },
+  {
+    id: 'crystal-glacier',
+    name: 'Sông Băng Cực Quang',
+    tagline: 'Tinh thể pha lê băng giá dưới bầu trời cực quang',
+    description: 'Lãnh nguyên băng giá phản chiếu vầng cực quang huyền bí mỗi khi màn đêm buông xuống. Khí hậu băng giá nhưng ẩn chứa những mạch tinh thể ngàn năm.',
+    difficulty: 'thử-thách',
+    difficultyLabel: 'Kỳ Quan Băng Giá',
+    icon: '❄️',
+    accentColor: '#38bdf8',
+    config: {
+      seed: 'aetheria-song-bang-cuc-quang',
+      size: 48,
+      climate: 'lạnh',
+      water: 0.48,
+      resources: 0.72,
+    },
+    initialBlessing: 'Băng tinh huyền bí tỏa sáng vĩnh cửu trong đêm',
+  },
 ]
 
 export function getScenarioById(id: string): MapScenario | undefined {

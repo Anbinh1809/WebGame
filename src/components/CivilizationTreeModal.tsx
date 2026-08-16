@@ -5,6 +5,7 @@ import {
 } from '../simulation/specialization'
 import type { SpecializationBranchId } from '../simulation/specialization'
 import type { SimulationState } from '../simulation/types'
+import { EVOLUTION_EPOCH_DETAILS } from '../simulation/progression'
 
 interface CivilizationTreeModalProps {
   simulation: SimulationState
@@ -29,6 +30,11 @@ export const CivilizationTreeModal: React.FC<CivilizationTreeModalProps> = ({
 
   const activeBranch = SPECIALIZATION_BRANCHES.find((b) => b.id === selectedBranchId) || SPECIALIZATION_BRANCHES[0]!
   const availableResearch = Math.floor(simulation.villages.reduce((sum, v) => sum + v.research, 0))
+  const totalBiomass = Math.floor(simulation.villages.reduce((sum, v) => sum + (v.biomass ?? 0), 0))
+  const totalDna = Math.floor(simulation.villages.reduce((sum, v) => sum + (v.dnaPoints ?? 0), 0))
+  const primaryVillage = simulation.villages[0]
+  const currentEpoch = primaryVillage?.epoch ?? 'Kỷ Tiền Cambri (Đơn Bào)'
+  const epochDetail = EVOLUTION_EPOCH_DETAILS[currentEpoch]
   const bonuses = calculateSpecializationBonuses(unlockedPerks)
 
   return (
@@ -36,22 +42,42 @@ export const CivilizationTreeModal: React.FC<CivilizationTreeModalProps> = ({
       <div className="modal-card civ-tree-modal">
         <header className="modal-header">
           <div>
-            <span className="eyebrow">Cây Tiến Hóa Lục Địa</span>
-            <h2 id="civ-tree-title" className="modal-title">Phân Nhánh Văn Minh & Chuyên Môn Hóa</h2>
+            <span className="eyebrow">🧬 Cây Tiến Hóa Sinh Học & Văn Minh</span>
+            <h2 id="civ-tree-title" className="modal-title">Phân Nhánh Đột Biến Gen & Chuyên Môn Hóa</h2>
           </div>
           <button type="button" className="close-button" onClick={onClose} aria-label="Đóng bảng tiến hóa">
             ✕
           </button>
         </header>
 
+        {/* Biological Epoch Banner */}
+        <div className="evolution-epoch-banner" style={{ borderLeftColor: epochDetail.accentColor }}>
+          <div className="epoch-icon">{epochDetail.icon}</div>
+          <div className="epoch-info">
+            <div className="epoch-badge" style={{ backgroundColor: `${epochDetail.accentColor}22`, color: epochDetail.accentColor }}>
+              {epochDetail.title} • {epochDetail.period}
+            </div>
+            <h3 className="epoch-title">Sinh vật thống trị: {epochDetail.dominantLife}</h3>
+            <p className="epoch-desc">{epochDetail.description}</p>
+          </div>
+        </div>
+
         <div className="civ-tree-summary-bar">
           <div className="civ-stat-item">
-            <span className="label">💡 Điểm Nghiên Cứu Hiện Có:</span>
-            <strong className="value gold">{availableResearch} Điểm</strong>
+            <span className="label">💡 Điểm Nghiên Cứu:</span>
+            <strong className="value gold">{availableResearch}</strong>
           </div>
           <div className="civ-stat-item">
-            <span className="label">⚔️ Lực Chiến Thêm:</span>
-            <strong className="value text-cyan">+{bonuses.militaryBonus}</strong>
+            <span className="label">🧬 Điểm DNA Tích Lũy:</span>
+            <strong className="value text-cyan">+{totalDna + bonuses.dnaBonus} DNA</strong>
+          </div>
+          <div className="civ-stat-item">
+            <span className="label">🌿 Sinh Khối Sinh Quyển:</span>
+            <strong className="value text-emerald">+{totalBiomass + bonuses.biomassBonus} Biomass</strong>
+          </div>
+          <div className="civ-stat-item">
+            <span className="label">⚔️ Lực Chiến Sinh Học:</span>
+            <strong className="value text-rose">+{bonuses.militaryBonus}</strong>
           </div>
           <div className="civ-stat-item">
             <span className="label">🛡️ Binh Chủng Độc Quyền:</span>

@@ -2,6 +2,23 @@ import type { ToolId } from '../world/types'
 
 export type SimulationSpeed = 0 | 1 | 2 | 4 | 8
 export type VillageEra = 'Thời Đồ Đá' | 'Làng Gỗ' | 'Nông Nghiệp' | 'Thời Kim Khí' | 'Thị Trấn'
+export type EvolutionEpoch =
+  | 'Kỷ Tiền Cambri (Đơn Bào)'
+  | 'Kỷ Cổ Sinh (Thủy Sinh)'
+  | 'Kỷ Devon (Lên Cạn)'
+  | 'Kỷ Trung Sinh (Bò Sát & Dực Long)'
+  | 'Kỷ Tân Sinh (Thú Khổng Lồ)'
+  | 'Kỷ Nhân Sinh (Văn Minh & Siêu Thể)'
+
+export const EVOLUTION_EPOCHS: readonly EvolutionEpoch[] = [
+  'Kỷ Tiền Cambri (Đơn Bào)',
+  'Kỷ Cổ Sinh (Thủy Sinh)',
+  'Kỷ Devon (Lên Cạn)',
+  'Kỷ Trung Sinh (Bò Sát & Dực Long)',
+  'Kỷ Tân Sinh (Thú Khổng Lồ)',
+  'Kỷ Nhân Sinh (Văn Minh & Siêu Thể)',
+] as const
+
 export const VILLAGE_TOOL_IDS = [
   'stone-handaxe',
   'flint-axe',
@@ -10,6 +27,14 @@ export const VILLAGE_TOOL_IDS = [
   'copper-hammer',
   'bronze-spear',
   'iron-anvil',
+  'obsidian-dagger',
+  'iron-sword',
+  'hunting-bow',
+  'repeating-crossbow',
+  'war-hammer',
+  'titan-halberd',
+  'aether-staff',
+  'crystal-scepter',
 ] as const
 export type VillageToolId = (typeof VILLAGE_TOOL_IDS)[number]
 export const VILLAGE_KNOWLEDGE_IDS = [
@@ -56,6 +81,13 @@ export interface VillageSimulation {
   /** Capacity to absorb a disaster and recover without a soft-lock. */
   resilience: number
   era: VillageEra
+  /** Biological evolution epoch. */
+  epoch?: EvolutionEpoch
+  /** Biological resources */
+  biomass?: number
+  dnaPoints?: number
+  biodiversity?: number
+  adaptationRate?: number
   /** Ordered craft ledger that controls both gameplay bonuses and visual growth. */
   tools: VillageToolId[]
   /** Player-taught, validated techniques; arbitrary text never becomes simulation state. */

@@ -293,13 +293,42 @@ export class AnimatedFaunaLayer {
       const template = this.templates.get(spawn.species)
       if (!template) continue
       const root = new THREE.Group()
-      const targetHeight = spawn.species === 'dực-long' || spawn.species === 'dực-điểu'
-        ? 1.45
-        : spawn.species === 'thạch-thú' || spawn.species === 'mộc-quái' || spawn.species === 'cự-tượng'
-        ? 1.35
-        : spawn.species === 'lang-tộc' || spawn.species === 'lợn-rừng'
-        ? 1.05
-        : 0.82
+      let targetHeight = 0.22
+      switch (spawn.species) {
+        case 'dực-long':
+        case 'dực-điểu':
+          targetHeight = 0.65
+          break
+        case 'thạch-thú':
+        case 'mộc-quái':
+          targetHeight = 0.52
+          break
+        case 'cự-tượng':
+          targetHeight = 0.58
+          break
+        case 'gấu-bắc-cực':
+        case 'lạc-đà':
+        case 'xà-vương':
+          targetHeight = 0.32
+          break
+        case 'lang-tộc':
+        case 'hươu-rừng':
+        case 'lợn-rừng':
+        case 'sơn-dương':
+        case 'báo-đốm':
+        case 'cá-sấu':
+          targetHeight = 0.22
+          break
+        case 'sói-hoang':
+        case 'cáo-tuyết':
+        case 'bọ-cạp-vàng':
+          targetHeight = 0.16
+          break
+        case 'thỏ-hoang':
+        default:
+          targetHeight = 0.09
+          break
+      }
       const visual = createNormalisedVisual(template.visual, targetHeight)
       root.name = `aetheria-animated-${spawn.species}-${spawn.id}`
       root.add(visual)
@@ -452,7 +481,7 @@ export class AnimatedSettlerLayer {
     if (!template) return
     for (const settler of this.selected) {
       const root = new THREE.Group()
-      const visual = createNormalisedVisual(template.visual, 0.88)
+      const visual = createNormalisedVisual(template.visual, 0.22)
       root.name = `aetheria-animated-${settler.id}`
       root.add(visual)
       const mixer = new THREE.AnimationMixer(visual)

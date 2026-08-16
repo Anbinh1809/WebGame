@@ -26,6 +26,9 @@ import { AnimatedFaunaLayer, AnimatedSettlerLayer } from './AnimatedActorLayers'
 import { AmbientLifeLayer } from './AmbientLifeLayer'
 import { SettlementModelLayer } from './SettlementModelLayer'
 import { ShipLayer } from './ShipLayer'
+import { SketchfabModelLayer } from './SketchfabModelLayer'
+import type { SpawnedSketchfabEntity } from './SketchfabModelLayer'
+import { EvolutionFxLayer } from './EvolutionFxLayer'
 import { AvatarController } from './AvatarController'
 import type { AvatarCameraPerspective, AvatarState } from './AvatarController'
 import { isReducedMotion } from './MotionPreference'
@@ -71,6 +74,11 @@ const MAX_LANTERNS = 48
 const MAX_WORKSHOPS = 24
 const MAX_FORGES = 24
 const MAX_TOWN_HALLS = 12
+const MAX_WATCHTOWERS = 16
+const MAX_WINDMILLS = 16
+const MAX_WELLS = 16
+const MAX_DOCKS = 16
+const MAX_MONUMENTS = 12
 const MAX_RAIN_DROPS = 360
 /** Keeps photo mode below a predictable browser/GPU memory budget. */
 export const MAX_PHOTO_PIXELS = 8_000_000
@@ -104,6 +112,7 @@ interface TreePlacement {
   canopyHeight: number
   rotation: number
   variation: number
+  biome?: Tile['biome']
 }
 
 interface RockPlacement {
@@ -314,6 +323,124 @@ function createWorkshopStockpileGeometry(): THREE.BufferGeometry {
   return merged
 }
 
+function createWatchtowerGeometry(): THREE.BufferGeometry {
+  const base = new THREE.BoxGeometry(0.36, 0.28, 0.36)
+  base.translate(0, 0.14, 0)
+  const postCoords: readonly [number, number, number][] = [
+    [-0.14, 0.44, -0.14],
+    [0.14, 0.44, -0.14],
+    [-0.14, 0.44, 0.14],
+    [0.14, 0.44, 0.14],
+  ]
+  const posts = postCoords.map(([x, y, z]) => {
+    const post = new THREE.CylinderGeometry(0.02, 0.02, 0.35, 6)
+    post.translate(x, y, z)
+    return post
+  })
+  const platform = new THREE.BoxGeometry(0.42, 0.04, 0.42)
+  platform.translate(0, 0.62, 0)
+  const roof = new THREE.ConeGeometry(0.3, 0.22, 4)
+  roof.rotateY(Math.PI / 4)
+  roof.translate(0, 0.74, 0)
+  const merged = mergeGeometries([base, ...posts, platform, roof], false)
+  base.dispose()
+  for (const p of posts) p.dispose()
+  platform.dispose()
+  roof.dispose()
+  if (!merged) throw new Error('Could not build watchtower geometry.')
+  merged.computeVertexNormals()
+  return merged
+}
+
+function createWindmillGeometry(): THREE.BufferGeometry {
+  const tower = new THREE.CylinderGeometry(0.18, 0.28, 0.65, 12)
+  tower.translate(0, 0.325, 0)
+  const cap = new THREE.ConeGeometry(0.22, 0.18, 12)
+  cap.translate(0, 0.72, 0)
+  const blade1 = new THREE.BoxGeometry(0.55, 0.04, 0.015)
+  blade1.translate(0, 0.65, 0.2)
+  blade1.rotateZ(Math.PI / 4)
+  const blade2 = new THREE.BoxGeometry(0.55, 0.04, 0.015)
+  blade2.translate(0, 0.65, 0.2)
+  blade2.rotateZ(-Math.PI / 4)
+  const merged = mergeGeometries([tower, cap, blade1, blade2], false)
+  tower.dispose()
+  cap.dispose()
+  blade1.dispose()
+  blade2.dispose()
+  if (!merged) throw new Error('Could not build windmill geometry.')
+  merged.computeVertexNormals()
+  return merged
+}
+
+function createWellGeometry(): THREE.BufferGeometry {
+  const basin = new THREE.CylinderGeometry(0.18, 0.2, 0.16, 12)
+  basin.translate(0, 0.08, 0)
+  const post1 = new THREE.CylinderGeometry(0.015, 0.015, 0.32, 6)
+  post1.translate(-0.14, 0.22, 0)
+  const post2 = new THREE.CylinderGeometry(0.015, 0.015, 0.32, 6)
+  post2.translate(0.14, 0.22, 0)
+  const roof = new THREE.ConeGeometry(0.22, 0.14, 4)
+  roof.rotateY(Math.PI / 4)
+  roof.translate(0, 0.38, 0)
+  const merged = mergeGeometries([basin, post1, post2, roof], false)
+  basin.dispose()
+  post1.dispose()
+  post2.dispose()
+  roof.dispose()
+  if (!merged) throw new Error('Could not build well geometry.')
+  merged.computeVertexNormals()
+  return merged
+}
+
+function createDockGeometry(): THREE.BufferGeometry {
+  const deck = new THREE.BoxGeometry(0.24, 0.03, 0.68)
+  deck.translate(0, 0.04, 0.2)
+  const postCoords: readonly [number, number, number][] = [
+    [-0.1, -0.08, -0.05],
+    [0.1, -0.08, -0.05],
+    [-0.1, -0.08, 0.45],
+    [0.1, -0.08, 0.45],
+  ]
+  const posts = postCoords.map(([x, y, z]) => {
+    const post = new THREE.CylinderGeometry(0.02, 0.02, 0.24, 6)
+    post.translate(x, y, z)
+    return post
+  })
+  const merged = mergeGeometries([deck, ...posts], false)
+  deck.dispose()
+  for (const p of posts) p.dispose()
+  if (!merged) throw new Error('Could not build dock geometry.')
+  merged.computeVertexNormals()
+  return merged
+}
+
+function createMonumentGeometry(): THREE.BufferGeometry {
+  const step1 = new THREE.BoxGeometry(0.48, 0.08, 0.48)
+  step1.translate(0, 0.04, 0)
+  const step2 = new THREE.BoxGeometry(0.36, 0.08, 0.36)
+  step2.translate(0, 0.12, 0)
+  const obelisk = new THREE.ConeGeometry(0.16, 0.58, 4)
+  obelisk.rotateY(Math.PI / 4)
+  obelisk.translate(0, 0.42, 0)
+  const gemTop = new THREE.ConeGeometry(0.08, 0.1, 4)
+  gemTop.rotateY(Math.PI / 4)
+  gemTop.translate(0, 0.76, 0)
+  const gemBottom = new THREE.ConeGeometry(0.08, 0.1, 4)
+  gemBottom.rotateX(Math.PI)
+  gemBottom.rotateY(Math.PI / 4)
+  gemBottom.translate(0, 0.68, 0)
+  const merged = mergeGeometries([step1, step2, obelisk, gemTop, gemBottom], false)
+  step1.dispose()
+  step2.dispose()
+  obelisk.dispose()
+  gemTop.dispose()
+  gemBottom.dispose()
+  if (!merged) throw new Error('Could not build monument geometry.')
+  merged.computeVertexNormals()
+  return merged
+}
+
 function waterPlaneSize(size: number): number {
   return Math.max(2, (size - 1 + OCEAN_MARGIN_TILES * 2) * TILE_SCALE)
 }
@@ -359,14 +486,21 @@ function terrainNormalAt(world: World, x: number, z: number, target: THREE.Vecto
   return target.set(-slopeX, 1, -slopeZ).normalize()
 }
 
-/** A light-weight horizon gradient gives the open world depth without a full-screen texture. */
+/** Atmospheric scattering sky dome with dynamic sun/moon disks, starry cosmos, and Aurora Borealis. */
 function createSkyDome(): THREE.Mesh<THREE.SphereGeometry, THREE.ShaderMaterial> {
-  const geometry = new THREE.SphereGeometry(1, 32, 16)
+  const geometry = new THREE.SphereGeometry(1, 32, 24)
   const material = new THREE.ShaderMaterial({
     uniforms: {
       topColor: { value: SKY_ZENITH.clone() },
       horizonColor: { value: SKY_HORIZON.clone() },
       bottomColor: { value: SKY_BASE.clone() },
+      sunDirection: { value: new THREE.Vector3(0, 1, 0) },
+      moonDirection: { value: new THREE.Vector3(0, -1, 0) },
+      sunColor: { value: new THREE.Color(0xfffae6) },
+      moonColor: { value: new THREE.Color(0xd0e8ff) },
+      time: { value: 0 },
+      nightIntensity: { value: 0 },
+      auroraIntensity: { value: 0 },
     },
     vertexShader: `
       varying vec3 worldDirection;
@@ -379,12 +513,80 @@ function createSkyDome(): THREE.Mesh<THREE.SphereGeometry, THREE.ShaderMaterial>
       uniform vec3 topColor;
       uniform vec3 horizonColor;
       uniform vec3 bottomColor;
+      uniform vec3 sunDirection;
+      uniform vec3 moonDirection;
+      uniform vec3 sunColor;
+      uniform vec3 moonColor;
+      uniform float time;
+      uniform float nightIntensity;
+      uniform float auroraIntensity;
       varying vec3 worldDirection;
+
+      float hash3(vec3 p) {
+        p = fract(p * 0.3183099 + 0.1);
+        p *= 17.0;
+        return fract(p.x * p.y * p.z * (p.x + p.y + p.z));
+      }
+
+      float noise3(vec3 p) {
+        vec3 i = floor(p);
+        vec3 f = fract(p);
+        f = f * f * (3.0 - 2.0 * f);
+        return mix(
+          mix(mix(hash3(i + vec3(0,0,0)), hash3(i + vec3(1,0,0)), f.x),
+              mix(hash3(i + vec3(0,1,0)), hash3(i + vec3(1,1,0)), f.x), f.y),
+          mix(mix(hash3(i + vec3(0,0,1)), hash3(i + vec3(1,0,1)), f.x),
+              mix(hash3(i + vec3(0,1,1)), hash3(i + vec3(1,1,1)), f.x), f.y), f.z);
+      }
+
       void main() {
-        float height = clamp(worldDirection.y * 0.5 + 0.5, 0.0, 1.0);
-        vec3 color = mix(bottomColor, horizonColor, smoothstep(0.08, 0.48, height));
-        color = mix(color, topColor, smoothstep(0.42, 1.0, height));
-        gl_FragColor = vec4(color, 1.0);
+        vec3 dir = normalize(worldDirection);
+        float height = clamp(dir.y * 0.5 + 0.5, 0.0, 1.0);
+        
+        vec3 sky = mix(bottomColor, horizonColor, smoothstep(0.04, 0.45, height));
+        sky = mix(sky, topColor, smoothstep(0.40, 1.0, height));
+
+        // Sun disk and corona glow
+        float sunDot = max(0.0, dot(dir, normalize(sunDirection)));
+        float sunDisk = smoothstep(0.9982, 0.9996, sunDot);
+        float sunGlow = pow(sunDot, 18.0) * 0.65;
+        sky += (sunDisk * 2.2 + sunGlow) * sunColor * (1.0 - nightIntensity * 0.85);
+
+        // Moon disk and soft silver glow
+        float moonDot = max(0.0, dot(dir, normalize(moonDirection)));
+        float moonDisk = smoothstep(0.9984, 0.9996, moonDot);
+        float moonGlow = pow(moonDot, 24.0) * 0.45;
+        sky += (moonDisk * 1.5 + moonGlow) * moonColor * nightIntensity;
+
+        // Twinkling Starfield in night sky
+        if (nightIntensity > 0.05 && dir.y > 0.05) {
+          vec3 starCoord = dir * 180.0;
+          float starVal = hash3(floor(starCoord));
+          if (starVal > 0.985) {
+            float twinkle = sin(time * 3.5 + starVal * 62.83) * 0.35 + 0.65;
+            float starDist = length(fract(starCoord) - vec3(0.5));
+            float starBright = smoothstep(0.24, 0.02, starDist) * twinkle * (starVal - 0.985) * 66.0;
+            sky += vec3(0.9, 0.95, 1.0) * starBright * nightIntensity * smoothstep(0.05, 0.25, dir.y);
+          }
+
+          // Cosmic Milky Way Nebula Band
+          float band = sin(dir.x * 2.2 + dir.z * 1.8 + dir.y * 1.5);
+          float nebula = pow(max(0.0, 1.0 - abs(band)), 6.0) * smoothstep(0.2, 0.8, dir.y);
+          sky += vec3(0.12, 0.08, 0.22) * nebula * nightIntensity * 0.45;
+        }
+
+        // Aurora Borealis (Cực quang) ribbons
+        if (auroraIntensity > 0.05 && dir.y > 0.15) {
+          vec3 aurPos = vec3(dir.x * 3.5, dir.y * 2.0 + time * 0.08, dir.z * 3.5);
+          float aurNoise1 = noise3(aurPos * 1.8);
+          float aurNoise2 = noise3(aurPos * 3.6 + vec3(time * 0.12, 0.0, time * 0.06));
+          float aurShape = pow(max(0.0, aurNoise1 * aurNoise2 - 0.15), 2.2) * 8.0;
+          float aurFade = smoothstep(0.15, 0.5, dir.y) * smoothstep(0.95, 0.55, dir.y);
+          vec3 aurColor = mix(vec3(0.1, 0.95, 0.55), vec3(0.65, 0.2, 0.9), sin(dir.x * 3.0 + time * 0.2) * 0.5 + 0.5);
+          sky += aurColor * aurShape * aurFade * auroraIntensity;
+        }
+
+        gl_FragColor = vec4(sky, 1.0);
         #include <tonemapping_fragment>
         #include <colorspace_fragment>
       }
@@ -399,13 +601,21 @@ function createSkyDome(): THREE.Mesh<THREE.SphereGeometry, THREE.ShaderMaterial>
 /** Surface selection is deterministic and keeps biome readability independent from texture resolution. */
 export function terrainSurfaceForBiome(biome: Tile['biome']): TerrainSurface | undefined {
   switch (biome) {
-    case 'đồng cỏ': return 'terrainGrass'
-    case 'rừng': return 'terrainForest'
+    case 'đồng cỏ':
+    case 'hoa anh đào': return 'terrainGrass'
+    case 'rừng':
+    case 'rừng nhiệt đới':
+    case 'đầm lầy': return 'terrainForest'
     case 'đồi':
-    case 'núi': return 'terrainRock'
-    case 'bờ cát': return 'terrainSand'
-    case 'tuyết': return 'terrainSnow'
-    case 'biển': return undefined
+    case 'núi':
+    case 'núi lửa': return 'terrainRock'
+    case 'bờ cát':
+    case 'sa mạc':
+    case 'hẻm núi': return 'terrainSand'
+    case 'tuyết':
+    case 'sông băng': return 'terrainSnow'
+    case 'biển':
+    case 'san hô': return undefined
   }
 }
 
@@ -460,10 +670,18 @@ function terrainColor(
     biển: 0x174e7a,
     'bờ cát': 0xd7bb79,
     'đồng cỏ': tile.soil === 'màu mỡ' ? 0x7ea84a : tile.soil === 'cằn cỗi' ? 0x8b794d : 0x67984a,
+    'sa mạc': 0xdbad54,
     rừng: 0x2e7045,
+    'rừng nhiệt đới': 0x1d5e38,
+    'đầm lầy': 0x485f3c,
     đồi: 0x7d8155,
     núi: 0x73777e,
     tuyết: 0xe5edf1,
+    'san hô': 0x1da1bf,
+    'hoa anh đào': 0x7bc66b,
+    'núi lửa': 0x2d2426,
+    'hẻm núi': 0xb85d38,
+    'sông băng': 0xbce6f8,
   }
 
   const variation = hash2d(seedToUint32(world.config.seed) ^ 0x4f1bbcdc, tile.x, tile.z)
@@ -472,8 +690,40 @@ function terrainColor(
     target.setHex(0x286f99).lerp(scratchColorSecondary.setHex(0x0c365d), depth).offsetHSL((variation - 0.5) * 0.018, 0, 0)
     return target
   }
+  if (tile.biome === 'san hô') {
+    target.setHex(0x1da1bf).lerp(scratchColorSecondary.setHex(0xeb6b8b), 0.35 + variation * 0.3).offsetHSL((variation - 0.5) * 0.02, 0, 0)
+    return target
+  }
+  if (tile.biome === 'hoa anh đào') {
+    target.setHex(0x7bc66b).lerp(scratchColorSecondary.setHex(0xf49ebe), 0.32 + variation * 0.25).offsetHSL((variation - 0.5) * 0.015, 0, (variation - 0.5) * 0.03)
+    return target
+  }
   if (tile.biome === 'bờ cát') {
     target.setHex(0xe1c47f).lerp(scratchColorSecondary.setHex(0x9d956d), clamp(tile.moisture * 0.22, 0, 0.22)).offsetHSL(0.008, 0, (variation - 0.5) * 0.06)
+    return target
+  }
+  if (tile.biome === 'sa mạc') {
+    target.setHex(0xdbad54).lerp(scratchColorSecondary.setHex(0xb58231), (variation - 0.5) * 0.2).offsetHSL(0.005, 0, (variation - 0.5) * 0.04)
+    return target
+  }
+  if (tile.biome === 'hẻm núi') {
+    target.setHex(0xb85d38).lerp(scratchColorSecondary.setHex(0xdb8546), variation * 0.4).offsetHSL((variation - 0.5) * 0.015, 0, (variation - 0.5) * 0.05)
+    return target
+  }
+  if (tile.biome === 'núi lửa') {
+    target.setHex(0x2a2224).lerp(scratchColorSecondary.setHex(0xd94318), variation > 0.6 ? 0.65 : 0.08).offsetHSL((variation - 0.5) * 0.01, 0, (variation - 0.5) * 0.04)
+    return target
+  }
+  if (tile.biome === 'sông băng') {
+    target.setHex(0xbce6f8).lerp(scratchColorSecondary.setHex(0x7ed0ea), variation * 0.45).offsetHSL(0.01, 0, (variation - 0.5) * 0.03)
+    return target
+  }
+  if (tile.biome === 'rừng nhiệt đới') {
+    target.setHex(0x1d5e38).lerp(scratchColorSecondary.setHex(0x134526), variation * 0.3).offsetHSL((variation - 0.5) * 0.02, 0, 0)
+    return target
+  }
+  if (tile.biome === 'đầm lầy') {
+    target.setHex(0x485f3c).lerp(scratchColorSecondary.setHex(0x2e3d26), variation * 0.4).offsetHSL(0, 0, (variation - 0.5) * 0.05)
     return target
   }
   return target.setHex(palette[tile.biome]).offsetHSL((variation - 0.5) * 0.025, 0, (variation - 0.5) * 0.065)
@@ -590,6 +840,16 @@ export class WorldRenderer {
   private readonly townHallMaterial = new THREE.MeshStandardMaterial({ color: 0x858887, flatShading: false, roughness: 0.84 })
   private readonly lanternGeometry = new THREE.SphereGeometry(0.075, 14, 10)
   private readonly lanternMaterial = new THREE.MeshStandardMaterial({ color: 0xffcc73, emissive: 0x8d4d16, emissiveIntensity: 0.55, flatShading: false, roughness: 0.5 })
+  private readonly watchtowerGeometry = createWatchtowerGeometry()
+  private readonly watchtowerMaterial = new THREE.MeshStandardMaterial({ color: 0x5a544d, flatShading: false, roughness: 0.82 })
+  private readonly windmillGeometry = createWindmillGeometry()
+  private readonly windmillMaterial = new THREE.MeshStandardMaterial({ color: 0xd2c4ab, flatShading: false, roughness: 0.85 })
+  private readonly wellGeometry = createWellGeometry()
+  private readonly wellMaterial = new THREE.MeshStandardMaterial({ color: 0x767b7e, flatShading: false, roughness: 0.88 })
+  private readonly dockGeometry = createDockGeometry()
+  private readonly dockMaterial = new THREE.MeshStandardMaterial({ color: 0x6e5238, flatShading: false, roughness: 0.9 })
+  private readonly monumentGeometry = createMonumentGeometry()
+  private readonly monumentMaterial = new THREE.MeshStandardMaterial({ color: 0x475569, emissive: 0x0284c7, emissiveIntensity: 0.35, flatShading: false, roughness: 0.4, metalness: 0.25 })
   private readonly rainGeometry = new THREE.BufferGeometry()
   private readonly rainMaterial = new THREE.LineBasicMaterial({ color: 0xbdeaff, transparent: true, opacity: 0.84, depthWrite: false, depthTest: false })
   private readonly previewMaterial = new THREE.MeshBasicMaterial({ transparent: true, opacity: 0.68, side: THREE.DoubleSide })
@@ -597,8 +857,8 @@ export class WorldRenderer {
   private readonly actionPulseMaterial = new THREE.MeshBasicMaterial({ transparent: true, opacity: 0.72, side: THREE.DoubleSide, depthWrite: false, blending: THREE.AdditiveBlending })
   private readonly clouds: Array<{ baseX: number; baseZ: number; altitude: number; speed: number; variation: number }> = []
   private readonly waterRipples: WaterRipple[] = []
-  private readonly sun = new THREE.DirectionalLight(0xfff0bc, 2.3)
-  private readonly skyLight = new THREE.HemisphereLight(0x9bd8ff, 0x4d5539, 1.55)
+  private readonly sun = new THREE.DirectionalLight(0xfffae6, 2.4)
+  private readonly skyLight = new THREE.HemisphereLight(0x9fe3ff, 0x48583c, 1.45)
   private readonly skyDome = createSkyDome()
   private readonly dummy = new THREE.Object3D()
   private readonly skyColor = new THREE.Color()
@@ -611,6 +871,8 @@ export class WorldRenderer {
   private readonly ambientLifeLayer = new AmbientLifeLayer(TILE_SCALE)
   private readonly settlementModelLayer = new SettlementModelLayer()
   private readonly shipLayer = new ShipLayer(TILE_SCALE)
+  private readonly sketchfabModelLayer = new SketchfabModelLayer(TILE_SCALE)
+  private readonly evolutionFxLayer = new EvolutionFxLayer()
   private readonly avatarController = new AvatarController(TILE_SCALE)
   private fpsLimit: FpsLimit = 'auto'
   /** Two vertices per drop make weather legible as rain streaks while retaining one draw call. */
@@ -643,6 +905,11 @@ export class WorldRenderer {
   private forges!: THREE.InstancedMesh
   private townHalls!: THREE.InstancedMesh
   private lanterns!: THREE.InstancedMesh
+  private watchtowers!: THREE.InstancedMesh
+  private windmills!: THREE.InstancedMesh
+  private wells!: THREE.InstancedMesh
+  private docks!: THREE.InstancedMesh
+  private monuments!: THREE.InstancedMesh
   private rain!: THREE.LineSegments<THREE.BufferGeometry, THREE.LineBasicMaterial>
   private preview!: THREE.Mesh<THREE.RingGeometry, THREE.MeshBasicMaterial>
   private actionPulse!: THREE.Mesh<THREE.RingGeometry, THREE.MeshBasicMaterial>
@@ -730,33 +997,33 @@ export class WorldRenderer {
     this.host.appendChild(this.renderer.domElement)
 
     this.scene.background = new THREE.Color(0x9acde2)
-    this.scene.fog = new THREE.Fog(0x9acde2, 28, 68)
+    this.scene.fog = new THREE.Fog(0x9acde2, 34, 96)
     this.camera.position.set(14, 25, 17)
 
     this.controls = new OrbitControls(this.camera, this.renderer.domElement)
     this.controls.target.set(0, 0, 0)
     this.controls.enableDamping = true
     this.controls.dampingFactor = 0.08
-    this.controls.minDistance = 11
-    this.controls.maxDistance = 42
+    this.controls.minDistance = 5
+    this.controls.maxDistance = 58
     this.controls.minPolarAngle = 0.35
     this.controls.maxPolarAngle = 1.22
     this.controls.panSpeed = 0.72
     this.controls.rotateSpeed = 0.62
     this.controls.zoomSpeed = 0.84
 
-    this.sun.position.set(11, 17, 8)
+    this.sun.position.set(14, 22, 10)
     this.sun.castShadow = true
     this.sun.shadow.camera.near = 1
-    this.sun.shadow.camera.far = 45
-    this.sun.shadow.camera.left = -15
-    this.sun.shadow.camera.right = 15
-    this.sun.shadow.camera.top = 15
-    this.sun.shadow.camera.bottom = -15
+    this.sun.shadow.camera.far = 68
+    this.sun.shadow.camera.left = -28
+    this.sun.shadow.camera.right = 28
+    this.sun.shadow.camera.top = 28
+    this.sun.shadow.camera.bottom = -28
     this.sun.shadow.radius = 2.5
     this.sun.shadow.bias = -0.0002
     this.sun.shadow.normalBias = 0.032
-    this.skyDome.scale.setScalar(86)
+    this.skyDome.scale.setScalar(120)
     this.skyDome.frustumCulled = false
     this.frameWorld(world)
     this.applyQuality()
@@ -796,6 +1063,14 @@ export class WorldRenderer {
     this.updateSettlementInstances(true)
   }
 
+  public focusTile(tileIndex: number): void {
+    const tile = this.world.tiles[tileIndex]
+    if (!tile) return
+    const pos = this.tilePosition(tile)
+    this.controls.target.set(pos.x, pos.y, pos.z)
+    this.controls.update()
+  }
+
   public updateSimulation(simulation: SimulationState): void {
     this.simulation = simulation
     this.ambientLifeLayer.setSimulation(simulation)
@@ -827,6 +1102,38 @@ export class WorldRenderer {
     this.actionPulseMaterial.opacity = 0.76
     this.actionPulse.visible = true
     this.actionPulseStartedAt = this.elapsed
+  }
+
+  public setSketchfabEntities(entities: SpawnedSketchfabEntity[]): void {
+    this.sketchfabModelLayer.setEntities(entities, this.world, this.effectiveQuality)
+  }
+
+  public addSketchfabEntity(entity: SpawnedSketchfabEntity): void {
+    this.sketchfabModelLayer.addEntity(entity, this.world, this.effectiveQuality)
+  }
+
+  public removeSketchfabEntity(id: string): void {
+    this.sketchfabModelLayer.removeEntity(id, this.world, this.effectiveQuality)
+  }
+
+  public getSketchfabEntities(): readonly SpawnedSketchfabEntity[] {
+    return this.sketchfabModelLayer.getEntities()
+  }
+
+  public triggerEvolutionMutation(x: number, y: number, z: number, colorHex?: number): void {
+    this.evolutionFxLayer.triggerMutationPulse(x, y, z, colorHex)
+  }
+
+  public triggerEvolutionConvergence(x: number, y: number, z: number): void {
+    this.evolutionFxLayer.triggerConvergenceResonance(x, y, z)
+  }
+
+  public getSketchfabModelLayer(): SketchfabModelLayer {
+    return this.sketchfabModelLayer
+  }
+
+  public getEvolutionFxLayer(): EvolutionFxLayer {
+    return this.evolutionFxLayer
   }
 
   public setQuality(profile: QualityProfile): void {
@@ -1227,6 +1534,8 @@ export class WorldRenderer {
     this.detachStockpileModelLayer()
     this.settlementModelLayer.dispose()
     this.shipLayer.dispose()
+    this.sketchfabModelLayer.dispose()
+    this.evolutionFxLayer.dispose()
     this.assetPackManager.dispose()
     this.disposeWorldObjects()
     this.previewMaterial.dispose()
@@ -1336,8 +1645,13 @@ export class WorldRenderer {
     this.forges = new THREE.InstancedMesh(this.forgeGeometry, this.forgeMaterial, MAX_FORGES)
     this.townHalls = new THREE.InstancedMesh(this.townHallGeometry, this.townHallMaterial, MAX_TOWN_HALLS)
     this.lanterns = new THREE.InstancedMesh(this.lanternGeometry, this.lanternMaterial, MAX_LANTERNS)
+    this.watchtowers = new THREE.InstancedMesh(this.watchtowerGeometry, this.watchtowerMaterial, MAX_WATCHTOWERS)
+    this.windmills = new THREE.InstancedMesh(this.windmillGeometry, this.windmillMaterial, MAX_WINDMILLS)
+    this.wells = new THREE.InstancedMesh(this.wellGeometry, this.wellMaterial, MAX_WELLS)
+    this.docks = new THREE.InstancedMesh(this.dockGeometry, this.dockMaterial, MAX_DOCKS)
+    this.monuments = new THREE.InstancedMesh(this.monumentGeometry, this.monumentMaterial, MAX_MONUMENTS)
 
-    for (const object of [this.trees, this.trunks, this.rocks, this.resources, this.groundDetails, this.sandDetails, this.houses, this.roofs, this.thatchRoofs, this.farms, this.roads, this.workshops, this.stockpiles, this.forges, this.townHalls, this.lanterns]) {
+    for (const object of [this.trees, this.trunks, this.rocks, this.resources, this.groundDetails, this.sandDetails, this.houses, this.roofs, this.thatchRoofs, this.farms, this.roads, this.workshops, this.stockpiles, this.forges, this.townHalls, this.lanterns, this.watchtowers, this.windmills, this.wells, this.docks, this.monuments]) {
       object.castShadow = true
       object.receiveShadow = true
       object.frustumCulled = true
@@ -1352,6 +1666,9 @@ export class WorldRenderer {
     this.faunaLayer.attach(this.scene)
     this.animatedFaunaLayer.attach(this.scene)
     this.scene.add(this.avatarController.getRootGroup())
+    this.scene.add(this.sketchfabModelLayer.group)
+    this.scene.add(this.evolutionFxLayer.group)
+    this.evolutionFxLayer.initParticles(world, this.effectiveQuality)
 
     this.rainGeometry.setAttribute('position', new THREE.BufferAttribute(this.rainPositions, 3))
     this.rain = new THREE.LineSegments(this.rainGeometry, this.rainMaterial)
@@ -1464,7 +1781,7 @@ export class WorldRenderer {
     if (this.waterRippleMesh) this.scene.remove(this.waterRippleMesh)
     this.waterRipples.length = 0
     if (this.coastFoam) this.scene.remove(this.coastFoam)
-    for (const object of [this.trees, this.trunks, this.rocks, this.resources, this.groundDetails, this.sandDetails, this.houses, this.roofs, this.thatchRoofs, this.farms, this.roads, this.workshops, this.stockpiles, this.forges, this.townHalls, this.lanterns]) {
+    for (const object of [this.trees, this.trunks, this.rocks, this.resources, this.groundDetails, this.sandDetails, this.houses, this.roofs, this.thatchRoofs, this.farms, this.roads, this.workshops, this.stockpiles, this.forges, this.townHalls, this.lanterns, this.watchtowers, this.windmills, this.wells, this.docks, this.monuments]) {
       if (object) this.scene.remove(object)
     }
     this.faunaLayer.detach()
@@ -1624,7 +1941,8 @@ export class WorldRenderer {
       const { x, y, z } = this.tilePosition(tile)
       const variation = hash2d(seed, tile.x, tile.z)
 
-      if (tile.forest && hash2d(seed ^ 0x15ac3d, tile.x, tile.z) < settings.vegetationDensity) {
+      const supportsTrees = tile.forest || tile.biome === 'hoa anh đào' || tile.biome === 'rừng nhiệt đới' || tile.biome === 'rừng' || (tile.biome === 'đồng cỏ' && variation > 0.68)
+      if (supportsTrees && hash2d(seed ^ 0x15ac3d, tile.x, tile.z) < settings.vegetationDensity) {
         const treeScaleX = 0.66 + variation * 0.42
         const treeScaleY = 0.72 + hash2d(seed ^ 0x2d3d4f, tile.x, tile.z) * 0.8
         const treeScaleZ = 0.66 + hash2d(seed ^ 0x7a1e3b, tile.z, tile.x) * 0.42
@@ -1644,10 +1962,12 @@ export class WorldRenderer {
           canopyHeight: treeHeight,
           rotation,
           variation,
+          biome: tile.biome,
         })
       }
 
-      if ((tile.biome === 'đồi' || tile.biome === 'núi' || tile.biome === 'tuyết') && variation > 0.47 && hash2d(seed ^ 0x91f07c, tile.z, tile.x) < settings.rockDensity && rockCandidates.length < this.rocks.instanceMatrix.count) {
+      const supportsRocks = tile.biome === 'đồi' || tile.biome === 'núi' || tile.biome === 'tuyết' || tile.biome === 'sa mạc' || tile.biome === 'núi lửa' || tile.biome === 'hẻm núi' || tile.biome === 'sông băng'
+      if (supportsRocks && variation > 0.45 && hash2d(seed ^ 0x91f07c, tile.z, tile.x) < settings.rockDensity && rockCandidates.length < this.rocks.instanceMatrix.count) {
         rockCandidates.push({
           id: rockCandidates.length,
           priority: x * x + z * z + hash2d(seed ^ 0x91f07c, tile.z, tile.x) * 0.2,
@@ -1672,18 +1992,36 @@ export class WorldRenderer {
         resourceCount += 1
       }
 
-      const supportsVegetationDetail = tile.biome === 'đồng cỏ' || tile.biome === 'rừng' || tile.biome === 'tuyết'
-      if (supportsVegetationDetail && settings.groundDetailDensity > 0 && hash2d(seed ^ 0x1c53d7, tile.z, tile.x) < settings.groundDetailDensity && variation > 0.32 && groundDetailCandidates.length < this.groundDetails.instanceMatrix.count) {
+      const supportsVegetationDetail = tile.biome === 'đồng cỏ' || tile.biome === 'rừng' || tile.biome === 'rừng nhiệt đới' || tile.biome === 'đầm lầy' || tile.biome === 'tuyết' || tile.biome === 'đồi' || tile.biome === 'hoa anh đào' || tile.biome === 'sông băng'
+      if (supportsVegetationDetail && settings.groundDetailDensity > 0 && hash2d(seed ^ 0x1c53d7, tile.z, tile.x) < settings.groundDetailDensity && variation > 0.3 && groundDetailCandidates.length < this.groundDetails.instanceMatrix.count) {
         const offsetX = (hash2d(seed ^ 0x37d8af, tile.z, tile.x) - 0.5) * 0.34
         const offsetZ = (hash2d(seed ^ 0xae21d9, tile.x, tile.z) - 0.5) * 0.34
-        const detailScale = tile.biome === 'rừng' ? 1.28 : tile.biome === 'đồng cỏ' ? 0.72 + tile.moisture * 0.56 : 0.5 + variation * 0.36
-        const detailColor = tile.biome === 'rừng'
-          ? 0x3d7b46
-          : tile.biome === 'đồng cỏ'
-            ? variation > 0.82 ? 0xe8c86c : 0x88ae54
-            : tile.biome === 'bờ cát'
-              ? 0xd9c483
-              : 0xeaf5fa
+        let detailScale = 1.0
+        let detailColor = 0x67984a
+
+        if (tile.biome === 'hoa anh đào') {
+          detailScale = 1.25
+          detailColor = variation > 0.6 ? 0xf472b6 : variation > 0.3 ? 0xfbcfe8 : 0xd946ef
+        } else if (tile.biome === 'rừng nhiệt đới') {
+          detailScale = 1.45
+          detailColor = variation > 0.7 ? 0xe0245e : variation > 0.4 ? 0x1db954 : 0x00f59b
+        } else if (tile.biome === 'đầm lầy') {
+          detailScale = 1.15
+          detailColor = variation > 0.5 ? 0x6ee7b7 : 0x3d5c3a
+        } else if (tile.biome === 'rừng') {
+          detailScale = 1.28
+          detailColor = variation > 0.7 ? 0xef4444 : variation > 0.4 ? 0x3d7b46 : 0xa855f7
+        } else if (tile.biome === 'đồng cỏ') {
+          detailScale = 0.72 + tile.moisture * 0.56
+          detailColor = variation > 0.85 ? 0xfacc15 : variation > 0.7 ? 0xef4444 : variation > 0.5 ? 0xa855f7 : 0x88ae54
+        } else if (tile.biome === 'sông băng' || tile.biome === 'tuyết') {
+          detailScale = 0.6
+          detailColor = variation > 0.5 ? 0xa5f3fc : 0xeaf5fa
+        } else {
+          detailScale = 0.5 + variation * 0.36
+          detailColor = 0x789248
+        }
+
         groundDetailCandidates.push({
           id: groundDetailCandidates.length,
           priority: x * x + z * z + hash2d(seed ^ 0x1c53d7, tile.x, tile.z) * 0.2,
@@ -1696,10 +2034,29 @@ export class WorldRenderer {
         })
       }
 
-      if (tile.biome === 'bờ cát' && settings.groundDetailDensity > 0 && hash2d(seed ^ 0xbe17a9, tile.x, tile.z) < Math.min(0.62, settings.groundDetailDensity * 0.5) && sandDetailCandidates.length < sandDetailLimit) {
+      const supportsSandDetail = tile.biome === 'bờ cát' || tile.biome === 'sa mạc' || tile.biome === 'hẻm núi' || tile.biome === 'san hô' || tile.biome === 'núi lửa'
+      if (supportsSandDetail && settings.groundDetailDensity > 0 && hash2d(seed ^ 0xbe17a9, tile.x, tile.z) < Math.min(0.75, settings.groundDetailDensity * 0.65) && sandDetailCandidates.length < sandDetailLimit) {
         const offsetX = (hash2d(seed ^ 0x5ca93e, tile.z, tile.x) - 0.5) * 0.46
         const offsetZ = (hash2d(seed ^ 0xe11c72, tile.x, tile.z) - 0.5) * 0.46
-        const sandScale = 0.7 + variation * 0.7
+        let sandScale = 0.75 + variation * 0.65
+        let sandColor = 0xd7bd7c
+
+        if (tile.biome === 'san hô') {
+          sandScale = 1.2
+          sandColor = variation > 0.7 ? 0xec4899 : variation > 0.4 ? 0x06b6d4 : 0xf59e0b
+        } else if (tile.biome === 'núi lửa') {
+          sandScale = 0.9
+          sandColor = variation > 0.5 ? 0x1c1917 : 0xe11d48
+        } else if (tile.biome === 'hẻm núi') {
+          sandScale = 0.95
+          sandColor = variation > 0.6 ? 0xc2410c : 0xd97706
+        } else if (tile.biome === 'sa mạc') {
+          sandScale = 0.85 + variation * 0.5
+          sandColor = variation > 0.7 ? 0xcc8833 : variation > 0.4 ? 0xdaa520 : 0xb8860b
+        } else {
+          sandColor = variation > 0.72 ? 0xb8aa84 : variation > 0.38 ? 0xd7bd7c : 0x8f8872
+        }
+
         sandDetailCandidates.push({
           id: sandDetailCandidates.length,
           priority: x * x + z * z + hash2d(seed ^ 0xbe17a9, tile.z, tile.x) * 0.2,
@@ -1708,7 +2065,7 @@ export class WorldRenderer {
           z: z + offsetZ,
           scale: sandScale * (0.76 + tile.moisture * 0.22),
           rotation: variation * Math.PI * 2,
-          color: variation > 0.72 ? 0xb8aa84 : variation > 0.38 ? 0xd7bd7c : 0x8f8872,
+          color: sandColor,
         })
       }
     }
@@ -1846,8 +2203,15 @@ export class WorldRenderer {
       this.dummy.rotation.set(0, tree.rotation, 0)
       this.dummy.scale.set(tree.canopyScaleX * 1.25, tree.canopyScaleY * 0.95, tree.canopyScaleZ * 1.25)
       this.dummy.updateMatrix()
-      this.trees.setMatrixAt(treeCount, this.dummy.matrix)
-      this.trees.setColorAt(treeCount, new THREE.Color(0x2d683d).lerp(new THREE.Color(0x66934b), tree.variation))
+      let color = new THREE.Color(0x2d683d).lerp(new THREE.Color(0x66934b), tree.variation)
+      if (tree.biome === 'hoa anh đào') {
+        color = new THREE.Color(0xf472b6).lerp(new THREE.Color(0xfbcfe8), tree.variation)
+      } else if (tree.biome === 'tuyết' || tree.biome === 'sông băng') {
+        color = new THREE.Color(0x3e6550).lerp(new THREE.Color(0xd9e8ea), tree.variation * 0.7)
+      } else if (tree.biome === 'rừng nhiệt đới') {
+        color = new THREE.Color(0x196338).lerp(new THREE.Color(0x27874c), tree.variation)
+      }
+      this.trees.setColorAt(treeCount, color)
       treeCount += 1
     }
 
@@ -1931,6 +2295,11 @@ export class WorldRenderer {
     let forgeCount = 0
     let townHallCount = 0
     let lanternCount = 0
+    let watchtowerCount = 0
+    let windmillCount = 0
+    let wellCount = 0
+    let dockCount = 0
+    let monumentCount = 0
     const settlerPlacements: SettlerPlacement[] = []
     const settlementTownHallMatrices: THREE.Matrix4[] = []
     const settlementForgeMatrices: THREE.Matrix4[] = []
@@ -1996,6 +2365,67 @@ export class WorldRenderer {
           this.farms.setMatrixAt(farmCount, this.dummy.matrix)
           farmCount += 1
         }
+
+        if (village.population >= 8 && windmillCount < MAX_WINDMILLS) {
+          const angle = hash2d(localSeed, 13, 91) * Math.PI * 2
+          const radius = 1.25 + hash2d(localSeed, 17, 93) * 0.2
+          this.dummy.position.set(base.x + Math.cos(angle) * radius, base.y + 0.02, base.z + Math.sin(angle) * radius)
+          this.dummy.rotation.set(0, angle, 0)
+          this.dummy.scale.setScalar(0.95 + hash2d(localSeed, 19, 95) * 0.15)
+          this.dummy.updateMatrix()
+          this.windmills.setMatrixAt(windmillCount, this.dummy.matrix)
+          windmillCount += 1
+        }
+      }
+
+      if (village.population >= 6 && wellCount < MAX_WELLS) {
+        const wellAngle = hash2d(localSeed, 31, 97) * Math.PI * 2
+        const wellRadius = 0.22
+        this.dummy.position.set(base.x + Math.cos(wellAngle) * wellRadius, base.y + 0.02, base.z + Math.sin(wellAngle) * wellRadius)
+        this.dummy.rotation.set(0, wellAngle, 0)
+        this.dummy.scale.setScalar(0.9)
+        this.dummy.updateMatrix()
+        this.wells.setMatrixAt(wellCount, this.dummy.matrix)
+        wellCount += 1
+      }
+
+      if (village.resilience >= 5 || toolTier >= 3) {
+        const watchtowersForVillage = Math.min(2, Math.floor((village.resilience + 5) / 10))
+        const visibleWatchtowers = Math.ceil(watchtowersForVillage * settings.settlementDensity)
+        for (let index = 0; index < visibleWatchtowers && watchtowerCount < MAX_WATCHTOWERS; index += 1) {
+          const angle = hash2d(localSeed, index, 89) * Math.PI * 2
+          const radius = 1.1 + index * 0.3
+          this.dummy.position.set(base.x + Math.cos(angle) * radius, base.y + 0.02, base.z + Math.sin(angle) * radius)
+          this.dummy.rotation.set(0, angle, 0)
+          this.dummy.scale.setScalar(0.95 + (index % 2) * 0.1)
+          this.dummy.updateMatrix()
+          this.watchtowers.setMatrixAt(watchtowerCount, this.dummy.matrix)
+          watchtowerCount += 1
+        }
+      }
+
+      const isCoastal = this.world.tiles.some((t) => Math.abs(t.x - home.x) <= 2 && Math.abs(t.z - home.z) <= 2 && (t.biome === 'biển' || t.biome === 'bờ cát'))
+      if (isCoastal && dockCount < MAX_DOCKS) {
+        const waterNeighbor = this.world.tiles.find((t) => Math.abs(t.x - home.x) <= 2 && Math.abs(t.z - home.z) <= 2 && t.biome === 'biển')
+        const dockTarget = waterNeighbor ? this.tilePosition(waterNeighbor) : { x: base.x + 0.8, y: base.y, z: base.z + 0.8 }
+        const dockAngle = Math.atan2(dockTarget.z - base.z, dockTarget.x - base.x)
+        this.dummy.position.set(base.x + Math.cos(dockAngle) * 0.75, base.y + 0.01, base.z + Math.sin(dockAngle) * 0.75)
+        this.dummy.rotation.set(0, dockAngle + Math.PI / 2, 0)
+        this.dummy.scale.setScalar(0.95)
+        this.dummy.updateMatrix()
+        this.docks.setMatrixAt(dockCount, this.dummy.matrix)
+        dockCount += 1
+      }
+
+      if ((hasTownHall || village.knowledge.length >= 2) && monumentCount < MAX_MONUMENTS) {
+        const angle = hash2d(localSeed, 47, 99) * Math.PI * 2
+        const radius = 0.55
+        this.dummy.position.set(base.x + Math.cos(angle) * radius, base.y + 0.02, base.z + Math.sin(angle) * radius)
+        this.dummy.rotation.set(0, angle, 0)
+        this.dummy.scale.setScalar(0.9 + Math.min(0.25, village.knowledge.length * 0.04))
+        this.dummy.updateMatrix()
+        this.monuments.setMatrixAt(monumentCount, this.dummy.matrix)
+        monumentCount += 1
       }
 
       if (toolTier >= 1) {
@@ -2136,6 +2566,11 @@ export class WorldRenderer {
     this.forges.count = forgeCount
     this.townHalls.count = townHallCount
     this.lanterns.count = lanternCount
+    this.watchtowers.count = watchtowerCount
+    this.windmills.count = windmillCount
+    this.wells.count = wellCount
+    this.docks.count = dockCount
+    this.monuments.count = monumentCount
     this.houses.instanceMatrix.needsUpdate = true
     this.roofs.instanceMatrix.needsUpdate = true
     this.thatchRoofs.instanceMatrix.needsUpdate = true
@@ -2146,6 +2581,11 @@ export class WorldRenderer {
     this.forges.instanceMatrix.needsUpdate = true
     this.townHalls.instanceMatrix.needsUpdate = true
     this.lanterns.instanceMatrix.needsUpdate = true
+    this.watchtowers.instanceMatrix.needsUpdate = true
+    this.windmills.instanceMatrix.needsUpdate = true
+    this.wells.instanceMatrix.needsUpdate = true
+    this.docks.instanceMatrix.needsUpdate = true
+    this.monuments.instanceMatrix.needsUpdate = true
     this.houses.computeBoundingSphere()
     this.roofs.computeBoundingSphere()
     this.thatchRoofs.computeBoundingSphere()
@@ -2156,6 +2596,11 @@ export class WorldRenderer {
     this.forges.computeBoundingSphere()
     this.townHalls.computeBoundingSphere()
     this.lanterns.computeBoundingSphere()
+    this.watchtowers.computeBoundingSphere()
+    this.windmills.computeBoundingSphere()
+    this.wells.computeBoundingSphere()
+    this.docks.computeBoundingSphere()
+    this.monuments.computeBoundingSphere()
     this.settlerLayer.setSettlers(this.world, settlerPlacements)
     this.animatedSettlerLayer.setSettlers(this.world, settlerPlacements, natureQuality)
   }
@@ -2247,24 +2692,85 @@ export class WorldRenderer {
 
   private updateSky(delta: number, reducedMotion: boolean, updateDynamicMotion: boolean): void {
     const phase = (this.simulation.tick % 96) / 96
-    const sunArc = Math.sin(phase * Math.PI * 2)
-    const daylight = clamp(sunArc * 0.8 + 0.45, 0.14, 1)
+    const sunAngle = phase * Math.PI * 2
+    const sunArc = Math.sin(sunAngle)
+    const daylight = clamp(sunArc * 0.9 + 0.42, 0.08, 1)
+    const nightIntensity = clamp((1 - daylight) * 1.3 - 0.1, 0, 1)
     const storm = this.simulation.activeStorm
     const stormStrength = storm ? clamp(storm.intensity / 2.2, 0, 0.78) : 0
-    const sky = this.skyColor.copy(NIGHT_SKY).lerp(DAY_SKY, daylight)
+    const isCold = this.world.config.climate === 'lạnh'
+    const auroraIntensity = (isCold ? 0.8 : nightIntensity * 0.75) * (1 - stormStrength * 0.6)
+
+    const isGoldenHour = sunArc > -0.25 && sunArc < 0.42 && stormStrength < 0.4
+    const goldenFactor = isGoldenHour ? clamp(1 - Math.abs(sunArc - 0.08) / 0.34, 0, 1) : 0
+
+    const dawnHorizon = new THREE.Color(0xf59e0b).lerp(new THREE.Color(0xec4899), 0.45)
+    const dayHorizon = DAY_SKY
+    const nightHorizon = NIGHT_SKY
+
+    const sky = this.skyColor.copy(nightHorizon).lerp(dayHorizon, daylight)
+    if (goldenFactor > 0) sky.lerp(dawnHorizon, goldenFactor * 0.65)
     if (stormStrength > 0) sky.lerp(STORM_SKY, 0.46 * stormStrength)
+
     const fog = this.scene.fog
     if (!this.polyHavenSkyTexture) this.scene.background = sky
-    this.skyLight.intensity = (0.42 + daylight * 1.15) * (1 - stormStrength * 0.26)
-    this.skyLight.color.setHSL(0.58, 0.5, 0.3 + daylight * 0.42)
-    this.sun.intensity = (0.3 + daylight * 2.1) * (1 - stormStrength * 0.44)
-    this.sun.color.setHSL(0.1, 0.65, 0.55 + daylight * 0.25)
-    this.sun.position.set(Math.cos(phase * Math.PI * 2) * 13, 6 + daylight * 15, Math.sin(phase * Math.PI * 2) * 12)
-    this.skyDome.material.uniforms.topColor!.value.copy(sky).lerp(SKY_ZENITH, 0.62 + daylight * 0.2)
-    this.skyHorizonColor.copy(sky).lerp(SKY_HORIZON, 0.58 + daylight * 0.18)
-    this.skyDome.material.uniforms.horizonColor!.value.copy(this.skyHorizonColor)
-    this.skyDome.material.uniforms.bottomColor!.value.copy(this.skyHorizonColor).lerp(SKY_BASE, 0.24)
+
+    // Dynamic environmental lighting
+    this.skyLight.intensity = (0.35 + daylight * 1.25) * (1 - stormStrength * 0.26)
+    if (goldenFactor > 0) {
+      this.skyLight.color.setHex(0xfbcfe8).lerp(new THREE.Color(0xfde68a), goldenFactor)
+    } else if (nightIntensity > 0.5) {
+      this.skyLight.color.setHex(0x384d72)
+    } else {
+      this.skyLight.color.setHSL(0.58, 0.5, 0.3 + daylight * 0.42)
+    }
+
+    const sunX = Math.cos(sunAngle) * 16
+    const sunY = Math.sin(sunAngle) * 18
+    const sunZ = Math.sin(sunAngle * 0.8) * 14
+    this.sun.position.set(sunX, Math.max(1.2, sunY), sunZ)
+    this.sun.intensity = (0.2 + daylight * 2.2) * (1 - stormStrength * 0.44)
+    if (goldenFactor > 0) {
+      this.sun.color.setHex(0xffaa55).lerp(new THREE.Color(0xfff0aa), 1 - goldenFactor)
+    } else if (nightIntensity > 0.6) {
+      this.sun.color.setHex(0x93c5fd)
+    } else {
+      this.sun.color.setHSL(0.1, 0.65, 0.55 + daylight * 0.25)
+    }
+
+    // Sky Dome uniforms
+    const uniforms = this.skyDome.material.uniforms
+    if (uniforms) {
+      const topCol = uniforms.topColor?.value as THREE.Color | undefined
+      const horizCol = uniforms.horizonColor?.value as THREE.Color | undefined
+      const botCol = uniforms.bottomColor?.value as THREE.Color | undefined
+
+      if (topCol) {
+        topCol.copy(sky).lerp(SKY_ZENITH, 0.62 + daylight * 0.2)
+        if (nightIntensity > 0.5) topCol.lerp(new THREE.Color(0x060e1d), nightIntensity * 0.85)
+      }
+
+      this.skyHorizonColor.copy(sky).lerp(SKY_HORIZON, 0.58 + daylight * 0.18)
+      if (goldenFactor > 0) this.skyHorizonColor.lerp(dawnHorizon, goldenFactor * 0.8)
+      if (nightIntensity > 0.5) this.skyHorizonColor.lerp(new THREE.Color(0x102138), nightIntensity * 0.85)
+
+      if (horizCol) horizCol.copy(this.skyHorizonColor)
+      if (botCol) botCol.copy(this.skyHorizonColor).lerp(SKY_BASE, 0.24)
+
+      if (uniforms.sunDirection) (uniforms.sunDirection.value as THREE.Vector3).set(sunX, sunY, sunZ).normalize()
+      if (uniforms.moonDirection) (uniforms.moonDirection.value as THREE.Vector3).set(-sunX, -sunY, -sunZ).normalize()
+      if (uniforms.time) uniforms.time.value = this.elapsed
+      if (uniforms.nightIntensity) uniforms.nightIntensity.value = nightIntensity
+      if (uniforms.auroraIntensity) uniforms.auroraIntensity.value = auroraIntensity
+    }
+
     if (fog) fog.color.copy(this.skyHorizonColor)
+
+    // Warm emissive glow on lanterns and village monuments at night
+    this.lanternMaterial.emissiveIntensity = 0.45 + nightIntensity * 1.55
+    this.monumentMaterial.emissiveIntensity = 0.32 + Math.sin(this.elapsed * 2.2) * 0.18 + nightIntensity * 0.45
+    this.forgeMaterial.emissiveIntensity = 0.35 + Math.sin(this.elapsed * 3.4) * 0.25
+
     this.waterMaterial.color.setHSL(0.55, 0.74 - stormStrength * 0.16, 0.18 + daylight * 0.08)
     this.waterMaterial.emissive.setHSL(0.56, 0.54, 0.018 + daylight * 0.026)
     this.waterMaterial.roughness = 0.11 + stormStrength * 0.22
@@ -2641,6 +3147,8 @@ export class WorldRenderer {
       this.lanternModelLayer?.animate(this.elapsed, reducedMotion)
       this.stockpileModelLayer?.animate(this.elapsed, reducedMotion)
     }
+    this.sketchfabModelLayer.update(this.elapsed)
+    this.evolutionFxLayer.update(delta)
     this.updateActionPulse(reducedMotion)
     this.avatarController.update(delta, this.world, this.camera)
     this.controls.update()

@@ -37,8 +37,16 @@ function toolVisual(tool: VillageToolId): ToolVisual {
     'copper-hammer': { handleScale: 0.92, headScale: [1.16, 0.92, 0.92], color: 0xc77946 },
     'bronze-spear': { handleScale: 1.42, headScale: [0.54, 1.46, 0.5], color: 0xd5a651 },
     'iron-anvil': { handleScale: 0.88, headScale: [1.44, 0.88, 0.88], color: 0x63727d },
+    'obsidian-dagger': { handleScale: 0.65, headScale: [0.45, 0.95, 0.4], color: 0x222831 },
+    'iron-sword': { handleScale: 1.15, headScale: [0.4, 1.6, 0.35], color: 0xd8e2ec },
+    'hunting-bow': { handleScale: 1.35, headScale: [1.2, 0.4, 0.6], color: 0x9b5a32 },
+    'repeating-crossbow': { handleScale: 1.1, headScale: [1.3, 0.8, 1.1], color: 0x5a4838 },
+    'war-hammer': { handleScale: 1.3, headScale: [1.5, 1.2, 1.2], color: 0x48535c },
+    'titan-halberd': { handleScale: 1.65, headScale: [0.65, 1.85, 0.55], color: 0x4a7c9d },
+    'aether-staff': { handleScale: 1.5, headScale: [0.9, 1.1, 0.9], color: 0x38bdf8 },
+    'crystal-scepter': { handleScale: 1.2, headScale: [1.1, 1.3, 1.1], color: 0xe879f9 },
   }
-  return visuals[tool]
+  return visuals[tool] ?? visuals['stone-handaxe']
 }
 
 function createInstancedMesh<G extends THREE.BufferGeometry>(
@@ -56,19 +64,19 @@ function createInstancedMesh<G extends THREE.BufferGeometry>(
 }
 
 /**
- * Lightweight biped rig. Each resident keeps two terrain-conforming legs and
- * two animated arms while all residents remain batched in a few draw calls.
+ * Lightweight biped rig with realistic human proportions (~0.22 units tall).
+ * Each resident keeps two terrain-conforming legs and two animated arms.
  */
 export class SettlerLayer {
   private readonly group = new THREE.Group()
   private readonly bodyMaterial = new THREE.MeshStandardMaterial({ color: 0x8eb5d1, flatShading: false, roughness: 0.74 })
   private readonly skinMaterial = new THREE.MeshStandardMaterial({ color: 0xf4d6a4, flatShading: false, roughness: 0.78 })
   private readonly toolMaterial = new THREE.MeshStandardMaterial({ color: 0x8a9299, flatShading: false, roughness: 0.58, metalness: 0.22 })
-  private readonly torsoGeometry = new THREE.CapsuleGeometry(0.055, 0.13, 4, 12)
-  private readonly headGeometry = new THREE.SphereGeometry(0.065, 14, 10)
-  private readonly limbGeometry = new THREE.CylinderGeometry(1, 1, 1, 10)
-  private readonly toolHandleGeometry = new THREE.CylinderGeometry(0.012, 0.016, 0.32, 8)
-  private readonly toolHeadGeometry = new THREE.BoxGeometry(0.1, 0.07, 0.06)
+  private readonly torsoGeometry = new THREE.CapsuleGeometry(0.022, 0.05, 4, 10)
+  private readonly headGeometry = new THREE.SphereGeometry(0.026, 12, 8)
+  private readonly limbGeometry = new THREE.CylinderGeometry(1, 1, 1, 8)
+  private readonly toolHandleGeometry = new THREE.CylinderGeometry(0.005, 0.007, 0.14, 6)
+  private readonly toolHeadGeometry = new THREE.BoxGeometry(0.045, 0.03, 0.025)
   private readonly bodies: THREE.InstancedMesh<THREE.CapsuleGeometry, THREE.MeshStandardMaterial>
   private readonly heads: THREE.InstancedMesh<THREE.SphereGeometry, THREE.MeshStandardMaterial>
   private readonly legs: THREE.InstancedMesh<THREE.CylinderGeometry, THREE.MeshStandardMaterial>
@@ -100,7 +108,7 @@ export class SettlerLayer {
   public constructor(private readonly tileScale: number, private readonly capacity = 180) {
     this.group.name = 'aetheria-instanced-settlers'
     this.group.visible = false
-    this.torsoGeometry.translate(0, 0.29, 0)
+    this.torsoGeometry.translate(0, 0.11, 0)
     this.bodies = createInstancedMesh(this.torsoGeometry, this.bodyMaterial, capacity)
     this.heads = createInstancedMesh(this.headGeometry, this.skinMaterial, capacity)
     this.legs = createInstancedMesh(this.limbGeometry, this.bodyMaterial, capacity * 4)
@@ -163,7 +171,7 @@ export class SettlerLayer {
       const gait = reducedMotion ? 0 : Math.sin(elapsed * (walking ? 5.6 : 3.4) + settler.phase)
 
       sampleTerrainPointAtTile(this.world, this.tileScale, tileX, tileZ, this.rootPosition, this.surfaceNormal)
-      this.rootPosition.y += reducedMotion ? 0 : Math.abs(gait) * 0.014 * settler.scale
+      this.rootPosition.y += reducedMotion ? 0 : Math.abs(gait) * 0.008 * settler.scale
       this.setRootOrientation(this.surfaceNormal, heading)
       this.forward.copy(LOCAL_FORWARD).applyQuaternion(this.rootQuaternion).normalize()
       this.side.copy(LOCAL_RIGHT).applyQuaternion(this.rootQuaternion).normalize()
@@ -174,7 +182,7 @@ export class SettlerLayer {
       this.dummy.updateMatrix()
       this.bodies.setMatrixAt(index, this.dummy.matrix)
 
-      this.dummy.position.set(0, 0.49 * settler.scale, 0).applyQuaternion(this.rootQuaternion).add(this.rootPosition)
+      this.dummy.position.set(0, 0.185 * settler.scale, 0).applyQuaternion(this.rootQuaternion).add(this.rootPosition)
       this.dummy.quaternion.copy(this.rootQuaternion)
       this.dummy.scale.setScalar(settler.scale)
       this.dummy.updateMatrix()
@@ -220,20 +228,20 @@ export class SettlerLayer {
 
   private updateLeg(index: number, sideSign: -1 | 1, gait: number, scale: number): void {
     if (!this.world) return
-    const stride = gait * 0.075 * scale
-    const lift = Math.max(0, gait) * 0.065 * scale
-    this.hipPosition.set(sideSign * 0.042 * scale, 0.2 * scale, 0).applyQuaternion(this.rootQuaternion).add(this.rootPosition)
+    const stride = gait * 0.035 * scale
+    const lift = Math.max(0, gait) * 0.028 * scale
+    this.hipPosition.set(sideSign * 0.018 * scale, 0.08 * scale, 0).applyQuaternion(this.rootQuaternion).add(this.rootPosition)
     this.footPosition
-      .set(sideSign * 0.055 * scale, 0, stride)
+      .set(sideSign * 0.022 * scale, 0, stride)
       .applyQuaternion(this.rootQuaternion)
       .add(this.rootPosition)
     sampleTerrainPointAtScene(this.world, this.tileScale, this.footPosition.x, this.footPosition.z, this.footPosition, this.footNormal)
-    this.footPosition.y += lift + 0.01
+    this.footPosition.y += lift + 0.005
     this.bendHint.copy(this.forward).addScaledVector(this.side, sideSign * 0.35).normalize()
-    solveTwoBoneKnee(this.hipPosition, this.footPosition, 0.14 * scale, 0.145 * scale, this.bendHint, this.kneePosition)
+    solveTwoBoneKnee(this.hipPosition, this.footPosition, 0.055 * scale, 0.058 * scale, this.bendHint, this.kneePosition)
     const segmentIndex = index * 4 + (sideSign < 0 ? 0 : 2)
-    this.setSegmentMatrix(this.legs, segmentIndex, this.hipPosition, this.kneePosition, 0.021 * scale)
-    this.setSegmentMatrix(this.legs, segmentIndex + 1, this.kneePosition, this.footPosition, 0.018 * scale)
+    this.setSegmentMatrix(this.legs, segmentIndex, this.hipPosition, this.kneePosition, 0.009 * scale)
+    this.setSegmentMatrix(this.legs, segmentIndex + 1, this.kneePosition, this.footPosition, 0.008 * scale)
   }
 
   private updateArmsAndTool(
@@ -250,22 +258,22 @@ export class SettlerLayer {
       const swing = working
         ? sideSign < 0 ? workPulse * 0.32 : -workPulse
         : walking ? sideSign < 0 ? -gait : gait * 0.32 : gait * 0.16
-      this.shoulderPosition.set(sideSign * 0.082 * settler.scale, 0.39 * settler.scale, 0).applyQuaternion(this.rootQuaternion).add(this.rootPosition)
+      this.shoulderPosition.set(sideSign * 0.034 * settler.scale, 0.155 * settler.scale, 0).applyQuaternion(this.rootQuaternion).add(this.rootPosition)
       this.handPosition
-        .set(sideSign * 0.13 * settler.scale, (0.24 - swing * 0.035) * settler.scale, swing * 0.075 * settler.scale)
+        .set(sideSign * 0.052 * settler.scale, (0.095 - swing * 0.015) * settler.scale, swing * 0.032 * settler.scale)
         .applyQuaternion(this.rootQuaternion)
         .add(this.rootPosition)
-      this.setSegmentMatrix(this.arms, index * 2 + (sideSign < 0 ? 0 : 1), this.shoulderPosition, this.handPosition, 0.018 * settler.scale)
+      this.setSegmentMatrix(this.arms, index * 2 + (sideSign < 0 ? 0 : 1), this.shoulderPosition, this.handPosition, 0.008 * settler.scale)
 
       if (sideSign > 0) {
-        this.dummy.position.copy(this.handPosition).addScaledVector(this.forward, 0.018 * settler.scale)
+        this.dummy.position.copy(this.handPosition).addScaledVector(this.forward, 0.008 * settler.scale)
         this.dummy.quaternion.copy(this.rootQuaternion)
         this.dummy.rotateZ(0.54)
         this.dummy.scale.set(1, visual.handleScale * settler.scale, 1)
         this.dummy.updateMatrix()
         this.toolHandles.setMatrixAt(index, this.dummy.matrix)
 
-        this.dummy.position.copy(this.handPosition).addScaledVector(this.forward, (0.09 + visual.handleScale * 0.08) * settler.scale)
+        this.dummy.position.copy(this.handPosition).addScaledVector(this.forward, (0.045 + visual.handleScale * 0.04) * settler.scale)
         this.dummy.quaternion.copy(this.rootQuaternion)
         this.dummy.rotateZ(0.2)
         this.dummy.scale.set(...visual.headScale).multiplyScalar(settler.scale)

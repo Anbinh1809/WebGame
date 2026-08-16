@@ -13,6 +13,9 @@ interface ToolDockProps {
   onToggleAvatarMode?: () => void
   onOpenCivTree?: () => void
   onOpenRankedArena?: () => void
+  onOpenEvolutionTree?: () => void
+  onOpenSketchfabExplorer?: () => void
+  onOpenArchipelago?: () => void
 }
 
 const TOOL_OPTIONS: Array<{ id: ToolId; key: string; symbol: string; label: string; hint: string }> = [
@@ -38,6 +41,9 @@ export function ToolDock({
   onToggleAvatarMode,
   onOpenCivTree,
   onOpenRankedArena,
+  onOpenEvolutionTree,
+  onOpenSketchfabExplorer,
+  onOpenArchipelago,
 }: ToolDockProps): JSX.Element {
   return (
     <section className="tool-dock panel-surface" aria-labelledby="tools-heading">
@@ -58,6 +64,42 @@ export function ToolDock({
 
       {/* Special Epic Modes Bar */}
       <div className="special-modes-bar" role="group" aria-label="Tính năng nâng cao">
+        {onOpenEvolutionTree && (
+          <button
+            type="button"
+            className="special-mode-btn evolution-mode-btn"
+            onClick={onOpenEvolutionTree}
+            title="Mở Cây Tiến Hóa Phân Nhánh 0.5% (Phím E)"
+          >
+            <span>🧬 Tiến Hóa Độc Bản</span>
+            <kbd>E</kbd>
+          </button>
+        )}
+
+        {onOpenSketchfabExplorer && (
+          <button
+            type="button"
+            className="special-mode-btn sketchfab-mode-btn"
+            onClick={onOpenSketchfabExplorer}
+            title="Mở Thư Viện Mô Hình 3D Sketchfab (Phím S)"
+          >
+            <span>🎨 Mô Hình 3D</span>
+            <kbd>S</kbd>
+          </button>
+        )}
+
+        {onOpenArchipelago && (
+          <button
+            type="button"
+            className="special-mode-btn archipelago-mode-btn"
+            onClick={onOpenArchipelago}
+            title="Quản Lý Quần Đảo & Đảo Riêng (Phím A)"
+          >
+            <span>🏝️ Quần Đảo</span>
+            <kbd>A</kbd>
+          </button>
+        )}
+
         {onToggleAvatarMode && (
           <button
             type="button"

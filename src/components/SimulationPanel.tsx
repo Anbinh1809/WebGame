@@ -75,13 +75,15 @@ export function SimulationPanel({
             <div><span>Lương thực</span><strong>{Math.round(village.food)}</strong></div>
             <div><span>Hạnh phúc</span><strong>{Math.round(village.happiness)}%</strong></div>
             <div><span>Thời đại</span><strong>{villageEraLabel(village.era)}</strong></div>
+            <div><span>Kỷ nguyên</span><strong className="text-cyan">{village.epoch ?? 'Kỷ Tiền Cambri (Đơn Bào)'}</strong></div>
+            <div><span>Điểm DNA</span><strong className="text-emerald">+{Math.round(village.dnaPoints ?? 15)} DNA</strong></div>
           </div>
         ) : <p className="muted-copy">Chưa có cộng đồng nào trên bản đồ này.</p>}
         {village ? (
           <div className="council-stats" role="group" aria-label="Nghiên cứu, phòng vệ và lãnh thổ">
             <span>Nghiên cứu <strong>{Math.round(village.research)}</strong><small>Tăng thu hoạch</small></span>
-            <span>Phòng vệ <strong>{Math.round(village.military)}</strong><small>Giảm thiệt hại bão</small></span>
-            <span>Lãnh thổ <strong>{village.territory}</strong><small>Mở rộng sản lượng</small></span>
+            <span>Sinh khối <strong>{Math.round(village.biomass ?? 30)}</strong><small>Sức sống hệ sinh thái</small></span>
+            <span>Đa dạng <strong>{village.biodiversity ?? 65}%</strong><small>Hệ động thực vật</small></span>
             <span>Phục hồi <strong>{Math.round(village.resilience)}%</strong><small>Không bị kẹt sau bão</small></span>
           </div>
         ) : null}

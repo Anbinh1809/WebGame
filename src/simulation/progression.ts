@@ -102,6 +102,78 @@ export const VILLAGE_TOOL_DEFINITIONS: readonly VillageToolDefinition[] = [
     benefit: 'Xưởng sắt và nhà đá làm làng thành thị trấn.',
     effects: { harvest: 0.042, research: 0.11, stormDefense: 0.06, resilience: 12 },
   },
+  {
+    id: 'obsidian-dagger',
+    label: 'Dao găm hắc diện thạch',
+    era: 'Thị Trấn',
+    researchCost: 85,
+    foodCost: 65,
+    benefit: 'Lưỡi dao hắc thạch bén ngọt tăng khả năng tự vệ và thu thập tinh hoa.',
+    effects: { harvest: 0.03, research: 0.08, stormDefense: 0.08, resilience: 15 },
+  },
+  {
+    id: 'iron-sword',
+    label: 'Kiếm thép hiệp sĩ',
+    era: 'Thị Trấn',
+    researchCost: 105,
+    foodCost: 80,
+    benefit: 'Thanh kiếm thép rèn gia tăng vượt bậc khả năng bảo vệ lãnh thổ.',
+    effects: { harvest: 0.02, research: 0.09, stormDefense: 0.15, resilience: 20 },
+  },
+  {
+    id: 'hunting-bow',
+    label: 'Cung săn gân rồng',
+    era: 'Thị Trấn',
+    researchCost: 130,
+    foodCost: 95,
+    benefit: 'Vũ khí tầm xa giúp cư dân săn bắn và cảnh giới từ xa an toàn.',
+    effects: { harvest: 0.06, research: 0.08, stormDefense: 0.12, resilience: 22 },
+  },
+  {
+    id: 'repeating-crossbow',
+    label: 'Nỏ liên thanh cơ khí',
+    era: 'Thị Trấn',
+    researchCost: 160,
+    foodCost: 115,
+    benefit: 'Hệ thống nỏ bắn liên hoàn đẩy lùi mọi nguy cơ thiên tai và thú dữ.',
+    effects: { harvest: 0.03, research: 0.12, stormDefense: 0.18, resilience: 26 },
+  },
+  {
+    id: 'war-hammer',
+    label: 'Búa chiến công thành',
+    era: 'Thị Trấn',
+    researchCost: 195,
+    foodCost: 140,
+    benefit: 'Uy lực nghiền nát mở rộng công trình kiên cố.',
+    effects: { harvest: 0.05, research: 0.14, stormDefense: 0.16, resilience: 30 },
+  },
+  {
+    id: 'titan-halberd',
+    label: 'Đại kích titan',
+    era: 'Thị Trấn',
+    researchCost: 240,
+    foodCost: 175,
+    benefit: 'Vũ khí hộ vệ tối thượng đúc từ hợp kim titan siêu cứng.',
+    effects: { harvest: 0.04, research: 0.16, stormDefense: 0.22, resilience: 38 },
+  },
+  {
+    id: 'aether-staff',
+    label: 'Trượng linh khí Aether',
+    era: 'Thị Trấn',
+    researchCost: 290,
+    foodCost: 210,
+    benefit: 'Hấp thu tinh hoa Aether tạo màng bảo hộ vững chãi.',
+    effects: { harvest: 0.08, research: 0.24, stormDefense: 0.25, resilience: 45 },
+  },
+  {
+    id: 'crystal-scepter',
+    label: 'Quyền trượng pha lê',
+    era: 'Thị Trấn',
+    researchCost: 350,
+    foodCost: 260,
+    benefit: 'Biểu tượng vương quyền và trí tuệ đỉnh cao của nền văn minh.',
+    effects: { harvest: 0.12, research: 0.32, stormDefense: 0.3, resilience: 60 },
+  },
 ]
 
 export const STARTING_VILLAGE_TOOLS: readonly VillageToolId[] = ['stone-handaxe']
@@ -147,3 +219,81 @@ export function villageToolEffects(tools: readonly VillageToolId[]): VillageTool
     }
   }, NO_TOOL_EFFECTS)
 }
+
+export function villageEvolutionEpochForTools(tools: readonly VillageToolId[]): import('./types').EvolutionEpoch {
+  const tier = villageToolTier(tools)
+  if (tier >= 6) return 'Kỷ Nhân Sinh (Văn Minh & Siêu Thể)'
+  if (tier >= 4) return 'Kỷ Tân Sinh (Thú Khổng Lồ)'
+  if (tier >= 3) return 'Kỷ Trung Sinh (Bò Sát & Dực Long)'
+  if (tier >= 2) return 'Kỷ Devon (Lên Cạn)'
+  if (tier >= 1) return 'Kỷ Cổ Sinh (Thủy Sinh)'
+  return 'Kỷ Tiền Cambri (Đơn Bào)'
+}
+
+export interface EvolutionEpochDetail {
+  id: import('./types').EvolutionEpoch
+  title: string
+  period: string
+  dominantLife: string
+  description: string
+  icon: string
+  accentColor: string
+}
+
+export const EVOLUTION_EPOCH_DETAILS: Record<import('./types').EvolutionEpoch, EvolutionEpochDetail> = {
+  'Kỷ Tiền Cambri (Đơn Bào)': {
+    id: 'Kỷ Tiền Cambri (Đơn Bào)',
+    title: 'Kỷ Tiền Cambri',
+    period: '4.000 - 541 triệu năm trước',
+    dominantLife: 'Vi sinh vật, Tảo lam & Sinh vật đơn bào',
+    description: 'Nước súp hữu cơ nguyên thủy. Tế bào bắt đầu hấp thu năng lượng hóa học, phát triển màng bao và quang hợp.',
+    icon: '🦠',
+    accentColor: '#38bdf8',
+  },
+  'Kỷ Cổ Sinh (Thủy Sinh)': {
+    id: 'Kỷ Cổ Sinh (Thủy Sinh)',
+    title: 'Kỷ Cổ Sinh (Cambrian)',
+    period: '541 - 419 triệu năm trước',
+    dominantLife: 'Cá cổ đại, Động vật thân mềm & San hô',
+    description: 'Bùng nổ sinh học đại dương. Hình thành bộ xương trong, mang thở, vây bơi và cơ quan thị giác sơ khai.',
+    icon: '🐠',
+    accentColor: '#06b6d4',
+  },
+  'Kỷ Devon (Lên Cạn)': {
+    id: 'Kỷ Devon (Lên Cạn)',
+    title: 'Kỷ Devon & Than Đá',
+    period: '419 - 298 triệu năm trước',
+    dominantLife: 'Lưỡng cư nguyên thủy, Côn trùng khổng lồ & Rừng dương xỉ',
+    description: 'Sinh vật vây tay tiến hóa thành tứ chi bò lên cạn. Phát triển phổi thở không khí và rừng cây cổ đại.',
+    icon: '🦎',
+    accentColor: '#10b981',
+  },
+  'Kỷ Trung Sinh (Bò Sát & Dực Long)': {
+    id: 'Kỷ Trung Sinh (Bò Sát & Dực Long)',
+    title: 'Kỷ Trung Sinh (Mesozoic)',
+    period: '252 - 66 triệu năm trước',
+    dominantLife: 'Khủng long, Bò sát khổng lồ & Dực long bầu trời',
+    description: 'Kỷ nguyên thống trị của loài bò sát và khủng long. Phát triển cánh màng bay lượn và lớp da sừng cứng cáp.',
+    icon: '🦖',
+    accentColor: '#f59e0b',
+  },
+  'Kỷ Tân Sinh (Thú Khổng Lồ)': {
+    id: 'Kỷ Tân Sinh (Thú Khổng Lồ)',
+    title: 'Kỷ Tân Sinh (Cenozoic)',
+    period: '66 - 0.3 triệu năm trước',
+    dominantLife: 'Voi ma mút, Gấu tuyết, Sói săn mồi & Vượn người',
+    description: 'Kỷ Băng Hà và sự trỗi dậy của động vật có vú đẳng nhiệt. Tập tính săn mồi bầy đàn và trí thông minh tăng vọt.',
+    icon: '🦣',
+    accentColor: '#ec4899',
+  },
+  'Kỷ Nhân Sinh (Văn Minh & Siêu Thể)': {
+    id: 'Kỷ Nhân Sinh (Văn Minh & Siêu Thể)',
+    title: 'Kỷ Nhân Sinh & Tương Lai',
+    period: 'Hiện đại - Tương lai siêu tiến hóa',
+    dominantLife: 'Nhân loại, Nền văn minh trí tuệ & Siêu sinh thể',
+    description: 'Sử dụng công cụ, ngôn ngữ, khoa học luyện kim và kiểm soát năng lượng nguyên tố sáng thế.',
+    icon: '✨',
+    accentColor: '#a855f7',
+  },
+}
+

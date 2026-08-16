@@ -53,21 +53,42 @@ export function getWaterLevel(config: WorldConfig): number {
 export function classifyBiome(tile: Tile, config: WorldConfig): TerrainKind {
   const waterLevel = getWaterLevel(config)
 
-  if (tile.height <= waterLevel) return 'biển'
-  if (tile.height <= waterLevel + 0.1) return 'bờ cát'
-  if (tile.height > 1.06 && tile.temperature < 0.43) return 'tuyết'
-  if (tile.height > 0.87) return 'núi'
-  if (tile.height > 0.62) return 'đồi'
-  if (tile.forest) return 'rừng'
+  if (tile.height <= waterLevel) {
+    if (tile.height > waterLevel - 0.05 && tile.temperature > 0.62 && tile.resources > 0.52) {
+      return 'san hô'
+    }
+    return 'biển'
+  }
+  if (tile.height <= waterLevel + 0.08) return 'bờ cát'
+  if (tile.temperature < 0.18 && tile.height > waterLevel + 0.05) return 'sông băng'
+  if (tile.height > 1.05 || (tile.temperature < 0.28 && tile.height > waterLevel + 0.1)) return 'tuyết'
+  if (tile.height > 0.88 && tile.temperature > 0.62 && tile.resources > 0.68) return 'núi lửa'
+  if (tile.height > 0.84) return 'núi'
+  if (tile.height > 0.58) {
+    if (tile.moisture < 0.26 && tile.temperature > 0.54) return 'hẻm núi'
+    return 'đồi'
+  }
+  if (tile.soil === 'màu mỡ' && tile.moisture > 0.58 && tile.temperature >= 0.42 && tile.temperature <= 0.7 && tile.height > waterLevel + 0.12 && tile.height < 0.72) {
+    return 'hoa anh đào'
+  }
+  if (tile.moisture < 0.32 && tile.temperature > 0.54) return 'sa mạc'
+  if (tile.moisture > 0.72 && tile.temperature > 0.52) return 'rừng nhiệt đới'
+  if (tile.moisture > 0.76 && tile.height <= waterLevel + 0.25) return 'đầm lầy'
+  if (tile.forest || tile.moisture > 0.44) return 'rừng'
   return 'đồng cỏ'
 }
 
 function createTile(config: WorldConfig, seed: number, x: number, z: number): Tile {
   const center = (config.size - 1) / 2
-  const normalizedDistance = Math.hypot(x - center, z - center) / (center * 1.42)
-  const continental = fractalNoise(seed, x, z) - 0.47
+  const distFromCenter = Math.hypot(x - center, z - center)
+  const normalizedDistance = distFromCenter / (center * 1.42)
+  const continental = fractalNoise(seed, x, z) - 0.45
   const ridge = Math.abs(fractalNoise(seed ^ 0x9e3779b9, x + 31, z - 19) - 0.5)
-  const height = clamp(continental * 2.2 + ridge * 0.55 - normalizedDistance * 0.27, -0.62, 1.52)
+
+  // Gentle plain expansion around the continent center to give players abundant buildable room
+  const centralFlatness = smoothstep(clamp(1.0 - (distFromCenter / (center * 0.72)), 0, 1))
+  const rawHeight = continental * 2.1 + ridge * (0.55 * (1 - centralFlatness * 0.35)) - normalizedDistance * 0.28
+  const height = clamp(rawHeight + centralFlatness * 0.12, -0.62, 1.52)
   const moisture = clamp(fractalNoise(seed ^ 0x7f4a7c15, x - 17, z + 23) * 0.92 + 0.08, 0, 1)
   const latitudeCold = Math.abs(z - center) / Math.max(center, 1) * 0.32
   const temperature = clamp(
@@ -75,7 +96,11 @@ function createTile(config: WorldConfig, seed: number, x: number, z: number): Ti
     0,
     1,
   )
-  const soil = moisture > 0.62 && height > getWaterLevel(config) + 0.12 ? 'màu mỡ' : 'thường'
+  const soil = (moisture > 0.62 && height > getWaterLevel(config) + 0.12) || (temperature > 0.5 && moisture > 0.65)
+    ? 'màu mỡ'
+    : (moisture < 0.3 && temperature > 0.55)
+      ? 'cằn cỗi'
+      : 'thường'
   const resources = clamp(
     (0.2 + ridge * 0.82 + moisture * 0.16 + hash2d(seed ^ 0x2c1b3c6d, x, z) * 0.26) * config.resources,
     0,
@@ -114,11 +139,11 @@ function normalizeElevation(tiles: Tile[], config: WorldConfig, seed: number): T
     const normalized = (tile.height - minimum) / range
     const height = clamp(-0.55 + normalized * 1.85, -0.55, 1.3)
     const forest =
-      height > waterLevel + 0.1 &&
-      height < 0.72 &&
-      tile.moisture > 0.49 &&
-      tile.temperature > 0.22 &&
-      hash2d(seed ^ 0x4cf5ad43, tile.x, tile.z) > 0.43
+      height > waterLevel + 0.08 &&
+      height < 0.82 &&
+      tile.moisture > 0.42 &&
+      tile.temperature > 0.24 &&
+      hash2d(seed ^ 0x4cf5ad43, tile.x, tile.z) > 0.28
     const elevatedTile = { ...tile, height, forest }
 
     // Generation must establish the same ecology invariant used by terrain
@@ -127,10 +152,10 @@ function normalizeElevation(tiles: Tile[], config: WorldConfig, seed: number): T
   })
 }
 
-function chooseVillageSite(tiles: Tile[], config: WorldConfig, seed: number): VillageSite {
+export function chooseVillageSite(tiles: Tile[], config: WorldConfig, seed: number): VillageSite {
   const center = (config.size - 1) / 2
   const candidates = tiles
-    .filter((tile) => tile.biome === 'đồng cỏ' || tile.biome === 'rừng')
+    .filter((tile) => tile.biome === 'đồng cỏ' || tile.biome === 'rừng' || tile.biome === 'rừng nhiệt đới' || tile.biome === 'hoa anh đào')
     .map((tile) => {
       const distancePenalty = Math.hypot(tile.x - center, tile.z - center) * 0.03
       const score = tile.moisture * 0.7 + tile.resources * 0.45 - distancePenalty + hash2d(seed, tile.x, tile.z) * 0.08
@@ -164,7 +189,11 @@ export function normalizeWorldConfig(config: WorldConfig): WorldConfig {
   }
 }
 
-export function generateWorld(input: WorldConfig): World {
+export interface WorldGenerationOptions {
+  pristine?: boolean
+}
+
+export function generateWorld(input: WorldConfig, options?: WorldGenerationOptions): World {
   const config = normalizeWorldConfig(input)
   const seed = seedToUint32(config.seed)
   const rawTiles: Tile[] = []
@@ -175,11 +204,12 @@ export function generateWorld(input: WorldConfig): World {
     }
   }
   const tiles = normalizeElevation(rawTiles, config, seed)
+  const villages = options?.pristine ? [] : [chooseVillageSite(tiles, config, seed)]
 
   return {
     config,
     tiles,
-    villages: [chooseVillageSite(tiles, config, seed)],
+    villages,
     revision: 0,
   }
 }
@@ -190,12 +220,13 @@ export function getTile(world: World, tileIndex: number): Tile | undefined {
 
 export function refreshTileBiome(tile: Tile, config: WorldConfig): Tile {
   const waterLevel = getWaterLevel(config)
-  const supportsForest = tile.height > waterLevel + 0.1
-    && tile.height < 0.72
-    && tile.moisture > 0.42
-    && tile.temperature > 0.18
+  const supportsForest = tile.height > waterLevel + 0.08
+    && tile.height < 0.85
+    && tile.moisture > 0.38
+    && tile.temperature > 0.22
+  const isCoral = tile.height <= waterLevel && tile.height > waterLevel - 0.05 && tile.temperature > 0.62 && tile.resources > 0.52
   const withEcologyRules = tile.height <= waterLevel
-    ? { ...tile, forest: false, resources: 0 }
+    ? (isCoral ? { ...tile, forest: false } : { ...tile, forest: false, resources: 0 })
     : { ...tile, forest: tile.forest && supportsForest }
   return { ...withEcologyRules, biome: classifyBiome(withEcologyRules, config) }
 }

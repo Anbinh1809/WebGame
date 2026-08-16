@@ -1,7 +1,23 @@
 export const WORLD_SIZES = [28, 36, 48, 60] as const
 
 export type Climate = 'ôn hòa' | 'ấm' | 'lạnh'
-export type TerrainKind = 'biển' | 'bờ cát' | 'đồng cỏ' | 'rừng' | 'đồi' | 'núi' | 'tuyết'
+export type TerrainKind =
+  | 'biển'
+  | 'bờ cát'
+  | 'đồng cỏ'
+  | 'sa mạc'
+  | 'rừng'
+  | 'rừng nhiệt đới'
+  | 'đầm lầy'
+  | 'đồi'
+  | 'núi'
+  | 'tuyết'
+  | 'san hô'
+  | 'hoa anh đào'
+  | 'núi lửa'
+  | 'hẻm núi'
+  | 'sông băng'
+
 export type SoilKind = 'thường' | 'màu mỡ' | 'cằn cỗi'
 export type TerrainTool = 'raise' | 'lower' | 'water' | 'forest' | 'fertile' | 'barren'
 export type ToolId = TerrainTool | 'settler' | 'storm'

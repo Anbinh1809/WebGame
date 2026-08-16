@@ -26,7 +26,7 @@ export type SaveDecodeResult =
   | { ok: false; reason: string }
 
 const CLIMATES = ['ôn hòa', 'ấm', 'lạnh'] as const
-const BIOMES = ['biển', 'bờ cát', 'đồng cỏ', 'rừng', 'đồi', 'núi', 'tuyết'] as const
+const BIOMES = ['biển', 'bờ cát', 'đồng cỏ', 'sa mạc', 'rừng', 'rừng nhiệt đới', 'đầm lầy', 'đồi', 'núi', 'tuyết', 'san hô', 'hoa anh đào', 'núi lửa', 'hẻm núi', 'sông băng'] as const
 const SOILS = ['thường', 'màu mỡ', 'cằn cỗi'] as const
 const ERAS = ['Thời Đồ Đá', 'Làng Gỗ', 'Nông Nghiệp', 'Thời Kim Khí', 'Thị Trấn'] as const
 const EVENT_TONES = ['calm', 'good', 'warning', 'danger'] as const
