@@ -204,7 +204,7 @@ function createGrassClumpGeometry(): THREE.BufferGeometry {
     { w: 0.11, h: 0.28, angle: (Math.PI * 4) / 3, tilt: 0.16, x: -0.03, z: -0.02 },
     { w: 0.12, h: 0.31, angle: (Math.PI * 5) / 3, tilt: -0.18, x: 0.02, z: -0.01 },
   ].map(({ w, h, angle, tilt, x, z }) => {
-    const blade = new THREE.PlaneGeometry(w, h)
+    const blade = new THREE.PlaneGeometry(w, h).toNonIndexed()
     blade.translate(0, h / 2, 0)
     blade.rotateX(tilt)
     blade.rotateY(angle)

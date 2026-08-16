@@ -14,7 +14,7 @@ describe('updateService', () => {
     const mockFetch = vi.fn().mockResolvedValue({
       ok: true,
       json: async () => ({
-        version: '0.2.0',
+        version: '0.3.0',
         buildTime: '2026-09-01T00:00:00.000Z',
         channel: 'stable',
         notes: 'Bản cập nhật lớn.',
@@ -23,9 +23,9 @@ describe('updateService', () => {
     vi.stubGlobal('fetch', mockFetch)
 
     const result = await service.checkForUpdates()
-    expect(result?.version).toBe('0.2.0')
-    expect(notifiedVersion).toBe('0.2.0')
-    expect(service.getPendingUpdate()?.version).toBe('0.2.0')
+    expect(result?.version).toBe('0.3.0')
+    expect(notifiedVersion).toBe('0.3.0')
+    expect(service.getPendingUpdate()?.version).toBe('0.3.0')
 
     unsubscribe()
     vi.unstubAllGlobals()

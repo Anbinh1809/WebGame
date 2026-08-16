@@ -1,8 +1,7 @@
 {
-  "version": "0.1.8",
-  "buildTime": "2026-08-16T13:21:00.000Z",
+  "version": "0.2.0",
+  "buildTime": "2026-08-16T16:00:00.000Z",
   "channel": "stable",
   "mandatory": false,
-  "notes": "Bản cập nhật v0.1.8: Tối ưu hóa hiệu năng cấp độ render pipeline - Chuyển sang PCFShadowMap nhanh hơn, giảm maxDPR đáng kể trên màn hình 2K/4K, tắt shadow cast cho ~8 loại object phẳng gần đất, giảm draw calls shadow cho cư dân và động vật. Game mượt hơn 40-60% FPS trên mọi cấu hình máy."
+  "notes": "Bản cập nhật v0.2.0: Nâng cấp toàn diện đồ họa & hiệu năng Aetheria World Shaper — Màn hình loading Tinh vân vũ trụ, FPS Counter đo đạc màu sắc, Bảng soi ô địa hình nổi trực quan, tối ưu GPU Frustum Culling, và hoàn thiện hệ thống mô phỏng làng."
 }
-
