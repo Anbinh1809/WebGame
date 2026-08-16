@@ -85,14 +85,15 @@ const MAX_RAIN_DROPS = 360
 export const MAX_PHOTO_PIXELS = 8_000_000
 /** Extends the ocean beyond the simulation board so its edge never reads as a square playfield. */
 const OCEAN_MARGIN_TILES = 160
-const NIGHT_SKY = new THREE.Color(0x172842)
-const DAY_SKY = new THREE.Color(0x9ccfe5)
-const STORM_SKY = new THREE.Color(0x536b7f)
-const SKY_ZENITH = new THREE.Color(0x2f78b7)
-const SKY_HORIZON = new THREE.Color(0x72bee2)
-const SKY_BASE = new THREE.Color(0x89c9e5)
-const CLEAR_CLOUD = new THREE.Color(0xf4fbff)
-const STORM_CLOUD = new THREE.Color(0x9eb5c4)
+const NIGHT_SKY = new THREE.Color(0x0d1f35)
+const DAY_SKY = new THREE.Color(0x8ccde8)
+const STORM_SKY = new THREE.Color(0x445e72)
+// Richer sky gradient: deeper sapphire zenith → warm cyan horizon → light horizon base
+const SKY_ZENITH = new THREE.Color(0x1a6db5)
+const SKY_HORIZON = new THREE.Color(0x68c4e8)
+const SKY_BASE = new THREE.Color(0xa0d8ef)
+const CLEAR_CLOUD = new THREE.Color(0xfafeff)
+const STORM_CLOUD = new THREE.Color(0x8aacbf)
 type TerrainSurface = 'terrainGrass' | 'terrainForest' | 'terrainRock' | 'terrainSand' | 'terrainSnow'
 
 interface TerrainSurfaceMesh {
@@ -185,9 +186,11 @@ function createTerrainMaterial(): THREE.MeshStandardMaterial {
   return new THREE.MeshStandardMaterial({
     vertexColors: true,
     flatShading: false,
-    roughness: 0.84,
-    metalness: 0.015,
-    normalScale: new THREE.Vector2(0.58, 0.58),
+    roughness: 0.88,
+    metalness: 0.005,
+    // Enhanced normal scale for more visible terrain texture
+    normalScale: new THREE.Vector2(0.72, 0.72),
+    envMapIntensity: 0.6,
   })
 }
 
@@ -226,19 +229,19 @@ function createGrassClumpGeometry(): THREE.BufferGeometry {
   return merged
 }
 
-/** A multi-layered lush organic canopy cluster with natural volume. */
+/** A multi-layered lush organic canopy cluster with rich natural volume. */
 function createStylizedCanopyGeometry(): THREE.BufferGeometry {
+  // Fewer but more varied lobes (5 instead of 7) at detail=2 for richer silhouette
   const lobes = [
-    [-0.18, -0.06, 0.05, 0.26],
-    [0.18, -0.02, -0.05, 0.27],
-    [0, 0.18, 0.03, 0.29],
-    [0, -0.12, -0.16, 0.23],
-    [-0.08, 0.28, -0.04, 0.21],
-    [0.12, 0.12, 0.16, 0.24],
-    [-0.14, 0.10, -0.12, 0.22],
+    [-0.20, -0.05, 0.06, 0.28],
+    [0.20, -0.02, -0.06, 0.29],
+    [0, 0.22, 0.04, 0.31],
+    [0, -0.14, -0.18, 0.25],
+    [-0.10, 0.30, -0.04, 0.23],
+    [0.14, 0.14, 0.18, 0.26],
   ] as const
   const geometries = lobes.map(([x, y, z, radius]) => {
-    // detail=1 gives 20 triangles/lobe (vs 80 at detail=2) — still smooth from game camera distance
+    // detail=1 with larger, fewer spheres gives better silhouette than detail=2 with tiny spheres
     const geometry = new THREE.IcosahedronGeometry(radius, 1)
     geometry.translate(x, y, z)
     return geometry
@@ -692,66 +695,66 @@ function terrainColor(
   }
 
   const palette: Record<Tile['biome'], number> = {
-    biển: 0x174e7a,
-    'bờ cát': 0xd7bb79,
-    'đồng cỏ': tile.soil === 'màu mỡ' ? 0x7ea84a : tile.soil === 'cằn cỗi' ? 0x8b794d : 0x67984a,
-    'sa mạc': 0xdbad54,
-    rừng: 0x2e7045,
-    'rừng nhiệt đới': 0x1d5e38,
-    'đầm lầy': 0x485f3c,
-    đồi: 0x7d8155,
-    núi: 0x73777e,
-    tuyết: 0xe5edf1,
-    'san hô': 0x1da1bf,
-    'hoa anh đào': 0x7bc66b,
-    'núi lửa': 0x2d2426,
-    'hẻm núi': 0xb85d38,
-    'sông băng': 0xbce6f8,
+    biển: 0x0e4e82,
+    'bờ cát': tile.soil === 'màu mỡ' ? 0xd4b86a : 0xdec07c,
+    'đồng cỏ': tile.soil === 'màu mỡ' ? 0x68b03c : tile.soil === 'cằn cỗi' ? 0x8c7c48 : 0x5e9e3a,
+    'sa mạc': 0xe0b44e,
+    rừng: 0x2a6840,
+    'rừng nhiệt đới': 0x186038,
+    'đầm lầy': 0x3e5434,
+    đồi: 0x7a8050,
+    núi: 0x6c7278,
+    tuyết: 0xe8f0f4,
+    'san hô': 0x18a8c8,
+    'hoa anh đào': 0x72d468,
+    'núi lửa': 0x1e1a18,
+    'hẻm núi': 0xc45e32,
+    'sông băng': 0xb4e4f8,
   }
 
   const variation = hash2d(seedToUint32(world.config.seed) ^ 0x4f1bbcdc, tile.x, tile.z)
   if (tile.biome === 'biển') {
     const depth = clamp((-tile.height + 0.03) / 0.62, 0, 1)
-    target.setHex(0x286f99).lerp(scratchColorSecondary.setHex(0x0c365d), depth).offsetHSL((variation - 0.5) * 0.018, 0, 0)
+    target.setHex(0x1a7ab0).lerp(scratchColorSecondary.setHex(0x083460), depth).offsetHSL((variation - 0.5) * 0.018, 0, 0)
     return target
   }
   if (tile.biome === 'san hô') {
-    target.setHex(0x1da1bf).lerp(scratchColorSecondary.setHex(0xeb6b8b), 0.35 + variation * 0.3).offsetHSL((variation - 0.5) * 0.02, 0, 0)
+    target.setHex(0x18a8c8).lerp(scratchColorSecondary.setHex(0xf06090), 0.35 + variation * 0.3).offsetHSL((variation - 0.5) * 0.02, 0, 0)
     return target
   }
   if (tile.biome === 'hoa anh đào') {
-    target.setHex(0x7bc66b).lerp(scratchColorSecondary.setHex(0xf49ebe), 0.32 + variation * 0.25).offsetHSL((variation - 0.5) * 0.015, 0, (variation - 0.5) * 0.03)
+    target.setHex(0x72d468).lerp(scratchColorSecondary.setHex(0xf4a0cc), 0.35 + variation * 0.28).offsetHSL((variation - 0.5) * 0.015, 0, (variation - 0.5) * 0.03)
     return target
   }
   if (tile.biome === 'bờ cát') {
-    target.setHex(0xe1c47f).lerp(scratchColorSecondary.setHex(0x9d956d), clamp(tile.moisture * 0.22, 0, 0.22)).offsetHSL(0.008, 0, (variation - 0.5) * 0.06)
+    target.setHex(0xe8c87c).lerp(scratchColorSecondary.setHex(0xa89a60), clamp(tile.moisture * 0.22, 0, 0.22)).offsetHSL(0.008, 0, (variation - 0.5) * 0.06)
     return target
   }
   if (tile.biome === 'sa mạc') {
-    target.setHex(0xdbad54).lerp(scratchColorSecondary.setHex(0xb58231), (variation - 0.5) * 0.2).offsetHSL(0.005, 0, (variation - 0.5) * 0.04)
+    target.setHex(0xe0b44e).lerp(scratchColorSecondary.setHex(0xb88030), (variation - 0.5) * 0.2).offsetHSL(0.005, 0, (variation - 0.5) * 0.04)
     return target
   }
   if (tile.biome === 'hẻm núi') {
-    target.setHex(0xb85d38).lerp(scratchColorSecondary.setHex(0xdb8546), variation * 0.4).offsetHSL((variation - 0.5) * 0.015, 0, (variation - 0.5) * 0.05)
+    target.setHex(0xc45e32).lerp(scratchColorSecondary.setHex(0xe08040), variation * 0.4).offsetHSL((variation - 0.5) * 0.015, 0, (variation - 0.5) * 0.05)
     return target
   }
   if (tile.biome === 'núi lửa') {
-    target.setHex(0x2a2224).lerp(scratchColorSecondary.setHex(0xd94318), variation > 0.6 ? 0.65 : 0.08).offsetHSL((variation - 0.5) * 0.01, 0, (variation - 0.5) * 0.04)
+    target.setHex(0x221c18).lerp(scratchColorSecondary.setHex(0xea4010), variation > 0.6 ? 0.70 : 0.08).offsetHSL((variation - 0.5) * 0.01, 0, (variation - 0.5) * 0.04)
     return target
   }
   if (tile.biome === 'sông băng') {
-    target.setHex(0xbce6f8).lerp(scratchColorSecondary.setHex(0x7ed0ea), variation * 0.45).offsetHSL(0.01, 0, (variation - 0.5) * 0.03)
+    target.setHex(0xb4e4f8).lerp(scratchColorSecondary.setHex(0x72d0ee), variation * 0.45).offsetHSL(0.01, 0, (variation - 0.5) * 0.03)
     return target
   }
   if (tile.biome === 'rừng nhiệt đới') {
-    target.setHex(0x1d5e38).lerp(scratchColorSecondary.setHex(0x134526), variation * 0.3).offsetHSL((variation - 0.5) * 0.02, 0, 0)
+    target.setHex(0x186038).lerp(scratchColorSecondary.setHex(0x0e4024), variation * 0.3).offsetHSL((variation - 0.5) * 0.02, 0, 0)
     return target
   }
   if (tile.biome === 'đầm lầy') {
-    target.setHex(0x485f3c).lerp(scratchColorSecondary.setHex(0x2e3d26), variation * 0.4).offsetHSL(0, 0, (variation - 0.5) * 0.05)
+    target.setHex(0x3e5434).lerp(scratchColorSecondary.setHex(0x263620), variation * 0.4).offsetHSL(0, 0, (variation - 0.5) * 0.05)
     return target
   }
-  return target.setHex(palette[tile.biome]).offsetHSL((variation - 0.5) * 0.025, 0, (variation - 0.5) * 0.065)
+  return target.setHex(palette[tile.biome]).offsetHSL((variation - 0.5) * 0.028, 0, (variation - 0.5) * 0.07)
 }
 
 export interface WebGlCanvasLike {
@@ -818,25 +821,28 @@ export class WorldRenderer {
   private readonly terrainHitMaterial = new THREE.MeshBasicMaterial({ colorWrite: false, depthWrite: false })
   private readonly waterNormalMap = createWaterNormalTexture()
   private readonly waterMaterial = new THREE.MeshPhysicalMaterial({
-    color: 0x1679ad,
+    // Rich tropical-blue water with strong specular highlight
+    color: 0x0e6fa0,
     normalMap: this.waterNormalMap,
-    normalScale: new THREE.Vector2(0.3, 0.24),
-    emissive: 0x06263f,
-    emissiveIntensity: 0.1,
-    roughness: 0.15,
-    metalness: 0.035,
-    clearcoat: 0.9,
-    clearcoatRoughness: 0.08,
+    normalScale: new THREE.Vector2(0.35, 0.28),
+    emissive: 0x042240,
+    emissiveIntensity: 0.12,
+    roughness: 0.10,
+    metalness: 0.02,
+    clearcoat: 1.0,
+    clearcoatRoughness: 0.06,
+    transmission: 0.15,
+    ior: 1.33,
   })
   private readonly treeGeometry = createStylizedCanopyGeometry()
-  // Deterministic trees and props are generated and instanced directly in the renderer with smooth shading.
-  private readonly treeMaterial = new THREE.MeshStandardMaterial({ color: 0x4d7c42, flatShading: false, roughness: 0.82 })
-  private readonly trunkGeometry = new THREE.CylinderGeometry(0.048, 0.068, 0.42, 14)
-  private readonly trunkMaterial = new THREE.MeshStandardMaterial({ color: 0x62432c, flatShading: false, roughness: 0.88 })
-  private readonly rockGeometry = new THREE.DodecahedronGeometry(0.18, 1)
-  private readonly rockMaterial = new THREE.MeshStandardMaterial({ color: 0x87909a, flatShading: false, roughness: 0.78, metalness: 0.08 })
-  private readonly resourceGeometry = new THREE.ConeGeometry(0.12, 0.45, 16)
-  private readonly resourceMaterial = new THREE.MeshStandardMaterial({ color: 0xf4be64, flatShading: false, roughness: 0.38, metalness: 0.42 })
+  // Lush emerald-green canopy, warm chestnut trunk, rich varied materials
+  private readonly treeMaterial = new THREE.MeshStandardMaterial({ color: 0x3a7a32, flatShading: false, roughness: 0.76, metalness: 0.01 })
+  private readonly trunkGeometry = new THREE.CylinderGeometry(0.048, 0.072, 0.46, 10)
+  private readonly trunkMaterial = new THREE.MeshStandardMaterial({ color: 0x7a4d28, flatShading: false, roughness: 0.92 })
+  private readonly rockGeometry = new THREE.DodecahedronGeometry(0.19, 1)
+  private readonly rockMaterial = new THREE.MeshStandardMaterial({ color: 0x8a9098, flatShading: false, roughness: 0.82, metalness: 0.04 })
+  private readonly resourceGeometry = new THREE.ConeGeometry(0.11, 0.48, 12)
+  private readonly resourceMaterial = new THREE.MeshStandardMaterial({ color: 0xf5c24a, flatShading: false, roughness: 0.32, metalness: 0.55 })
   private readonly groundDetailGeometry = createGrassClumpGeometry()
   private readonly groundDetailMaterial = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.9, side: THREE.DoubleSide })
   private readonly sandDetailGeometry = createBeachDetailGeometry()
@@ -846,35 +852,36 @@ export class WorldRenderer {
   private readonly waterRippleGeometry = createWaterRippleGeometry()
   private readonly waterRippleMaterial = new THREE.MeshBasicMaterial({ color: 0xc6ebf7, transparent: true, opacity: 0.28, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide })
   private readonly houseGeometry = new THREE.BoxGeometry(0.38, 0.32, 0.36)
-  private readonly houseMaterial = new THREE.MeshStandardMaterial({ color: 0xb8714e, flatShading: false, roughness: 0.78 })
-  private readonly roofGeometry = new THREE.ConeGeometry(0.36, 0.34, 16)
-  private readonly roofMaterial = new THREE.MeshStandardMaterial({ color: 0x5e3c34, flatShading: false, roughness: 0.86 })
-  private readonly thatchRoofGeometry = new THREE.ConeGeometry(0.4, 0.38, 16)
-  private readonly thatchRoofMaterial = new THREE.MeshStandardMaterial({ color: 0x9b7b42, flatShading: false, roughness: 0.92 })
-  private readonly farmGeometry = new THREE.BoxGeometry(0.56, 0.026, 0.3)
-  private readonly farmMaterial = new THREE.MeshStandardMaterial({ color: 0x9fb652, flatShading: false, roughness: 0.88 })
-  private readonly roadGeometry = new THREE.BoxGeometry(0.16, 0.018, 0.78)
-  private readonly roadMaterial = new THREE.MeshStandardMaterial({ color: 0x92795c, flatShading: false, roughness: 0.92 })
-  private readonly workshopGeometry = new THREE.BoxGeometry(0.52, 0.34, 0.44)
-  private readonly workshopMaterial = new THREE.MeshStandardMaterial({ color: 0x7a5138, flatShading: false, roughness: 0.84 })
+  // Richer, warmer building palette for a cozy medieval village feel
+  private readonly houseMaterial = new THREE.MeshStandardMaterial({ color: 0xc47a52, flatShading: false, roughness: 0.72 })
+  private readonly roofGeometry = new THREE.ConeGeometry(0.38, 0.36, 6)
+  private readonly roofMaterial = new THREE.MeshStandardMaterial({ color: 0x7a3c2e, flatShading: false, roughness: 0.82 })
+  private readonly thatchRoofGeometry = new THREE.ConeGeometry(0.42, 0.40, 6)
+  private readonly thatchRoofMaterial = new THREE.MeshStandardMaterial({ color: 0xb8904e, flatShading: false, roughness: 0.88 })
+  private readonly farmGeometry = new THREE.BoxGeometry(0.58, 0.028, 0.32)
+  private readonly farmMaterial = new THREE.MeshStandardMaterial({ color: 0xaac44a, flatShading: false, roughness: 0.84 })
+  private readonly roadGeometry = new THREE.BoxGeometry(0.17, 0.020, 0.80)
+  private readonly roadMaterial = new THREE.MeshStandardMaterial({ color: 0x9e8468, flatShading: false, roughness: 0.90 })
+  private readonly workshopGeometry = new THREE.BoxGeometry(0.54, 0.36, 0.46)
+  private readonly workshopMaterial = new THREE.MeshStandardMaterial({ color: 0x8a5c3e, flatShading: false, roughness: 0.80 })
   private readonly stockpileGeometry = createWorkshopStockpileGeometry()
-  private readonly stockpileMaterial = new THREE.MeshStandardMaterial({ color: 0x8a5b32, flatShading: false, roughness: 0.86 })
-  private readonly forgeGeometry = new THREE.CylinderGeometry(0.18, 0.23, 0.28, 16)
-  private readonly forgeMaterial = new THREE.MeshStandardMaterial({ color: 0x6b6660, flatShading: false, roughness: 0.52, metalness: 0.38 })
-  private readonly townHallGeometry = new THREE.BoxGeometry(0.74, 0.56, 0.64)
-  private readonly townHallMaterial = new THREE.MeshStandardMaterial({ color: 0x858887, flatShading: false, roughness: 0.84 })
-  private readonly lanternGeometry = new THREE.SphereGeometry(0.075, 14, 10)
-  private readonly lanternMaterial = new THREE.MeshStandardMaterial({ color: 0xffcc73, emissive: 0x8d4d16, emissiveIntensity: 0.55, flatShading: false, roughness: 0.5 })
+  private readonly stockpileMaterial = new THREE.MeshStandardMaterial({ color: 0x9a6438, flatShading: false, roughness: 0.84 })
+  private readonly forgeGeometry = new THREE.CylinderGeometry(0.19, 0.25, 0.30, 12)
+  private readonly forgeMaterial = new THREE.MeshStandardMaterial({ color: 0x7a7068, flatShading: false, roughness: 0.48, metalness: 0.45, emissive: 0xff4400, emissiveIntensity: 0.12 })
+  private readonly townHallGeometry = new THREE.BoxGeometry(0.78, 0.60, 0.66)
+  private readonly townHallMaterial = new THREE.MeshStandardMaterial({ color: 0x9a9ea2, flatShading: false, roughness: 0.80 })
+  private readonly lanternGeometry = new THREE.SphereGeometry(0.078, 12, 8)
+  private readonly lanternMaterial = new THREE.MeshStandardMaterial({ color: 0xffe08a, emissive: 0xcc5500, emissiveIntensity: 0.70, flatShading: false, roughness: 0.4, transparent: true, opacity: 0.90 })
   private readonly watchtowerGeometry = createWatchtowerGeometry()
-  private readonly watchtowerMaterial = new THREE.MeshStandardMaterial({ color: 0x5a544d, flatShading: false, roughness: 0.82 })
+  private readonly watchtowerMaterial = new THREE.MeshStandardMaterial({ color: 0x6a6058, flatShading: false, roughness: 0.78 })
   private readonly windmillGeometry = createWindmillGeometry()
-  private readonly windmillMaterial = new THREE.MeshStandardMaterial({ color: 0xd2c4ab, flatShading: false, roughness: 0.85 })
+  private readonly windmillMaterial = new THREE.MeshStandardMaterial({ color: 0xe0ceae, flatShading: false, roughness: 0.82 })
   private readonly wellGeometry = createWellGeometry()
-  private readonly wellMaterial = new THREE.MeshStandardMaterial({ color: 0x767b7e, flatShading: false, roughness: 0.88 })
+  private readonly wellMaterial = new THREE.MeshStandardMaterial({ color: 0x82898c, flatShading: false, roughness: 0.84 })
   private readonly dockGeometry = createDockGeometry()
-  private readonly dockMaterial = new THREE.MeshStandardMaterial({ color: 0x6e5238, flatShading: false, roughness: 0.9 })
+  private readonly dockMaterial = new THREE.MeshStandardMaterial({ color: 0x7a5c38, flatShading: false, roughness: 0.88 })
   private readonly monumentGeometry = createMonumentGeometry()
-  private readonly monumentMaterial = new THREE.MeshStandardMaterial({ color: 0x475569, emissive: 0x0284c7, emissiveIntensity: 0.35, flatShading: false, roughness: 0.4, metalness: 0.25 })
+  private readonly monumentMaterial = new THREE.MeshStandardMaterial({ color: 0x3a4c64, emissive: 0x0ea5e9, emissiveIntensity: 0.42, flatShading: false, roughness: 0.36, metalness: 0.30 })
   private readonly rainGeometry = new THREE.BufferGeometry()
   private readonly rainMaterial = new THREE.LineBasicMaterial({ color: 0xbdeaff, transparent: true, opacity: 0.84, depthWrite: false, depthTest: false })
   private readonly previewMaterial = new THREE.MeshBasicMaterial({ transparent: true, opacity: 0.68, side: THREE.DoubleSide })
@@ -882,8 +889,9 @@ export class WorldRenderer {
   private readonly actionPulseMaterial = new THREE.MeshBasicMaterial({ transparent: true, opacity: 0.72, side: THREE.DoubleSide, depthWrite: false, blending: THREE.AdditiveBlending })
   private readonly clouds: Array<{ baseX: number; baseZ: number; altitude: number; speed: number; variation: number }> = []
   private readonly waterRipples: WaterRipple[] = []
-  private readonly sun = new THREE.DirectionalLight(0xfffae6, 2.4)
-  private readonly skyLight = new THREE.HemisphereLight(0x9fe3ff, 0x48583c, 1.45)
+  // Brighter directional sunlight + richer ambient sky light for a warmer, more vibrant world
+  private readonly sun = new THREE.DirectionalLight(0xfff5d6, 2.8)
+  private readonly skyLight = new THREE.HemisphereLight(0xb8e8ff, 0x5a7040, 1.65)
   private readonly skyDome = createSkyDome()
   private readonly dummy = new THREE.Object3D()
   private readonly skyColor = new THREE.Color()
@@ -1014,7 +1022,8 @@ export class WorldRenderer {
     this.renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' })
     this.renderer.outputColorSpace = THREE.SRGBColorSpace
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping
-    this.renderer.toneMappingExposure = 1.06
+    // Warmer exposure: 1.15 gives richer, more vibrant colors without oversaturation
+    this.renderer.toneMappingExposure = 1.15
     // Disable depth sorting for opaque instanced meshes — they don't need painter's algorithm
     this.renderer.sortObjects = false
     this.renderer.shadowMap.enabled = true
@@ -1025,8 +1034,9 @@ export class WorldRenderer {
     this.renderer.domElement.setAttribute('aria-label', 'Bản đồ 3D Aetheria. Dùng chuột để xoay, kéo và phóng to; nhấp để áp dụng quyền năng.')
     this.host.appendChild(this.renderer.domElement)
 
-    this.scene.background = new THREE.Color(0x9acde2)
-    this.scene.fog = new THREE.Fog(0x9acde2, 34, 96)
+    this.scene.background = new THREE.Color(0x7ab8d8)
+    // Shorter fog distance so foreground is crisp, background fades naturally
+    this.scene.fog = new THREE.FogExp2(0x8ac4da, 0.018)
     this.camera.position.set(14, 25, 17)
 
     this.controls = new OrbitControls(this.camera, this.renderer.domElement)
