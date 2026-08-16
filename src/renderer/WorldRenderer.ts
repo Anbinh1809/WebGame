@@ -1012,7 +1012,7 @@ export class WorldRenderer {
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping
     this.renderer.toneMappingExposure = 1.06
     this.renderer.shadowMap.enabled = true
-    this.renderer.shadowMap.type = THREE.PCFSoftShadowMap
+    this.renderer.shadowMap.type = THREE.PCFShadowMap
     this.waterNormalMap.anisotropy = Math.min(4, this.renderer.capabilities.getMaxAnisotropy())
     this.renderer.domElement.className = 'world-canvas'
     this.renderer.domElement.tabIndex = 0
@@ -1674,18 +1674,24 @@ export class WorldRenderer {
     this.docks = new THREE.InstancedMesh(this.dockGeometry, this.dockMaterial, MAX_DOCKS)
     this.monuments = new THREE.InstancedMesh(this.monumentGeometry, this.monumentMaterial, MAX_MONUMENTS)
 
-    for (const object of [this.trees, this.trunks, this.rocks, this.resources, this.groundDetails, this.sandDetails, this.houses, this.roofs, this.thatchRoofs, this.farms, this.roads, this.workshops, this.stockpiles, this.forges, this.townHalls, this.lanterns, this.watchtowers, this.windmills, this.wells, this.docks, this.monuments]) {
-      object.castShadow = true
+    // Objects that cast meaningful shadows (tall, above ground)
+    const shadowCasters = [this.trees, this.rocks, this.resources, this.houses, this.roofs, this.thatchRoofs, this.workshops, this.forges, this.townHalls, this.watchtowers, this.windmills, this.wells, this.monuments]
+    // Flat or small objects near ground - no shadow casting to reduce shadow pass draw calls
+    const shadowReceivers = [this.trunks, this.groundDetails, this.sandDetails, this.farms, this.roads, this.stockpiles, this.lanterns, this.docks]
+    for (const object of [...shadowCasters, ...shadowReceivers]) {
+      object.castShadow = false
       object.receiveShadow = true
       object.frustumCulled = true
       this.scene.add(object)
+    }
+    for (const object of shadowCasters) {
+      object.castShadow = true
     }
     this.settlerLayer.attach(this.scene)
     this.animatedSettlerLayer.attach(this.scene)
     this.settlementModelLayer.attach(this.scene)
     this.shipLayer.attach(this.scene)
     this.shipLayer.setWorld(world)
-    this.sandDetails.castShadow = false
     this.faunaLayer.attach(this.scene)
     this.animatedFaunaLayer.attach(this.scene)
     this.scene.add(this.avatarController.getRootGroup())
@@ -3018,7 +3024,7 @@ export class WorldRenderer {
     const effectSettings = qualitySettings(this.graphicsQuality('effects'))
     const waterSettings = qualitySettings(this.graphicsQuality('water'))
     this.renderer.shadowMap.enabled = shadowSettings.shadows
-    this.renderer.shadowMap.type = THREE.PCFSoftShadowMap
+    this.renderer.shadowMap.type = THREE.PCFShadowMap
     this.renderer.shadowMap.autoUpdate = false
     this.sun.castShadow = shadowSettings.shadows
     this.sun.shadow.radius = 2.5

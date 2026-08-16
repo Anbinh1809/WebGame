@@ -53,9 +53,10 @@ function createInstancedMesh<G extends THREE.BufferGeometry>(
   geometry: G,
   material: THREE.MeshStandardMaterial,
   capacity: number,
+  castShadow = true,
 ): THREE.InstancedMesh<G, THREE.MeshStandardMaterial> {
   const mesh = new THREE.InstancedMesh(geometry, material, capacity)
-  mesh.castShadow = true
+  mesh.castShadow = castShadow
   mesh.receiveShadow = true
   mesh.frustumCulled = true
   mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage)
@@ -109,12 +110,12 @@ export class SettlerLayer {
     this.group.name = 'aetheria-instanced-settlers'
     this.group.visible = false
     this.torsoGeometry.translate(0, 0.11, 0)
-    this.bodies = createInstancedMesh(this.torsoGeometry, this.bodyMaterial, capacity)
-    this.heads = createInstancedMesh(this.headGeometry, this.skinMaterial, capacity)
-    this.legs = createInstancedMesh(this.limbGeometry, this.bodyMaterial, capacity * 4)
-    this.arms = createInstancedMesh(this.limbGeometry, this.bodyMaterial, capacity * 2)
-    this.toolHandles = createInstancedMesh(this.toolHandleGeometry, this.bodyMaterial, capacity)
-    this.toolHeads = createInstancedMesh(this.toolHeadGeometry, this.toolMaterial, capacity)
+    this.bodies = createInstancedMesh(this.torsoGeometry, this.bodyMaterial, capacity, true)
+    this.heads = createInstancedMesh(this.headGeometry, this.skinMaterial, capacity, true)
+    this.legs = createInstancedMesh(this.limbGeometry, this.bodyMaterial, capacity * 4, false)
+    this.arms = createInstancedMesh(this.limbGeometry, this.bodyMaterial, capacity * 2, false)
+    this.toolHandles = createInstancedMesh(this.toolHandleGeometry, this.bodyMaterial, capacity, false)
+    this.toolHeads = createInstancedMesh(this.toolHeadGeometry, this.toolMaterial, capacity, false)
     this.bodies.name = 'aetheria-settler-bodies'
     this.legs.name = 'aetheria-settler-ik-legs'
     this.group.add(this.bodies, this.heads, this.legs, this.arms, this.toolHandles, this.toolHeads)

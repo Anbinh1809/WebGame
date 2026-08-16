@@ -446,7 +446,7 @@ export class FaunaLayer {
         ? createInstancedMesh(rig.headGeometry, material, SPECIES_CAPACITY[species], true)
         : undefined
       const legs = rig
-        ? createInstancedMesh(rig.legGeometry, material, SPECIES_CAPACITY[species] * 8, true)
+        ? createInstancedMesh(rig.legGeometry, material, SPECIES_CAPACITY[species] * 8, false)
         : undefined
       if (head) head.name = `aetheria-${species}-head`
       if (legs) legs.name = `aetheria-${species}-ik-legs`
