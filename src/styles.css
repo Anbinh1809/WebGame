@@ -789,7 +789,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, a:focus-visible
 /* Floating Drawer Toggles */
 .drawer-toggle {
   position: absolute;
-  top: calc(var(--safe-top) + 60px);
+  top: calc(var(--safe-top) + 68px);
   min-height: 34px;
   padding: 6px 12px;
   border: 1px solid var(--line-gold);
@@ -4947,7 +4947,7 @@ select option:checked,
 
 .aetheria-minimap-container {
   position: absolute;
-  top: calc(var(--safe-top) + 104px);
+  top: calc(var(--safe-top) + 114px);
   right: var(--safe-right);
   z-index: 20;
   display: flex;
