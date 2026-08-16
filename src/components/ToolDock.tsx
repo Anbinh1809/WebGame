@@ -19,14 +19,14 @@ interface ToolDockProps {
 }
 
 const TOOL_OPTIONS: Array<{ id: ToolId; key: string; symbol: string; label: string; hint: string }> = [
-  { id: 'raise', key: '1', symbol: '↟', label: 'Nâng đất', hint: 'Đẩy cao một ô địa hình' },
-  { id: 'lower', key: '2', symbol: '↡', label: 'Hạ đất', hint: 'Hạ thấp một ô địa hình' },
-  { id: 'water', key: '3', symbol: '≈', label: 'Gọi nước', hint: 'Mở một vũng nước mới' },
-  { id: 'forest', key: '4', symbol: '♣', label: 'Gieo rừng', hint: 'Gieo cây ở vùng đất phù hợp' },
-  { id: 'fertile', key: '5', symbol: '✦', label: 'Làm màu mỡ', hint: 'Tăng ẩm và tài nguyên' },
-  { id: 'barren', key: '6', symbol: '◌', label: 'Làm cằn cỗi', hint: 'Rút dinh dưỡng khỏi đất' },
-  { id: 'settler', key: '7', symbol: '●', label: 'Thả cư dân', hint: 'Mời người lữ hành vào làng' },
-  { id: 'storm', key: '8', symbol: 'ϟ', label: 'Mưa lớn', hint: 'Gọi một đợt thiên tai' },
+  { id: 'raise', key: '1', symbol: '⛰️', label: 'Nâng đất', hint: 'Đẩy cao một ô địa hình' },
+  { id: 'lower', key: '2', symbol: '🕳️', label: 'Hạ đất', hint: 'Hạ thấp một ô địa hình' },
+  { id: 'water', key: '3', symbol: '🌊', label: 'Gọi nước', hint: 'Mở một vũng nước mới' },
+  { id: 'forest', key: '4', symbol: '🌲', label: 'Gieo rừng', hint: 'Gieo cây ở vùng đất phù hợp' },
+  { id: 'fertile', key: '5', symbol: '🌾', label: 'Làm màu mỡ', hint: 'Tăng ẩm và tài nguyên' },
+  { id: 'barren', key: '6', symbol: '🏜️', label: 'Làm cằn cỗi', hint: 'Rút dinh dưỡng khỏi đất' },
+  { id: 'settler', key: '7', symbol: '👥', label: 'Thả cư dân', hint: 'Mời người lữ hành vào làng' },
+  { id: 'storm', key: '8', symbol: '⛈️', label: 'Mưa lớn', hint: 'Gọi một đợt thiên tai' },
 ]
 
 export function ToolDock({
