@@ -753,8 +753,8 @@ button:focus-visible, input:focus-visible, select:focus-visible, a:focus-visible
 }
 
 .performance-badge, .quality-select, .asset-pack-badge, .player-profile-chip {
-  min-height: 32px;
-  padding: 4px 8px;
+  min-height: 30px;
+  padding: 3px 8px;
   border: 1px solid var(--line);
   border-radius: 6px;
   color: var(--ink);
@@ -778,6 +778,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, a:focus-visible
   background: transparent;
   font-size: inherit;
   font-weight: 600;
+  cursor: pointer;
 }
 
 .player-profile-chip {
@@ -788,9 +789,9 @@ button:focus-visible, input:focus-visible, select:focus-visible, a:focus-visible
 /* Floating Drawer Toggles */
 .drawer-toggle {
   position: absolute;
-  top: calc(var(--safe-top) + 54px);
-  min-height: 36px;
-  padding: 7px 12px;
+  top: calc(var(--safe-top) + 60px);
+  min-height: 34px;
+  padding: 6px 12px;
   border: 1px solid var(--line-gold);
   border-radius: 8px;
   color: var(--ink);
@@ -800,6 +801,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, a:focus-visible
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
   backdrop-filter: blur(12px);
   transition: all 160ms ease;
+  z-index: 15;
 }
 
 .drawer-toggle:hover {
@@ -4945,17 +4947,18 @@ select option:checked,
 
 .aetheria-minimap-container {
   position: absolute;
-  top: 76px;
-  right: 20px;
-  z-index: 30;
+  top: calc(var(--safe-top) + 104px);
+  right: var(--safe-right);
+  z-index: 20;
   display: flex;
   flex-direction: column;
-  background: rgba(13, 20, 36, 0.82);
-  backdrop-filter: blur(14px);
-  -webkit-backdrop-filter: blur(14px);
-  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(8, 20, 28, 0.90);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-top-color: rgba(244, 202, 114, 0.35);
   border-radius: 14px;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.08);
   overflow: hidden;
   transition: width 0.25s cubic-bezier(0.16, 1, 0.3, 1), height 0.25s cubic-bezier(0.16, 1, 0.3, 1), transform 0.2s ease;
   user-select: none;
