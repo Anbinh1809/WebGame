@@ -1805,11 +1805,16 @@ export class WorldRenderer {
       geometry.setAttribute('normal', new THREE.BufferAttribute(new Float32Array(builder.normals), 3))
       geometry.setAttribute('color', new THREE.BufferAttribute(new Float32Array(builder.colors), 3))
       geometry.setAttribute('uv', new THREE.BufferAttribute(new Float32Array(builder.uvs), 2))
+      geometry.computeBoundingSphere()
+      geometry.computeBoundingBox()
       const mesh = new THREE.Mesh(geometry, this.terrainMaterials[surface])
       mesh.receiveShadow = true
+      mesh.frustumCulled = true
       this.terrainGroup.add(mesh)
       this.terrainSurfaces[surface] = { mesh, tileIndices: new Int32Array(builder.tileIndices) }
     }
+    hitGeometry.computeBoundingSphere()
+    hitGeometry.computeBoundingBox()
   }
 
   private disposeWorldObjects(): void {
@@ -2338,11 +2343,17 @@ export class WorldRenderer {
     if (this.groundDetails.instanceColor) this.groundDetails.instanceColor.needsUpdate = true
     if (this.sandDetails.instanceColor) this.sandDetails.instanceColor.needsUpdate = true
     this.trees.computeBoundingSphere()
+    this.trees.computeBoundingBox?.()
     this.trunks.computeBoundingSphere()
+    this.trunks.computeBoundingBox?.()
     this.rocks.computeBoundingSphere()
+    this.rocks.computeBoundingBox?.()
     this.resources.computeBoundingSphere()
+    this.resources.computeBoundingBox?.()
     this.groundDetails.computeBoundingSphere()
+    this.groundDetails.computeBoundingBox?.()
     this.sandDetails.computeBoundingSphere()
+    this.sandDetails.computeBoundingBox?.()
     this.faunaLayer.setWorld(this.world, natureQuality)
     this.animatedFaunaLayer.setWorld(this.world, natureQuality)
   }
@@ -2711,20 +2722,35 @@ export class WorldRenderer {
     this.docks.instanceMatrix.needsUpdate = true
     this.monuments.instanceMatrix.needsUpdate = true
     this.houses.computeBoundingSphere()
+    this.houses.computeBoundingBox?.()
     this.roofs.computeBoundingSphere()
+    this.roofs.computeBoundingBox?.()
     this.thatchRoofs.computeBoundingSphere()
+    this.thatchRoofs.computeBoundingBox?.()
     this.farms.computeBoundingSphere()
+    this.farms.computeBoundingBox?.()
     this.roads.computeBoundingSphere()
+    this.roads.computeBoundingBox?.()
     this.workshops.computeBoundingSphere()
+    this.workshops.computeBoundingBox?.()
     this.stockpiles.computeBoundingSphere()
+    this.stockpiles.computeBoundingBox?.()
     this.forges.computeBoundingSphere()
+    this.forges.computeBoundingBox?.()
     this.townHalls.computeBoundingSphere()
+    this.townHalls.computeBoundingBox?.()
     this.lanterns.computeBoundingSphere()
+    this.lanterns.computeBoundingBox?.()
     this.watchtowers.computeBoundingSphere()
+    this.watchtowers.computeBoundingBox?.()
     this.windmills.computeBoundingSphere()
+    this.windmills.computeBoundingBox?.()
     this.wells.computeBoundingSphere()
+    this.wells.computeBoundingBox?.()
     this.docks.computeBoundingSphere()
+    this.docks.computeBoundingBox?.()
     this.monuments.computeBoundingSphere()
+    this.monuments.computeBoundingBox?.()
     this.settlerLayer.setSettlers(this.world, settlerPlacements)
     this.animatedSettlerLayer.setSettlers(this.world, settlerPlacements, natureQuality)
   }

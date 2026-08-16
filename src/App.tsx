@@ -57,12 +57,133 @@ const WorldViewport = lazy(async () => {
   return { default: module.WorldViewport }
 })
 
-const worldLoadingFallback = (
-  <div className="world-loading" role="status" aria-live="polite">
-    <span className="eyebrow">Đang dựng địa hình 3D</span>
-    <strong>Khởi tạo thế giới Aetheria…</strong>
-  </div>
-)
+const GAME_TIPS = [
+  '🌾 Thả cư dân gần nguồn nước và đất màu mỡ để làng phát triển thần tốc.',
+  '⛈️ Tạo bão lớn định kỳ để tưới ẩm đất cằn cỗi và đánh thức mầm sống mới.',
+  '🌲 Gieo rừng bạt ngàn giúp tăng sinh khối tự nhiên và điều hòa khí hậu lục địa.',
+  '🧬 Thu thập điểm DNA từ hệ sinh thái để mở khóa các nhánh tiến hóa độc bản 0.5%.',
+  '👑 Nhấn phím [V] để giáng trần hóa thân vào người thường, khám phá thế giới 3D.',
+  '⚔️ Rèn công cụ kim loại giúp tăng gấp đôi năng suất làm việc của cư dân.',
+  '🏝️ Khám phá các quần đảo hoang sơ và kiến tạo đế chế độc lập của riêng bạn.',
+]
+
+function AetheriaWorldLoading(): JSX.Element {
+  const [tipIndex, setTipIndex] = useState(0)
+
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      setTipIndex((prev) => (prev + 1) % GAME_TIPS.length)
+    }, 3200)
+    return () => window.clearInterval(timer)
+  }, [])
+
+  return (
+    <div className="world-loading" role="status" aria-live="polite">
+      <div className="loading-celestial-orb">
+        <div className="loading-orbit-ring" />
+        <div className="loading-core-glyph">✦</div>
+      </div>
+      <span className="eyebrow">Đang kiến tạo thế giới 3D</span>
+      <strong className="loading-title">Khởi tạo thế giới Aetheria…</strong>
+      <div className="loading-bar-container">
+        <div className="loading-bar-fill" />
+      </div>
+      <p className="loading-game-tip" key={tipIndex}>
+        <span className="tip-badge">MẸO</span> {GAME_TIPS[tipIndex]}
+      </p>
+    </div>
+  )
+}
+
+function FpsPerformanceBadge({ stats, assetPackLabel }: { stats: RenderStats; assetPackLabel: string }): JSX.Element {
+  const fps = stats.fps
+  let badgeClass = 'performance-badge fps-badge'
+  let dotClass = 'fps-dot'
+  let statusText = 'Tốt'
+
+  if (fps >= 50) {
+    badgeClass += ' fps-excellent'
+    dotClass += ' dot-excellent'
+    statusText = 'Mượt mà'
+  } else if (fps >= 30) {
+    badgeClass += ' fps-good'
+    dotClass += ' dot-good'
+    statusText = 'Ổn định'
+  } else if (fps > 0) {
+    badgeClass += ' fps-warning'
+    dotClass += ' dot-warning'
+    statusText = 'Khung hình thấp'
+  }
+
+  const tooltip = `Hiệu năng: ${fps || '—'} FPS (${statusText})
+• Draw Calls: ${stats.drawCalls}
+• Triangles: ${stats.triangles.toLocaleString()}
+• Textures: ${stats.textures}
+• Gói Texture: ${assetPackLabel} (${stats.assetPackReason})`
+
+  return (
+    <span className={badgeClass} title={tooltip} aria-label={`Tốc độ khung hình: ${fps} FPS`}>
+      <span className={dotClass} aria-hidden="true" />
+      <span className="fps-number">{fps || '—'}</span>
+      <span className="fps-unit">FPS</span>
+    </span>
+  )
+}
+
+const BIOME_EMOJIS: Record<string, string> = {
+  biển: '🌊',
+  'bờ cát': '🏖️',
+  'đồng cỏ': '🌱',
+  'sa mạc': '🏜️',
+  rừng: '🌲',
+  'rừng nhiệt đới': '🌴',
+  'đầm lầy': '🐊',
+  đồi: '⛰️',
+  núi: '🏔️',
+  tuyết: '❄️',
+  'san hô': '🪸',
+  'hoa anh đào': '🌸',
+  'núi lửa': '🌋',
+  'hẻm núi': '🏜️',
+  'sông băng': '🧊',
+}
+
+function TileHoverInspector({ hovered, isAvatarMode }: { hovered: HoveredTile | undefined; isAvatarMode: boolean }): JSX.Element | null {
+  if (!hovered?.tile || isAvatarMode) return null
+  const { tile } = hovered
+  const emoji = BIOME_EMOJIS[tile.biome] ?? '🗺️'
+  const resourcePct = Math.round(tile.resources * 100)
+
+  return (
+    <div className="hud-floating-tile-inspector" aria-hidden="true">
+      <div className="fti-header">
+        <span className="fti-emoji">{emoji}</span>
+        <div className="fti-title-group">
+          <span className="fti-name">{tile.biome}</span>
+          <span className="fti-coords">X:{tile.x + 1} Z:{tile.z + 1}</span>
+        </div>
+      </div>
+      <div className="fti-stats-grid">
+        <div className="fti-stat-pill">
+          <span className="fti-stat-lbl">Độ cao</span>
+          <span className="fti-stat-val">{(tile.height * 10).toFixed(1)}m</span>
+        </div>
+        <div className="fti-stat-pill">
+          <span className="fti-stat-lbl">Độ ẩm</span>
+          <span className="fti-stat-val">{Math.round(tile.moisture * 100)}%</span>
+        </div>
+        <div className="fti-stat-pill">
+          <span className="fti-stat-lbl">Đất đai</span>
+          <span className="fti-stat-val">{tile.soil}</span>
+        </div>
+        <div className="fti-stat-pill">
+          <span className="fti-stat-lbl">Tài nguyên</span>
+          <span className="fti-stat-val">{resourcePct}%</span>
+        </div>
+      </div>
+    </div>
+  )
+}
 
 type DrawerSide = 'left' | 'right' | null
 type DrawerTrigger = 'world' | 'player' | 'simulation'
@@ -881,7 +1002,7 @@ export default function App(): JSX.Element {
       <a className="skip-link" href="#game-map">Bỏ qua HUD, đến bản đồ</a>
       <section id="game-map" className="world-stage" aria-label="Bản đồ và điều khiển thế giới" tabIndex={-1}>
         <GameErrorBoundary>
-          <Suspense fallback={worldLoadingFallback}>
+          <Suspense fallback={<AetheriaWorldLoading />}>
             <WorldViewport
               world={session.world}
               simulation={session.simulation}
@@ -972,7 +1093,7 @@ export default function App(): JSX.Element {
               >
                 🛠 LOGS [F2]
               </button>
-              <span className="performance-badge" title="Chỉ số hiệu năng">{renderStats.fps || '—'} FPS</span>
+              <FpsPerformanceBadge stats={renderStats} assetPackLabel={assetPackLabel} />
               <span className="asset-pack-badge" title={renderStats.assetPackReason}>{assetPackLabel}</span>
               <label className="quality-select" htmlFor="quality-profile">
                 <select
@@ -1145,6 +1266,9 @@ export default function App(): JSX.Element {
             hoveredTile={hoveredTile}
             onSelectTile={handleMinimapSelectTile}
           />
+
+          {/* Floating Tile Inspector Tooltip */}
+          <TileHoverInspector hovered={hoveredTile} isAvatarMode={isAvatarMode} />
 
           {/* Map Instructions & Readout */}
           <div className="map-instructions">

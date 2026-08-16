@@ -13,10 +13,10 @@ import {
 
 describe('render quality profiles', () => {
   it('uses bounded DPR profiles and lowers auto quality under sustained low FPS', () => {
-    expect(qualitySettings('low').maxDpr).toBe(0.8)
-    expect(qualitySettings('medium').maxDpr).toBe(1.25)
-    expect(qualitySettings('high').maxDpr).toBe(2)
-    expect(qualitySettings('ultra').shadowMapSize).toBe(4096)
+    expect(qualitySettings('low').maxDpr).toBe(0.75)
+    expect(qualitySettings('medium').maxDpr).toBe(1.0)
+    expect(qualitySettings('high').maxDpr).toBe(1.25)
+    expect(qualitySettings('ultra').shadowMapSize).toBe(2048)
     expect(qualitySettings('low').rainDropCount).toBeLessThan(qualitySettings('high').rainDropCount)
     expect(qualitySettings('high').rainDropCount).toBeLessThan(qualitySettings('ultra').rainDropCount)
     expect(qualitySettings('low').groundDetailDensity).toBe(0)
@@ -52,9 +52,9 @@ describe('render quality profiles', () => {
 
   it('reduces water mesh detail deterministically for low quality', () => {
     expect(waterSegmentsFor('low', 36)).toBe(9)
-    expect(waterSegmentsFor('medium', 36)).toBe(20)
+    expect(waterSegmentsFor('medium', 36)).toBe(18)
     expect(waterSegmentsFor('high', 36)).toBe(36)
-    expect(waterSegmentsFor('ultra', 36)).toBe(47)
+    expect(waterSegmentsFor('ultra', 36)).toBe(43)
     expect(waterSegmentsFor('low', Number.NaN)).toBe(6)
   })
 
