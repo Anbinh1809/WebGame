@@ -23,6 +23,40 @@ interface SimulationPanelProps {
 }
 
 const SPEEDS: SimulationSpeed[] = [1, 2, 4, 8]
+const SPEED_LABELS: Record<SimulationSpeed, string> = { 0: '⏸', 1: '▶ 1×', 2: '⏩ 2×', 4: '⏭ 4×', 8: '💨 8×' }
+
+function StatBar({ value, max, color }: { value: number; max: number; color: string }): JSX.Element {
+  const pct = Math.min(100, Math.round((value / Math.max(1, max)) * 100))
+  return (
+    <div className="sim-stat-bar-track" role="progressbar" aria-valuenow={pct} aria-valuemin={0} aria-valuemax={100}>
+      <div className="sim-stat-bar-fill" style={{ width: `${pct}%`, background: color }} />
+    </div>
+  )
+}
+
+function DayNightIndicator({ tick }: { tick: number }): JSX.Element {
+  const phase = (tick % 96) / 96
+  const sunAngle = phase * Math.PI * 2
+  const sunArc = Math.sin(sunAngle)
+
+  let icon = '☀️'
+  let label = 'Ban ngày'
+  let cls = 'day'
+  if (sunArc < -0.35) { icon = '🌙'; label = 'Đêm tối'; cls = 'night' }
+  else if (sunArc < 0 && sunArc >= -0.35) { icon = '🌆'; label = 'Hoàng hôn'; cls = 'dusk' }
+  else if (sunArc >= 0 && sunArc < 0.18) { icon = '🌅'; label = 'Bình minh'; cls = 'dawn' }
+
+  const hours = Math.floor(phase * 24)
+  const mins = Math.floor((phase * 24 - hours) * 60)
+  const timeStr = `${String(hours).padStart(2, '0')}:${String(mins).padStart(2, '0')}`
+
+  return (
+    <span className={`day-night-indicator dn-${cls}`} title={label}>
+      <span className="dn-icon">{icon}</span>
+      <span className="dn-time">{timeStr}</span>
+    </span>
+  )
+}
 
 export function SimulationPanel({
   world,
@@ -60,35 +94,92 @@ export function SimulationPanel({
   return (
     <div className="simulation-stack">
       <section className="panel-surface simulation-panel" aria-labelledby="simulation-heading">
-        <div className="panel-heading">
-          <div>
+
+        {/* ── Village Header ── */}
+        <div className="sim-village-header">
+          <div className="sim-village-title">
             <span className="eyebrow">Mô phỏng theo nhịp cố định</span>
             <h2 id="simulation-heading">{village?.name ?? 'Thung lũng trống'}</h2>
           </div>
-          <span className={`weather-dot ${simulation.activeStorm ? 'is-stormy' : ''}`}>
-            {simulation.activeStorm ? 'Mưa lớn' : 'Trời quang'}
-          </span>
+          <div className="sim-header-badges">
+            <DayNightIndicator tick={simulation.tick} />
+            <span className={`weather-dot ${simulation.activeStorm ? 'is-stormy' : ''}`}>
+              {simulation.activeStorm ? '⛈️ Mưa lớn' : '☀️ Trời quang'}
+            </span>
+          </div>
         </div>
+
         {village ? (
-          <div className="stat-grid" role="group" aria-label="Chỉ số của làng">
-            <div><span>Dân số</span><strong>{village.population}</strong></div>
-            <div><span>Lương thực</span><strong>{Math.round(village.food)}</strong></div>
-            <div><span>Hạnh phúc</span><strong>{Math.round(village.happiness)}%</strong></div>
-            <div><span>Thời đại</span><strong>{villageEraLabel(village.era)}</strong></div>
-            <div><span>Kỷ nguyên</span><strong className="text-cyan">{village.epoch ?? 'Kỷ Tiền Cambri (Đơn Bào)'}</strong></div>
-            <div><span>Điểm DNA</span><strong className="text-emerald">+{Math.round(village.dnaPoints ?? 15)} DNA</strong></div>
-          </div>
+          <>
+            {/* ── Era Badge ── */}
+            <div className="sim-era-badge">
+              <span className="era-epoch">{village.epoch ?? 'Kỷ Tiền Cambri'}</span>
+              <span className="era-label">⚔️ {villageEraLabel(village.era)}</span>
+              <span className="era-dna">🧬 +{Math.round(village.dnaPoints ?? 15)} DNA</span>
+            </div>
+
+            {/* ── Stat Cards ── */}
+            <div className="sim-stat-cards" role="group" aria-label="Chỉ số của làng">
+              <div className="sim-stat-card">
+                <div className="ssc-header">
+                  <span className="ssc-icon">👥</span>
+                  <span className="ssc-label">Dân số</span>
+                  <strong className="ssc-value">{village.population}</strong>
+                </div>
+              </div>
+              <div className="sim-stat-card">
+                <div className="ssc-header">
+                  <span className="ssc-icon">🍖</span>
+                  <span className="ssc-label">Lương thực</span>
+                  <strong className="ssc-value">{Math.round(village.food)}</strong>
+                </div>
+                <StatBar value={village.food} max={500} color="linear-gradient(90deg, #f59e0b, #fbbf24)" />
+              </div>
+              <div className="sim-stat-card">
+                <div className="ssc-header">
+                  <span className="ssc-icon">😊</span>
+                  <span className="ssc-label">Hạnh phúc</span>
+                  <strong className="ssc-value" style={{ color: village.happiness >= 70 ? '#4ade80' : village.happiness >= 40 ? '#fbbf24' : '#f87171' }}>
+                    {Math.round(village.happiness)}%
+                  </strong>
+                </div>
+                <StatBar
+                  value={village.happiness}
+                  max={100}
+                  color={village.happiness >= 70 ? 'linear-gradient(90deg, #22c55e, #4ade80)' : village.happiness >= 40 ? 'linear-gradient(90deg, #d97706, #fbbf24)' : 'linear-gradient(90deg, #dc2626, #f87171)'}
+                />
+              </div>
+              <div className="sim-stat-card">
+                <div className="ssc-header">
+                  <span className="ssc-icon">🔬</span>
+                  <span className="ssc-label">Nghiên cứu</span>
+                  <strong className="ssc-value ssc-cyan">{Math.round(village.research)}</strong>
+                </div>
+                <StatBar value={village.research} max={nextTool?.researchCost ?? 200} color="linear-gradient(90deg, #0ea5e9, #38bdf8)" />
+              </div>
+              <div className="sim-stat-card">
+                <div className="ssc-header">
+                  <span className="ssc-icon">🌿</span>
+                  <span className="ssc-label">Sinh khối</span>
+                  <strong className="ssc-value ssc-emerald">{Math.round(village.biomass ?? 30)}</strong>
+                </div>
+                <StatBar value={village.biomass ?? 30} max={200} color="linear-gradient(90deg, #16a34a, #4ade80)" />
+              </div>
+              <div className="sim-stat-card">
+                <div className="ssc-header">
+                  <span className="ssc-icon">🦋</span>
+                  <span className="ssc-label">Đa dạng</span>
+                  <strong className="ssc-value ssc-violet">{village.biodiversity ?? 65}%</strong>
+                </div>
+                <StatBar value={village.biodiversity ?? 65} max={100} color="linear-gradient(90deg, #7c3aed, #c084fc)" />
+              </div>
+            </div>
+          </>
         ) : <p className="muted-copy">Chưa có cộng đồng nào trên bản đồ này.</p>}
-        {village ? (
-          <div className="council-stats" role="group" aria-label="Nghiên cứu, phòng vệ và lãnh thổ">
-            <span>Nghiên cứu <strong>{Math.round(village.research)}</strong><small>Tăng thu hoạch</small></span>
-            <span>Sinh khối <strong>{Math.round(village.biomass ?? 30)}</strong><small>Sức sống hệ sinh thái</small></span>
-            <span>Đa dạng <strong>{village.biodiversity ?? 65}%</strong><small>Hệ động thực vật</small></span>
-            <span>Phục hồi <strong>{Math.round(village.resilience)}%</strong><small>Không bị kẹt sau bão</small></span>
-          </div>
-        ) : null}
+
         <p className="decision-line">{village?.lastDecision ?? 'Chờ một câu chuyện bắt đầu.'}</p>
 
+        {/* ── Fauna Roster ── */}
         <section className="fauna-roster" aria-labelledby="fauna-heading">
           <div className="panel-heading compact-heading">
             <div>
@@ -115,7 +206,7 @@ export function SimulationPanel({
                 return (
                   <li key={tool.id} className={unlocked ? 'is-unlocked' : current ? 'is-current' : ''}>
                     <strong>{tool.label}</strong>
-                    <span>{unlocked ? 'Đã rèn' : current ? 'Kế tiếp' : 'Khoá'}</span>
+                    <span>{unlocked ? '✅ Đã rèn' : current ? '⚒️ Kế tiếp' : '🔒 Khoá'}</span>
                     <small>{tool.benefit}</small>
                   </li>
                 )
@@ -124,7 +215,7 @@ export function SimulationPanel({
             {nextTool ? (
               <div className="craft-action">
                 <button type="button" onClick={onDevelopVillageTool} disabled={!canDevelopTool}>
-                  Rèn {nextTool.label}
+                  {canDevelopTool ? '⚒️' : '🔒'} Rèn {nextTool.label}
                 </button>
                 <small>Cần {nextTool.researchCost} nghiên cứu · {nextTool.foodCost} lương thực</small>
               </div>
@@ -226,9 +317,16 @@ export function SimulationPanel({
           </section>
         ) : null}
 
+        {/* ── Time Controls (redesigned) ── */}
         <div className="time-controls" role="group" aria-label="Điều khiển thời gian">
-          <button type="button" className="pause-button" onClick={onPauseToggle} aria-pressed={simulation.paused} aria-keyshortcuts="Space">
-            {simulation.paused ? '▶ Tiếp tục' : 'Ⅱ Tạm dừng'}
+          <button
+            type="button"
+            className={`pause-button ${simulation.paused ? 'is-paused' : ''}`}
+            onClick={onPauseToggle}
+            aria-pressed={simulation.paused}
+            aria-keyshortcuts="Space"
+          >
+            {simulation.paused ? '▶ Tiếp tục' : '⏸ Tạm dừng'}
           </button>
           <div className="speed-buttons" role="group" aria-label="Tốc độ mô phỏng">
             {SPEEDS.map((speed) => (
@@ -239,7 +337,7 @@ export function SimulationPanel({
                 onClick={() => onSpeedChange(speed)}
                 aria-pressed={!simulation.paused && simulation.speed === speed}
               >
-                {speed}×
+                {SPEED_LABELS[speed]}
               </button>
             ))}
           </div>
@@ -252,12 +350,27 @@ export function SimulationPanel({
             <span className="eyebrow">Quan sát thế giới</span>
             <h2 id="lens-heading">Góc nhìn câu chuyện</h2>
           </div>
-          <button type="button" className="icon-button" onClick={onPhoto} aria-label="Chụp ảnh thế giới PNG">⌑</button>
+          <button type="button" className="icon-button" onClick={onPhoto} aria-label="Chụp ảnh thế giới PNG">📷</button>
         </div>
         {selected ? (
-          <p>
-            Ô <strong>{selected.x + 1}, {selected.z + 1}</strong>: {selected.biome}, đất {selected.soil}; tài nguyên {Math.round(selected.resources * 100)}%.
-          </p>
+          <div className="tile-inspector-card">
+            <div className="tic-row">
+              <span className="tic-label">📍 Vị trí</span>
+              <strong>Ô {selected.x + 1}, {selected.z + 1}</strong>
+            </div>
+            <div className="tic-row">
+              <span className="tic-label">🗺️ Biome</span>
+              <strong>{selected.biome}</strong>
+            </div>
+            <div className="tic-row">
+              <span className="tic-label">🌱 Đất</span>
+              <strong>{selected.soil}</strong>
+            </div>
+            <div className="tic-row">
+              <span className="tic-label">💎 Tài nguyên</span>
+              <strong>{Math.round(selected.resources * 100)}%</strong>
+            </div>
+          </div>
         ) : (
           <p>Rê chuột lên thế giới để đọc địa hình. Nhấp để áp dụng quyền năng đang chọn.</p>
         )}
