@@ -1,7 +1,7 @@
 import * as THREE from 'three'
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js'
-import type { SimulationState } from '../simulation/types'
+import type { SimulationState, VillageToolId } from '../simulation/types'
 import { villageToolTier } from '../simulation/progression'
 import { happinessAtTile } from '../simulation/metrics'
 import { createPrng, hash2d, seedToUint32 } from '../world/prng'
@@ -23,6 +23,7 @@ import { FaunaLayer } from './FaunaLayer'
 import { SettlerLayer } from './SettlerLayer'
 import type { SettlerPlacement } from './SettlerLayer'
 import { AnimatedFaunaLayer, AnimatedSettlerLayer } from './AnimatedActorLayers'
+import type { SettlerActivity } from './ActorMotion'
 import { AmbientLifeLayer } from './AmbientLifeLayer'
 import { SettlementModelLayer } from './SettlementModelLayer'
 import { ShipLayer } from './ShipLayer'
@@ -190,28 +191,50 @@ function createTerrainMaterial(): THREE.MeshStandardMaterial {
   })
 }
 
-/** Crossed blades give ground cover a readable silhouette without alpha textures or extra draw calls. */
+/** Rich multi-blade grass clump with blooming wildflower buds. */
 function createGrassClumpGeometry(): THREE.BufferGeometry {
-  const blades = [0, Math.PI / 3, (Math.PI * 2) / 3].map((angle) => {
-    const blade = new THREE.PlaneGeometry(0.12, 0.32)
-    blade.translate(0, 0.16, 0)
+  const blades = [
+    { w: 0.12, h: 0.32, angle: 0, tilt: 0.18, x: 0, z: 0 },
+    { w: 0.11, h: 0.36, angle: Math.PI / 3, tilt: -0.15, x: 0.03, z: 0.02 },
+    { w: 0.13, h: 0.30, angle: (Math.PI * 2) / 3, tilt: 0.22, x: -0.02, z: 0.03 },
+    { w: 0.10, h: 0.34, angle: Math.PI, tilt: -0.20, x: 0.01, z: -0.03 },
+    { w: 0.11, h: 0.28, angle: (Math.PI * 4) / 3, tilt: 0.16, x: -0.03, z: -0.02 },
+    { w: 0.12, h: 0.31, angle: (Math.PI * 5) / 3, tilt: -0.18, x: 0.02, z: -0.01 },
+  ].map(({ w, h, angle, tilt, x, z }) => {
+    const blade = new THREE.PlaneGeometry(w, h)
+    blade.translate(0, h / 2, 0)
+    blade.rotateX(tilt)
     blade.rotateY(angle)
+    blade.translate(x, 0, z)
     return blade
   })
-  const merged = mergeGeometries(blades, false)
-  for (const blade of blades) blade.dispose()
-  if (!merged) throw new Error('Could not build the grass-clump geometry.')
+
+  // Delicate wildflower blossom buds atop the grass clump
+  const flowerBuds = [
+    new THREE.SphereGeometry(0.042, 8, 6),
+    new THREE.SphereGeometry(0.036, 8, 6),
+  ]
+  flowerBuds[0]?.translate(-0.06, 0.33, 0.04)
+  flowerBuds[1]?.translate(0.07, 0.30, -0.05)
+
+  const merged = mergeGeometries([...blades, ...flowerBuds], false)
+  for (const b of blades) b.dispose()
+  for (const f of flowerBuds) f.dispose()
+  if (!merged) throw new Error('Could not build the lush grass-clump geometry.')
   merged.computeVertexNormals()
   return merged
 }
 
-/** A clustered canopy keeps distant deterministic trees readable without a raw hero-mesh cost. */
+/** A multi-layered lush organic canopy cluster with natural volume. */
 function createStylizedCanopyGeometry(): THREE.BufferGeometry {
   const lobes = [
-    [-0.17, -0.05, 0.04, 0.23],
-    [0.17, -0.01, -0.04, 0.24],
-    [0, 0.17, 0.02, 0.26],
-    [0, -0.11, -0.15, 0.2],
+    [-0.18, -0.06, 0.05, 0.26],
+    [0.18, -0.02, -0.05, 0.27],
+    [0, 0.18, 0.03, 0.29],
+    [0, -0.12, -0.16, 0.23],
+    [-0.08, 0.28, -0.04, 0.21],
+    [0.12, 0.12, 0.16, 0.24],
+    [-0.14, 0.10, -0.12, 0.22],
   ] as const
   const geometries = lobes.map(([x, y, z, radius]) => {
     const geometry = new THREE.IcosahedronGeometry(radius, 2)
@@ -1941,13 +1964,36 @@ export class WorldRenderer {
       const { x, y, z } = this.tilePosition(tile)
       const variation = hash2d(seed, tile.x, tile.z)
 
-      const supportsTrees = tile.forest || tile.biome === 'hoa anh đào' || tile.biome === 'rừng nhiệt đới' || tile.biome === 'rừng' || (tile.biome === 'đồng cỏ' && variation > 0.68)
+      const supportsTrees = tile.forest || tile.biome === 'hoa anh đào' || tile.biome === 'rừng nhiệt đới' || tile.biome === 'rừng' || (tile.biome === 'đồng cỏ' && variation > 0.65)
       if (supportsTrees && hash2d(seed ^ 0x15ac3d, tile.x, tile.z) < settings.vegetationDensity) {
-        const treeScaleX = 0.66 + variation * 0.42
-        const treeScaleY = 0.72 + hash2d(seed ^ 0x2d3d4f, tile.x, tile.z) * 0.8
-        const treeScaleZ = 0.66 + hash2d(seed ^ 0x7a1e3b, tile.z, tile.x) * 0.42
-        const treeHeight = 0.92 * treeScaleY
-        const trunkHeight = 0.28 + treeScaleY * 0.18
+        // Natural multi-tier tree height distribution (Sapling 22%, Mature 56%, Ancient Giant 22%)
+        const treeTier = hash2d(seed ^ 0x9b42e1, tile.x, tile.z)
+        let heightScale = 1.0
+        let widthScale = 1.0
+        let trunkScale = 1.0
+
+        if (treeTier < 0.22) {
+          // Sapling / Cây non
+          heightScale = 0.58 + hash2d(seed ^ 0x2d3d4f, tile.x, tile.z) * 0.22
+          widthScale = 0.68 + hash2d(seed ^ 0x7a1e3b, tile.z, tile.x) * 0.20
+          trunkScale = 0.75
+        } else if (treeTier > 0.78) {
+          // Ancient Giant Tree / Cây đại thụ ngàn năm
+          heightScale = 1.45 + hash2d(seed ^ 0x2d3d4f, tile.x, tile.z) * 0.68
+          widthScale = 1.35 + hash2d(seed ^ 0x7a1e3b, tile.z, tile.x) * 0.48
+          trunkScale = 1.35
+        } else {
+          // Mature Stately Tree / Cây trưởng thành
+          heightScale = 0.92 + hash2d(seed ^ 0x2d3d4f, tile.x, tile.z) * 0.40
+          widthScale = 0.92 + hash2d(seed ^ 0x7a1e3b, tile.z, tile.x) * 0.35
+          trunkScale = 1.0
+        }
+
+        const treeScaleX = (0.68 + variation * 0.38) * widthScale
+        const treeScaleY = heightScale
+        const treeScaleZ = (0.68 + hash2d(seed ^ 0x7a1e3b, tile.z, tile.x) * 0.38) * widthScale
+        const treeHeight = 0.95 * treeScaleY
+        const trunkHeight = (0.28 + treeScaleY * 0.22) * trunkScale
         const rotation = variation * Math.PI * 2
         treeCandidates.push({
           id: treeCandidates.length,
@@ -1993,45 +2039,59 @@ export class WorldRenderer {
       }
 
       const supportsVegetationDetail = tile.biome === 'đồng cỏ' || tile.biome === 'rừng' || tile.biome === 'rừng nhiệt đới' || tile.biome === 'đầm lầy' || tile.biome === 'tuyết' || tile.biome === 'đồi' || tile.biome === 'hoa anh đào' || tile.biome === 'sông băng'
-      if (supportsVegetationDetail && settings.groundDetailDensity > 0 && hash2d(seed ^ 0x1c53d7, tile.z, tile.x) < settings.groundDetailDensity && variation > 0.3 && groundDetailCandidates.length < this.groundDetails.instanceMatrix.count) {
-        const offsetX = (hash2d(seed ^ 0x37d8af, tile.z, tile.x) - 0.5) * 0.34
-        const offsetZ = (hash2d(seed ^ 0xae21d9, tile.x, tile.z) - 0.5) * 0.34
-        let detailScale = 1.0
-        let detailColor = 0x67984a
+      if (supportsVegetationDetail && settings.groundDetailDensity > 0 && hash2d(seed ^ 0x1c53d7, tile.z, tile.x) < settings.groundDetailDensity && variation > 0.22 && groundDetailCandidates.length < this.groundDetails.instanceMatrix.count) {
+        const clumpOffsets = tile.biome === 'đồng cỏ' || tile.biome === 'hoa anh đào'
+          ? [
+              [(hash2d(seed ^ 0x37d8af, tile.z, tile.x) - 0.5) * 0.36, (hash2d(seed ^ 0xae21d9, tile.x, tile.z) - 0.5) * 0.36],
+              [(hash2d(seed ^ 0x77b1e3, tile.x, tile.z) - 0.5) * 0.38, (hash2d(seed ^ 0x22c4f1, tile.z, tile.x) - 0.5) * 0.38],
+            ]
+          : [
+              [(hash2d(seed ^ 0x37d8af, tile.z, tile.x) - 0.5) * 0.34, (hash2d(seed ^ 0xae21d9, tile.x, tile.z) - 0.5) * 0.34],
+            ]
 
-        if (tile.biome === 'hoa anh đào') {
-          detailScale = 1.25
-          detailColor = variation > 0.6 ? 0xf472b6 : variation > 0.3 ? 0xfbcfe8 : 0xd946ef
-        } else if (tile.biome === 'rừng nhiệt đới') {
-          detailScale = 1.45
-          detailColor = variation > 0.7 ? 0xe0245e : variation > 0.4 ? 0x1db954 : 0x00f59b
-        } else if (tile.biome === 'đầm lầy') {
-          detailScale = 1.15
-          detailColor = variation > 0.5 ? 0x6ee7b7 : 0x3d5c3a
-        } else if (tile.biome === 'rừng') {
-          detailScale = 1.28
-          detailColor = variation > 0.7 ? 0xef4444 : variation > 0.4 ? 0x3d7b46 : 0xa855f7
-        } else if (tile.biome === 'đồng cỏ') {
-          detailScale = 0.72 + tile.moisture * 0.56
-          detailColor = variation > 0.85 ? 0xfacc15 : variation > 0.7 ? 0xef4444 : variation > 0.5 ? 0xa855f7 : 0x88ae54
-        } else if (tile.biome === 'sông băng' || tile.biome === 'tuyết') {
-          detailScale = 0.6
-          detailColor = variation > 0.5 ? 0xa5f3fc : 0xeaf5fa
-        } else {
-          detailScale = 0.5 + variation * 0.36
-          detailColor = 0x789248
+        for (let c = 0; c < clumpOffsets.length && groundDetailCandidates.length < this.groundDetails.instanceMatrix.count; c += 1) {
+          const offset = clumpOffsets[c]
+          if (!offset) continue
+          const offsetX = offset[0] ?? 0
+          const offsetZ = offset[1] ?? 0
+          const clumpVar = (variation + c * 0.37) % 1
+          let detailScale = 1.0
+          let detailColor = 0x67984a
+
+          if (tile.biome === 'hoa anh đào') {
+            detailScale = 1.15 + clumpVar * 0.4
+            detailColor = clumpVar > 0.65 ? 0xf472b6 : clumpVar > 0.35 ? 0xfbcfe8 : 0xd946ef
+          } else if (tile.biome === 'rừng nhiệt đới') {
+            detailScale = 1.35 + clumpVar * 0.4
+            detailColor = clumpVar > 0.7 ? 0xe0245e : clumpVar > 0.4 ? 0x1db954 : 0x00f59b
+          } else if (tile.biome === 'đầm lầy') {
+            detailScale = 1.1 + clumpVar * 0.3
+            detailColor = clumpVar > 0.5 ? 0x6ee7b7 : 0x3d5c3a
+          } else if (tile.biome === 'rừng') {
+            detailScale = 1.2 + clumpVar * 0.35
+            detailColor = clumpVar > 0.7 ? 0xef4444 : clumpVar > 0.4 ? 0x3d7b46 : 0xa855f7
+          } else if (tile.biome === 'đồng cỏ') {
+            detailScale = 0.85 + tile.moisture * 0.6 + clumpVar * 0.3
+            detailColor = clumpVar > 0.82 ? 0xfacc15 : clumpVar > 0.65 ? 0xec4899 : clumpVar > 0.45 ? 0x60a5fa : 0x88ae54
+          } else if (tile.biome === 'sông băng' || tile.biome === 'tuyết') {
+            detailScale = 0.65 + clumpVar * 0.25
+            detailColor = clumpVar > 0.5 ? 0xa5f3fc : 0xeaf5fa
+          } else {
+            detailScale = 0.6 + clumpVar * 0.36
+            detailColor = 0x789248
+          }
+
+          groundDetailCandidates.push({
+            id: groundDetailCandidates.length,
+            priority: x * x + z * z + hash2d(seed ^ 0x1c53d7, tile.x + c, tile.z + c) * 0.2,
+            x: x + offsetX,
+            y,
+            z: z + offsetZ,
+            scale: detailScale * (0.75 + tile.moisture * 0.35),
+            rotation: clumpVar * Math.PI * 2,
+            color: detailColor,
+          })
         }
-
-        groundDetailCandidates.push({
-          id: groundDetailCandidates.length,
-          priority: x * x + z * z + hash2d(seed ^ 0x1c53d7, tile.x, tile.z) * 0.2,
-          x: x + offsetX,
-          y,
-          z: z + offsetZ,
-          scale: detailScale * (0.75 + tile.moisture * 0.35),
-          rotation: variation * Math.PI * 2,
-          color: detailColor,
-        })
       }
 
       const supportsSandDetail = tile.biome === 'bờ cát' || tile.biome === 'sa mạc' || tile.biome === 'hẻm núi' || tile.biome === 'san hô' || tile.biome === 'núi lửa'
@@ -2518,29 +2578,70 @@ export class WorldRenderer {
           }
         }
       }
-      const visibleResidents = Math.min(6, Math.max(1, Math.floor(village.population / 4)))
+      const visibleResidents = Math.min(12, Math.max(3, Math.floor(village.population / 3) + 2))
       for (let index = 0; index < visibleResidents && settlerPlacements.length < MAX_SETTLERS; index += 1) {
-        const tool = village.tools[(index + Math.floor(hash2d(localSeed, index, 79) * village.tools.length)) % village.tools.length] ?? 'stone-handaxe'
-        const activity = this.simulation.activeStorm
-          ? index % 4 === 0 ? 'guard' : 'shelter'
-          : village.food < village.population * 1.35
-            ? 'forage'
-            : hasFarming && index % 3 === 0
-              ? 'farm'
-              : hasMetalwork && index % 4 === 0
-                ? 'craft'
-                : village.happiness < 38 && index % 5 === 0
-                  ? 'rest'
-                  : 'forage'
+        let activity: SettlerActivity = 'forage'
+        let tool: VillageToolId = 'stone-handaxe'
+
+        if (this.simulation.activeStorm) {
+          activity = index % 5 === 0 ? 'guard' : 'shelter'
+          tool = index % 5 === 0 ? (hasMetalwork ? 'iron-sword' : 'bronze-spear') : 'stone-handaxe'
+        } else {
+          const jobSlot = index % 8
+          switch (jobSlot) {
+            case 0:
+              // Chặt cây / Đốn củi
+              activity = 'chop'
+              tool = hasMetalwork ? 'titan-halberd' : toolTier >= 1 ? 'flint-axe' : 'stone-handaxe'
+              break
+            case 1:
+              // Đào quặng / Khai khoáng
+              activity = 'mine'
+              tool = hasMetalwork ? 'war-hammer' : toolTier >= 1 ? 'copper-hammer' : 'stone-hoe'
+              break
+            case 2:
+              // Xây nhà / Kiến thiết
+              activity = 'build'
+              tool = hasMetalwork ? 'iron-anvil' : 'copper-hammer'
+              break
+            case 3:
+              // Săn bắn
+              activity = 'hunt'
+              tool = toolTier >= 2 ? 'repeating-crossbow' : 'hunting-bow'
+              break
+            case 4:
+              // Canh tác đồng ruộng
+              activity = hasFarming ? 'farm' : 'forage'
+              tool = hasFarming ? 'wooden-plow' : 'stone-hoe'
+              break
+            case 5:
+              // Đúc rèn kim khí
+              activity = hasMetalwork ? 'craft' : 'build'
+              tool = hasMetalwork ? 'copper-hammer' : 'flint-axe'
+              break
+            case 6:
+              // Tuần tra canh gác
+              activity = 'guard'
+              tool = hasMetalwork ? 'iron-sword' : 'bronze-spear'
+              break
+            case 7:
+            default:
+              // Nghỉ ngơi quanh đống lửa / Hái lượm
+              activity = village.happiness > 45 && index % 2 === 0 ? 'rest' : 'forage'
+              tool = 'obsidian-dagger'
+              break
+          }
+        }
+
         settlerPlacements.push({
           id: `${village.id}-settler-${index}`,
           anchorTileX: home.x,
           anchorTileZ: home.z,
           phase: hash2d(localSeed, index, 2) * Math.PI * 2,
-          radius: 0.35 + (index % 4) * 0.18,
+          radius: 0.32 + (index % 5) * 0.16,
           scale: 0.85 + (index % 3) * 0.1,
-          clothingColor: index % 2 === 0 ? 0x8eb5d1 : 0xb87858,
-          skinColor: index % 3 === 0 ? 0xc98d65 : 0xf4d6a4,
+          clothingColor: index % 3 === 0 ? 0x8eb5d1 : index % 3 === 1 ? 0xb87858 : 0x5e8c61,
+          skinColor: index % 3 === 0 ? 0xc98d65 : index % 3 === 1 ? 0xf4d6a4 : 0xe0a880,
           tool,
           activity,
         })

@@ -253,11 +253,27 @@ export class SettlerLayer {
     updateColors: boolean,
   ): void {
     const visual = toolVisual(settler.tool)
-    const working = settler.activity === 'farm' || settler.activity === 'craft'
+    const activity = settler.activity ?? 'forage'
+    const isWorking = activity === 'farm' || activity === 'craft' || activity === 'chop' || activity === 'mine' || activity === 'build' || activity === 'hunt'
+
     for (const sideSign of [-1, 1] as const) {
-      const swing = working
-        ? sideSign < 0 ? workPulse * 0.32 : -workPulse
-        : walking ? sideSign < 0 ? -gait : gait * 0.32 : gait * 0.16
+      let swing = 0
+      if (isWorking) {
+        if (activity === 'chop') {
+          swing = sideSign < 0 ? workPulse * 0.25 : -Math.max(-0.2, workPulse * 1.4)
+        } else if (activity === 'mine') {
+          swing = sideSign < 0 ? workPulse * 0.2 : -Math.max(-0.1, workPulse * 1.5)
+        } else if (activity === 'build') {
+          swing = sideSign < 0 ? workPulse * 0.15 : -workPulse * 0.9
+        } else if (activity === 'hunt') {
+          swing = sideSign < 0 ? 0.35 : -0.65 + Math.sin(workPulse) * 0.15
+        } else {
+          swing = sideSign < 0 ? workPulse * 0.32 : -workPulse
+        }
+      } else {
+        swing = walking ? sideSign < 0 ? -gait : gait * 0.32 : gait * 0.16
+      }
+
       this.shoulderPosition.set(sideSign * 0.034 * settler.scale, 0.155 * settler.scale, 0).applyQuaternion(this.rootQuaternion).add(this.rootPosition)
       this.handPosition
         .set(sideSign * 0.052 * settler.scale, (0.095 - swing * 0.015) * settler.scale, swing * 0.032 * settler.scale)
@@ -266,16 +282,17 @@ export class SettlerLayer {
       this.setSegmentMatrix(this.arms, index * 2 + (sideSign < 0 ? 0 : 1), this.shoulderPosition, this.handPosition, 0.008 * settler.scale)
 
       if (sideSign > 0) {
+        const toolRotationZ = activity === 'hunt' ? 0.95 : activity === 'chop' || activity === 'mine' ? 0.72 : 0.54
         this.dummy.position.copy(this.handPosition).addScaledVector(this.forward, 0.008 * settler.scale)
         this.dummy.quaternion.copy(this.rootQuaternion)
-        this.dummy.rotateZ(0.54)
+        this.dummy.rotateZ(toolRotationZ)
         this.dummy.scale.set(1, visual.handleScale * settler.scale, 1)
         this.dummy.updateMatrix()
         this.toolHandles.setMatrixAt(index, this.dummy.matrix)
 
         this.dummy.position.copy(this.handPosition).addScaledVector(this.forward, (0.045 + visual.handleScale * 0.04) * settler.scale)
         this.dummy.quaternion.copy(this.rootQuaternion)
-        this.dummy.rotateZ(0.2)
+        this.dummy.rotateZ(toolRotationZ * 0.4)
         this.dummy.scale.set(...visual.headScale).multiplyScalar(settler.scale)
         this.dummy.updateMatrix()
         this.toolHeads.setMatrixAt(index, this.dummy.matrix)
