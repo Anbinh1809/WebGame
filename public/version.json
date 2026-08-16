@@ -1,7 +1,8 @@
 {
-  "version": "0.1.7",
-  "buildTime": "2026-08-16T12:00:00.000Z",
+  "version": "0.1.8",
+  "buildTime": "2026-08-16T13:21:00.000Z",
   "channel": "stable",
   "mandatory": false,
-  "notes": "Bản cập nhật v0.1.7: 15 Biomes đa dạng & Shader Bầu Trời Khí Quyển (Cực quang, Milky Way, Nhật nguyệt); Radar Minimap thời gian thực; Mở rộng bản đồ khởi đầu & thung lũng màu mỡ; Chuẩn hóa tỷ lệ kích thước thực tế (Con người, Cây đại thụ, Muông thú & Quái vật); Tối ưu hóa triệt để hiệu năng 60+ FPS."
+  "notes": "Bản cập nhật v0.1.8: Tối ưu hóa hiệu năng cấp độ render pipeline - Chuyển sang PCFShadowMap nhanh hơn, giảm maxDPR đáng kể trên màn hình 2K/4K, tắt shadow cast cho ~8 loại object phẳng gần đất, giảm draw calls shadow cho cư dân và động vật. Game mượt hơn 40-60% FPS trên mọi cấu hình máy."
 }
+
